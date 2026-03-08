@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "research-continuity-agent"
+version = "0.1.0"
+description = "Retrieval-first scaffolding for a research continuity agent."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "dmcp2003" }
+]
+dependencies = [
+  "pydantic>=2.8,<3.0",
+  "pydantic-settings>=2.4,<3.0",
+  "PyYAML>=6.0,<7.0",
+  "python-dotenv>=1.0,<2.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9.0"
+]
+vector = [
+  "chromadb>=0.5,<0.7"
+]
+pdf = [
+  "pypdf>=5.0,<6.0"
+]
+orchestration = [
+  "langgraph>=0.2,<1.0"
+]
+
+[project.scripts]
+rca-ingest = "cli.rca_ingest:main"
+rca-query = "cli.rca_query:main"
+rca-digest = "cli.rca_digest:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rca", "cli"]
+
+[tool.pytest.ini_options]
+testpaths = [
+  "tests",
+  "rca/mcp_servers/filesystem/tests",
+  "rca/mcp_servers/experiments/tests"
+]

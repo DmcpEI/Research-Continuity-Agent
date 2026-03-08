@@ -1,0 +1,9 @@
+[
+  {
+    "query": "What does the demo note describe?",
+    "expected_source_ids": [
+      "src:note/demo-note"
+    ],
+    "notes": "Populate this set with real source IDs after ingesting representative data."
+  }
+]

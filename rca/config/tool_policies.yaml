@@ -1,0 +1,22 @@
+flows:
+  ingest_flow:
+    allowed_tools:
+      - filesystem
+      - experiments
+      - pdf_extractor
+      - note_extractor
+      - git_extractor
+      - experiment_extractor
+      - graph_store
+      - vector_store
+      - event_log
+  retrieve_flow:
+    allowed_tools:
+      - filesystem
+      - graph_store
+      - vector_store
+  generate_flow:
+    allowed_tools:
+      - graph_store
+      - vector_store
+      - llm_client
