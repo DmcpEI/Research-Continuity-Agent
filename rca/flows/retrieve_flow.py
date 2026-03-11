@@ -57,16 +57,22 @@ class RetrieveFlow:
                 metadata=node.metadata,
             )
 
-        ordered_hits = sorted(hit_map.values(), key=lambda item: item.score, reverse=True)[:limit]
+        ordered_hits = sorted(hit_map.values(), key=lambda h: h.score, reverse=True)[:limit]
+
+        source_hits = self._expand_to_sources(ordered_hits)
+        source_hits_new = [h for h in source_hits if h.node_id not in hit_map]
+
+        final_hits = ordered_hits + source_hits_new
+
         seen_edge_keys: set[tuple[str, str, str]] = set()
-        for hit in ordered_hits:
+        for hit in final_hits:
             for edge in self.graph_store.list_edges(hit.node_id):
                 edge_key = (edge.source, edge.target, edge.kind.value)
                 if edge_key not in seen_edge_keys:
                     seen_edge_keys.add(edge_key)
                     related_edges.append(edge)
 
-        return RetrievalBundle(query=query, hits=ordered_hits, related_edges=related_edges)
+        return RetrievalBundle(query=query, hits=final_hits, related_edges=related_edges)
 
     def _merge_vector_hit(self, hit_map: dict[str, RetrievalHit], result: VectorQueryResult) -> None:
         node = self.graph_store.get_node(result.id)
@@ -83,3 +89,27 @@ class RetrieveFlow:
                 excerpt=excerpt,
                 metadata=metadata,
             )
+    
+    def _expand_to_sources(self, hits: list[RetrievalHit]) -> list[RetrievalHit]:
+        """Follow chunk → source edges to surface parent paper nodes."""
+        expanded: dict[str, RetrievalHit] = {}
+        
+        for hit in hits:
+            if hit.node_id.startswith("src:"):
+                if hit.node_id not in expanded:
+                    expanded[hit.node_id] = hit
+                continue
+            
+            edges = self.graph_store.list_edges(hit.node_id)
+            for edge in edges:
+                if edge.target == hit.node_id:
+                    parent = self.graph_store.get_node(edge.source)
+                    if parent and edge.source not in expanded:
+                        expanded[edge.source] = RetrievalHit(
+                            node_id=parent.id,
+                            score=hit.score * 0.95,
+                            title=parent.title,
+                            excerpt=(parent.text or "")[:240],
+                            metadata={**parent.metadata, "expanded_from": hit.node_id},
+                        )
+        return list(expanded.values())
