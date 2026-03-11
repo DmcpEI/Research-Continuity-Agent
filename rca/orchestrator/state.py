@@ -17,3 +17,4 @@ class OrchestratorState(BaseModel):
     retrieved_hits: list[dict[str, Any]] = Field(default_factory=list)
     final_output: dict[str, Any] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
+    trace: list[str] = Field(default_factory=list)
