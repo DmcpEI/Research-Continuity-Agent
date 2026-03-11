@@ -39,8 +39,21 @@ class VectorStore:
         self._collection = None
 
         if chromadb is not None:
+            from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+            from rca.config.settings import get_settings
+            settings = get_settings()
+
+            embedding_fn = OllamaEmbeddingFunction(
+                url=f"{settings.embedding_base_url}/api/embeddings",
+                model_name=settings.embedding_model,
+            )
+
             client = chromadb.PersistentClient(path=str(self.persist_dir))
-            self._collection = client.get_or_create_collection(name=self.collection_name)
+            self._collection = client.get_or_create_collection(
+                name=self.collection_name,
+                embedding_function=embedding_fn,
+                metadata={"hnsw:space": "cosine"},
+            )
 
     @property
     def backend(self) -> str:

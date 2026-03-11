@@ -33,7 +33,9 @@ class Settings(BaseSettings):
     tool_policy_path: Path = Field(default_factory=lambda: Path("rca/config/tool_policies.yaml"))
     chunk_size: int = 1200
     chunk_overlap: int = 150
-    embedding_dimensions: int = 32
+    embedding_dimensions: int = 768
+    embedding_model: str = "nomic-embed-text"
+    embedding_base_url: str = "http://localhost:11434"  # Ollama default
 
     if _HAS_PYDANTIC_SETTINGS:
         model_config = SettingsConfigDict(

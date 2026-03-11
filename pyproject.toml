@@ -16,7 +16,10 @@ dependencies = [
   "pydantic>=2.8,<3.0",
   "pydantic-settings>=2.4,<3.0",
   "PyYAML>=6.0,<7.0",
-  "python-dotenv>=1.0,<2.0"
+  "python-dotenv>=1.0,<2.0",
+  "mcp>=1.26.0",
+  "chromadb>=0.6.3",
+  "pypdf>=5.9.0",
 ]
 
 [project.optional-dependencies]
