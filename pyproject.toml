@@ -20,6 +20,9 @@ dependencies = [
   "mcp>=1.26.0",
   "chromadb>=0.6.3",
   "pypdf>=5.9.0",
+  "streamlit>=1.55.0",
+  "plotly>=6.6.0",
+  "networkx>=3.6.1",
 ]
 
 [project.optional-dependencies]
