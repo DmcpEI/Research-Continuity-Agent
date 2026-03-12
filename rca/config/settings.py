@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 768
     embedding_model: str = "nomic-embed-text"
     embedding_base_url: str = "http://localhost:11434"  # Ollama default
+    generation_model: str = "qwen2.5:14b"
 
     if _HAS_PYDANTIC_SETTINGS:
         model_config = SettingsConfigDict(

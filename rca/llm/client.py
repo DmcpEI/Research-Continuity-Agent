@@ -49,3 +49,33 @@ def _stable_embedding(text: str, dimensions: int) -> list[float]:
     for index in range(dimensions):
         vector.append(values[index % len(values)] / 255.0)
     return vector
+
+class OllamaLLMClient(LLMClient):
+    """Local generation via Ollama — free, private, no API key needed."""
+
+    def __init__(self, base_url: str, model: str) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+
+    def chat(self, messages: list[ChatMessage]) -> ChatResponse:
+        import json
+        import urllib.request
+
+        payload = {
+            "model": self.model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "stream": False,
+        }
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{self.base_url}/api/chat",
+            data=data,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read())
+        text = result["message"]["content"]
+        return ChatResponse(text=text, raw=result)
+
+    def embed(self, texts: list[str], dimensions: int = 768) -> list[list[float]]:
+        raise NotImplementedError("Use VectorStore directly for embeddings")
