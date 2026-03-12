@@ -39,7 +39,7 @@ class RetrieveFlow:
         self.graph_store = graph_store or GraphStore(self.settings.graph_db_path)
         self.vector_store = vector_store or VectorStore(self.settings.vector_dir, self.settings.default_collection)
 
-    def retrieve(self, query: str, limit: int = 5) -> RetrievalBundle:
+    def retrieve(self, query: str, limit: int = 10) -> RetrievalBundle:
         hit_map: dict[str, RetrievalHit] = {}
         related_edges: list[Edge] = []
 

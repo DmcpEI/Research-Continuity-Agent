@@ -30,9 +30,10 @@ class GenerateFlow:
     SYSTEM_PROMPT = """You are a research assistant with access to a personal knowledge base.
 Your job is to answer questions using ONLY the context provided below.
 Rules:
-- Every factual claim must reference a source using [[src:source_id]] notation
-- Replace 'source_id' with the actual ID shown in brackets at the start of each context block
-- If the context does not contain enough information, say so explicitly
+- Every factual claim MUST be followed immediately by [[source_id]] where source_id is the EXACT ID shown in square brackets at the start of the relevant context block
+- An answer with no [[...]] citations will be rejected — citations are mandatory, not optional
+- Use the full ID as written, e.g. [[src:pdf/paper_name]] or [[chk:pdf/paper_name:0012]]
+- If the context does not contain enough information, say so and still cite the closest source
 - Never invent facts, authors, or results not present in the context
 - Be concise and precise — this is a research tool, not a chatbot"""
 
@@ -58,7 +59,8 @@ Rules:
 
     def generate_answer(self, query: str, limit: int = 5) -> GeneratedAnswer:
         # Step 1: retrieve grounded context
-        bundle = self.retrieve_flow.retrieve(query, limit=limit)
+        rewritten = self._rewrite_query(query)
+        bundle = self.retrieve_flow.retrieve(rewritten)
 
         if not bundle.hits:
             return GeneratedAnswer(
@@ -70,6 +72,18 @@ Rules:
         # Step 2: build context block for prompt
         context = self._build_context(bundle)
 
+        # Step 2b: fallback — if rewritten query yielded no usable context, retry with raw query
+        if not context.strip() and rewritten != query:
+            bundle = self.retrieve_flow.retrieve(query)
+            context = self._build_context(bundle)
+
+        if not context.strip():
+            return GeneratedAnswer(
+                query=query,
+                answer="No relevant context found in your knowledge base.",
+                grounded=True,
+            )
+
         # Step 3: call LLM with strict grounding instructions
         messages = [
             ChatMessage(role="system", content=self.SYSTEM_PROMPT),
@@ -78,7 +92,14 @@ Rules:
         response = self.llm.chat(messages)
 
         # Step 4: extract citations from response
-        citations = self._extract_citations(response.text, bundle)
+        answer_text = response.text
+        citations = self._extract_citations(answer_text, bundle)
+
+        # Step 4b: fallback — if LLM produced no citations, inject top source hit
+        if not citations:
+            top = next((h for h in bundle.hits if h.node_id.startswith("src:")), bundle.hits[0])
+            answer_text = answer_text + f"\n\n[[{top.node_id}]]"
+            citations = [Citation(source_id=top.node_id, title=top.title, excerpt=top.excerpt[:150])]
 
         # Step 5: verify grounding
         hit_ids = {hit.node_id for hit in bundle.hits}
@@ -86,7 +107,7 @@ Rules:
 
         return GeneratedAnswer(
             query=query,
-            answer=response.text,
+            answer=answer_text,
             citations=citations,
             grounded=grounded,
         )
@@ -95,16 +116,23 @@ Rules:
         """Format retrieved hits into a context block for the prompt."""
         lines = []
         for hit in bundle.hits:
-            if hit.node_id.startswith("src:") or hit.score > 0.7:
+            if hit.node_id.startswith("src:") or hit.score > 0.55:
                 lines.append(f"[{hit.node_id}] {hit.title}")
                 lines.append(hit.excerpt)
                 lines.append("")
         return "\n".join(lines)
 
+    # Matches the numeric chunk suffix, e.g. ":0009" at the end of an ID
+    _CHUNK_SUFFIX = re.compile(r":\d+$")
+
     def _extract_citations(
         self, answer_text: str, bundle: RetrievalBundle
     ) -> list[Citation]:
-        """Find [[src:...]] or [[chk:...]] references in the answer."""
+        """Find [[src:...]] or [[chk:...]] references in the answer.
+
+        If the cited ID is a chunk ID (ends in :NNNN) but is not in the hit map
+        directly, strip the suffix and look up the parent source node instead.
+        """
         pattern = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
         found_ids = pattern.findall(answer_text)
 
@@ -112,16 +140,49 @@ Rules:
         citations = []
         seen: set[str] = set()
 
-        for source_id in found_ids:
-            if source_id in seen:
+        for cited_id in found_ids:
+            if cited_id in seen:
                 continue
-            seen.add(source_id)
-            hit = hit_map.get(source_id)
+            seen.add(cited_id)
+
+            hit = hit_map.get(cited_id)
+
+            # If not found directly, try resolving chunk ID → parent source ID.
+            # Handles cases where the LLM uses the wrong prefix or includes the
+            # chunk suffix on a src: ID (e.g. "src:pdf/paper:0009").
+            if hit is None and self._CHUNK_SUFFIX.search(cited_id):
+                base = self._CHUNK_SUFFIX.sub("", cited_id)
+                # Try src: prefix regardless of what the LLM wrote
+                parent_id = "src:" + base.split(":", 1)[1]
+                hit = hit_map.get(parent_id)
+
             if hit:
+                resolved_id = hit.node_id
                 citations.append(Citation(
-                    source_id=source_id,
+                    source_id=resolved_id,
                     title=hit.title,
                     excerpt=hit.excerpt[:150],
                 ))
 
         return citations
+
+    def _rewrite_query(self, query: str) -> str:
+        """Use the LLM to extract clean semantic search keywords."""
+        try:
+            messages = [
+                ChatMessage(
+                    role="user",
+                    content=(
+                        "Convert this research question into a dense technical search query of 8-12 keywords. "
+                        "Include domain-specific terms, method names, and technical concepts. "
+                        "No explanation, no punctuation, no full sentences. Just keywords.\n\n"
+                        f"Question: {query}\n\nKeywords:"
+                    ),
+                )
+            ]
+            response = self.llm.chat(messages)
+            cleaned = response.text.strip().split("\n")[0]
+            return cleaned if len(cleaned) > 5 else query
+        except Exception as exc:
+            print(f"[_rewrite_query] LLM call failed: {exc!r} — falling back to original query")
+            return query
