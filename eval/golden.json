@@ -179,7 +179,7 @@
     "id": "sgvl-001",
     "question": "What core limitation of pretrained VLMs does the scene graph paper target?",
     "expected_keywords": ["compositional", "bag of objects", "attributes", "relations", "structured scene"],
-    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision_language_models_using_scene_graphs",
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
     "difficulty": "medium",
     "category": "contribution"
   },
@@ -187,7 +187,7 @@
     "id": "sgvl-002",
     "question": "What are the two main mechanisms SGVL uses for incorporating scene graph information into VLMs?",
     "expected_keywords": ["graph-based hard negatives", "adaptive scene-graph tokens", "fine-grained captions", "image transformer"],
-    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision_language_models_using_scene_graphs",
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
     "difficulty": "medium",
     "category": "method"
   },
@@ -195,7 +195,7 @@
     "id": "sgvl-003",
     "question": "How much does SGVL improve BLIP on Winoground metrics?",
     "expected_keywords": ["3.8", "8.1", "6.5", "Winoground", "Text", "Image", "Group"],
-    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision_language_models_using_scene_graphs",
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
     "difficulty": "hard",
     "category": "results"
   },

@@ -112,34 +112,43 @@ RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, cover
 | Metric | Value |
 |---|---|
 | Grounded rate | 100% |
-| Citation precision | 73.3% |
-| Avg keyword hit rate | 0.164 |
-| Avg latency | 16.2 s |
+| Citation precision | 83.3% |
+| Avg keyword hit rate | 0.154 |
+| Avg latency | 17.1 s |
 
 **Breakdown by difficulty:**
 
 | Difficulty | Count | Grounded | Citation precision | Keyword hit rate |
 |---|---|---|---|---|
-| Easy | 6 | 100% | 83.3% | 0.439 |
-| Medium | 15 | 100% | 80.0% | 0.107 |
-| Hard | 9 | 100% | 55.6% | 0.076 |
+| Easy | 6 | 100% | 83.3% | 0.447 |
+| Medium | 15 | 100% | 86.7% | 0.083 |
+| Hard | 9 | 100% | 77.8% | 0.076 |
+
+**Retrieval ablations — hit@5 / hit@10 (n=30):**
+
+| Configuration | hit@5 | hit@10 |
+|---|---|---|
+| 1. vector-only | 80.0% | 96.7% |
+| 2. vector + FTS | 80.0% | 96.7% |
+| 3. vector + FTS + expansion | 80.0% | 96.7% |
+| 4. full pipeline (+ rewrite) | 90.0% | 93.3% |
 
 ### What the numbers mean
 
-- **73.3% citation precision** — chunk-to-source ID resolution fixed. The prior 26.7% was a code bug: `_extract_citations` skipped parent lookup when the chunk was already in the hit map, storing raw chunk IDs. Now always resolves to the parent `src:` node.
-- **Low keyword hit rate** — answers are plausible paraphrases but miss specific technical content. Retrieval is surfacing relevant documents but not always the right chunks.
-- **Hard split: 55.6%** — remaining citation misses are retrieval failures (wrong paper's chunks surface for cross-paper and detail queries), not citation logic.
-- **Root cause of remaining failures:** retrieval is the bottleneck. The LLM generates well from whatever it receives; the chunks it receives are sometimes from the wrong source.
+- **83.3% citation precision** — two fixes applied: (1) `_extract_citations` code bug where chunk IDs bypassed parent resolution (26.7% → 73.3%); (2) golden.json typo where `vision_language` should be `vision-language` in 3 sgvl expected_source fields (73.3% → 83.3%).
+- **96.7% hit@10 on plain vector search** — the correct source is almost always in the index and retrievable; the bottleneck is rank position, not embedding quality.
+- **Query rewriting improves hit@5 (+10pp)** but slightly hurts hit@10 (-3.3%) by drifting on queries with specific named entities.
+- **1 irreducible miss: jampacker-001** — "two main components of JamPacker" fails at top-10 under all strategies. Chunks describe components by function, not by name; the rewriter produces generic terms.
+- **Low keyword hit rate** — answers cite the right source but LLM paraphrases rather than quoting, missing specific technical terms. This is an answer quality issue, not a retrieval issue.
 
 ### Known failure modes
 
 | Failure class | Description |
 |---|---|
-| Query rewrite drift | Rewriter producing generic keywords instead of dense technical terms |
-| Score threshold sensitivity | 0.55 threshold excludes relevant chunks in hard queries |
-| Wrong-source retrieval | Off-topic chunks retrieved for cross-paper or detail queries, LLM cites them correctly |
-| Hallucination via wrong context | LLM generates plausible but wrong answers from off-topic chunks |
-| Cold-chain / safety attribute errors | Domain-specific failures on structured schema attributes |
+| Named-entity rewrite drift | Rewriter replaces specific system/scene names with generic terms |
+| Rank position sensitivity | Correct chunk exists in top-10 but scores below top-5 cutoff |
+| Function-vs-name chunk mismatch | Paper describes components by function; query asks by name (jampacker-001) |
+| LLM paraphrase | Answer cites correctly but misses specific numerical/keyword content |
 
 ---
 
@@ -326,5 +335,3 @@ uv run python eval/harness.py
 ## Project context
 
 Built alongside a Master's thesis at Instituto Superior Técnico on *Structured Perception for Packing-Relevant Inventory Generation* — a system that generates machine-readable grocery inventories from RGB images for robotic bagging. RCA serves as the research memory layer: ingesting related papers, tracking design decisions, and enabling grounded retrieval over the full literature corpus.
-
-The broader interest is **agent systems** — orchestration, memory, grounded reasoning, and decision-making infrastructure — not hardware robotics.

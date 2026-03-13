@@ -1,0 +1,15 @@
+.git
+.gitignore
+.rca/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+!.env.example
+eval/results/
+*.jsonl
+*.sqlite3
+docs/
+tests/

@@ -1,0 +1,42 @@
+# Research Continuity Agent — local Docker deployment
+#
+# Prerequisites
+# -------------
+# Ollama must be running on the host with both models pulled:
+#   ollama pull nomic-embed-text
+#   ollama pull qwen2.5:14b
+#
+# The container reaches host Ollama via http://host.docker.internal:11434.
+# On Linux this requires the extra_hosts entry below; on Mac Docker Desktop
+# host.docker.internal is available automatically.
+#
+# Usage
+#   docker compose up --build     # first run (builds image)
+#   docker compose up             # subsequent runs (reuses image)
+#   docker compose down           # stop and remove container
+
+services:
+  rca:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persist the knowledge store (SQLite graph + ChromaDB vectors) across restarts.
+      # The host path is relative to this file; create it if it doesn't exist.
+      - ./.rca:/app/.rca
+    env_file:
+      - .env
+    environment:
+      # Override Ollama URL so the container can reach the host's Ollama process.
+      # On Linux, Docker maps host-gateway → host machine IP automatically via extra_hosts.
+      RCA_EMBEDDING_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      # Needed on Linux; no-op on Mac Docker Desktop (already defined there).
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
