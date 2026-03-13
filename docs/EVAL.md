@@ -1,13 +1,23 @@
 # Evaluation
 
-Evaluation is retrieval-first.
+There are now two evaluation layers:
 
-`eval/golden_set.json` stores representative queries and the source IDs that should be retrieved.
+- `eval/run_eval.py` is retrieval-first and checks whether expected source IDs are surfaced.
+- `eval/harness.py` is generation-first and scores groundedness, citation correctness, keyword coverage, and latency.
 
-`eval/run_eval.py` executes the current retrieval flow against that set and writes a timestamped report into `eval/results/`.
+`eval/golden.json` is the default generation harness input. It stores 30 golden Q&A pairs with `id`, `question`, `expected_keywords`, `expected_source`, and `difficulty`.
 
-Suggested metrics:
+Run the generation harness with:
 
-- hit rate at `k`
-- whether expected source IDs appear in the top results
-- citation coverage once answer generation exists
+```bash
+uv run python eval/harness.py
+```
+
+The harness writes full per-question results to `eval/results/run_<timestamp>.json` and prints:
+
+- overall grounded rate
+- citation precision
+- average keyword hit rate
+- average latency
+- difficulty breakdown
+- top 5 failures by keyword hit rate

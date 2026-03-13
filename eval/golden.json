@@ -1,0 +1,242 @@
+[
+  {
+    "id": "pic2-001",
+    "question": "What are the two local perception pipelines evaluated in the robotic grocery bagging project?",
+    "expected_keywords": ["VLM-only", "YOLO+VLM", "Pipeline A", "Pipeline B"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "easy",
+    "category": "pipeline"
+  },
+  {
+    "id": "pic2-002",
+    "question": "What is the purpose of the canonical_name field in the grocery bagging inventory schema?",
+    "expected_keywords": ["canonical vocabulary", "85", "unknown_item", "closed vocabulary"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "easy",
+    "category": "schema"
+  },
+  {
+    "id": "pic2-003",
+    "question": "What micro-F1 scores do the best pipelines achieve under packing matching mode?",
+    "expected_keywords": ["0.38", "0.382", "Gemini", "0.357", "MiniCPM"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "medium",
+    "category": "results"
+  },
+  {
+    "id": "pic2-004",
+    "question": "Does adding YOLO improve packing-mode F1 scores in the grocery bagging evaluation?",
+    "expected_keywords": ["no", "precision drops", "false positives", "0.344", "0.315"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "medium",
+    "category": "results"
+  },
+  {
+    "id": "pic2-005",
+    "question": "What are the three matching modes used in the grocery bagging evaluation protocol?",
+    "expected_keywords": ["strict", "packing", "no_weight", "group", "packaging", "weight_class"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "easy",
+    "category": "evaluation"
+  },
+  {
+    "id": "pic2-006",
+    "question": "Which boolean attribute is most accurately predicted across all pipelines in the grocery bagging benchmark?",
+    "expected_keywords": ["edible", "0.95", "1.00", "food"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "medium",
+    "category": "results"
+  },
+  {
+    "id": "pic2-007",
+    "question": "What is the most dangerous attribute error observed in the SelfCheckoutMedium4 scene?",
+    "expected_keywords": ["edible", "shower gel", "MiniCPM", "hygiene", "food separation"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "hard",
+    "category": "error_analysis"
+  },
+  {
+    "id": "pic2-008",
+    "question": "What is the Hamming partial-credit score and what does it measure in the grocery bagging evaluation?",
+    "expected_keywords": ["per-item", "0 to 1", "attributes correct", "hamming_penalized", "unmatched"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "hard",
+    "category": "evaluation"
+  },
+  {
+    "id": "pic2-009",
+    "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+    "expected_keywords": ["edible", "leak_risk", "cold_chain", "hazard_class", "is_liquid"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "easy",
+    "category": "schema"
+  },
+  {
+    "id": "pic2-010",
+    "question": "What specific error does YOLO+VLM cause in the easy scene SelfCheckoutEasy2?",
+    "expected_keywords": ["water bottle", "quantity 6", "inflates", "heavy false positives"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "hard",
+    "category": "error_analysis"
+  },
+  {
+    "id": "review-001",
+    "question": "What research gap does the comprehensive review of robotized freight packing claim to fill?",
+    "expected_keywords": ["first review", "integrating robotics", "packing problems", "robotic packing cells"],
+    "expected_source": "src:pdf/comprehensive_review_of_robotized_freight_packing",
+    "difficulty": "medium",
+    "category": "contribution"
+  },
+  {
+    "id": "review-002",
+    "question": "What trend does the robotized freight packing review identify regarding online versus offline packing?",
+    "expected_keywords": ["online packing", "incomplete item information", "dynamic", "logistics"],
+    "expected_source": "src:pdf/comprehensive_review_of_robotized_freight_packing",
+    "difficulty": "medium",
+    "category": "findings"
+  },
+  {
+    "id": "review-003",
+    "question": "What key research gaps does the robotized freight packing review identify for future work?",
+    "expected_keywords": ["standardized terminology", "irregular shapes", "human-robot collaboration", "gripper", "sensor placement"],
+    "expected_source": "src:pdf/comprehensive_review_of_robotized_freight_packing",
+    "difficulty": "medium",
+    "category": "future_work"
+  },
+  {
+    "id": "review-004",
+    "question": "How is vertical stability handled in robotic packing studies according to the freight packing review?",
+    "expected_keywords": ["center-of-mass", "support hull", "heightmaps", "layer construction", "full-support"],
+    "expected_source": "src:pdf/comprehensive_review_of_robotized_freight_packing",
+    "difficulty": "hard",
+    "category": "method"
+  },
+  {
+    "id": "jampacker-001",
+    "question": "What are the two main components of JamPacker and what problem does each solve?",
+    "expected_keywords": ["Jampack", "FRM", "fault recovery", "packing algorithm", "reliability", "efficiency"],
+    "expected_source": "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "difficulty": "easy",
+    "category": "contribution"
+  },
+  {
+    "id": "jampacker-002",
+    "question": "What is the main algorithmic idea behind Jampack and why does it improve packing efficiency?",
+    "expected_keywords": ["internal corner points", "ICP", "free space", "bin utilization", "feasible packing points"],
+    "expected_source": "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "jampacker-003",
+    "question": "What role does the Fault Recovery Module play during robot execution in JamPacker?",
+    "expected_keywords": ["placement error", "offset corrections", "monitoring", "readjusts", "buffer space"],
+    "expected_source": "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "jampacker-004",
+    "question": "How does JamPacker compare with EP-FFD and LCGA in packing efficiency?",
+    "expected_keywords": ["outperforms", "1.62%", "10.51%", "fewer bins", "utilization"],
+    "expected_source": "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "difficulty": "hard",
+    "category": "results"
+  },
+  {
+    "id": "stablebinpacking-001",
+    "question": "What additional constraints does the stable bin packing paper add beyond standard packing constraints?",
+    "expected_keywords": ["stability", "manipulation feasibility", "kinematic", "collision-free", "containment"],
+    "expected_source": "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "difficulty": "medium",
+    "category": "contribution"
+  },
+  {
+    "id": "stablebinpacking-002",
+    "question": "What is the Heightmap-Minimization heuristic and what is its purpose in bin packing?",
+    "expected_keywords": ["HM", "pile volume", "loading direction", "heightmaps", "candidate placements"],
+    "expected_source": "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "stablebinpacking-003",
+    "question": "What execution success rates does the stable bin packing paper report for robot-packable plans?",
+    "expected_keywords": ["80%", "10-item", "17%", "non-overlap", "97.1%"],
+    "expected_source": "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "difficulty": "hard",
+    "category": "results"
+  },
+  {
+    "id": "stablebinpacking-004",
+    "question": "What does the fallback procedure contribute in the stable bin packing pipeline?",
+    "expected_keywords": ["3.2%", "fallback", "72.4%", "97.1%", "robustness"],
+    "expected_source": "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "difficulty": "hard",
+    "category": "results"
+  },
+  {
+    "id": "sgvl-001",
+    "question": "What core limitation of pretrained VLMs does the scene graph paper target?",
+    "expected_keywords": ["compositional", "bag of objects", "attributes", "relations", "structured scene"],
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision_language_models_using_scene_graphs",
+    "difficulty": "medium",
+    "category": "contribution"
+  },
+  {
+    "id": "sgvl-002",
+    "question": "What are the two main mechanisms SGVL uses for incorporating scene graph information into VLMs?",
+    "expected_keywords": ["graph-based hard negatives", "adaptive scene-graph tokens", "fine-grained captions", "image transformer"],
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision_language_models_using_scene_graphs",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "sgvl-003",
+    "question": "How much does SGVL improve BLIP on Winoground metrics?",
+    "expected_keywords": ["3.8", "8.1", "6.5", "Winoground", "Text", "Image", "Group"],
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision_language_models_using_scene_graphs",
+    "difficulty": "hard",
+    "category": "results"
+  },
+  {
+    "id": "vlmsurvey-001",
+    "question": "What shift in robot vision does the multimodal fusion survey attribute to the rise of VLMs?",
+    "expected_keywords": ["passive perception", "proactive", "zero-shot", "semantic understanding", "natural language"],
+    "expected_source": "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "difficulty": "medium",
+    "category": "findings"
+  },
+  {
+    "id": "vlmsurvey-002",
+    "question": "What major challenges does the multimodal fusion survey identify for VLMs in robotics?",
+    "expected_keywords": ["cross-modal alignment", "real-time", "domain adaptation", "latency", "interpretability"],
+    "expected_source": "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "difficulty": "medium",
+    "category": "challenges"
+  },
+  {
+    "id": "vlmsurvey-003",
+    "question": "What robotic vision tasks does the multimodal fusion survey cover?",
+    "expected_keywords": ["SLAM", "3D object detection", "navigation", "manipulation", "semantic scene understanding"],
+    "expected_source": "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "difficulty": "easy",
+    "category": "scope"
+  },
+  {
+    "id": "vlmsurvey-004",
+    "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+    "expected_keywords": ["self-supervised", "lightweight", "interpretability", "spatial memory", "human feedback"],
+    "expected_source": "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "difficulty": "medium",
+    "category": "future_work"
+  },
+  {
+    "id": "cross-001",
+    "question": "How does structured perception for grocery bagging differ from warehouse bin packing approaches?",
+    "expected_keywords": ["semantic constraints", "hygiene", "safety", "cold-chain", "geometry", "human acceptability"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "hard",
+    "category": "cross_paper"
+  }
+]

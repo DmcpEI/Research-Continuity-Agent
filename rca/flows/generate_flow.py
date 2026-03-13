@@ -130,8 +130,10 @@ Rules:
     ) -> list[Citation]:
         """Find [[src:...]] or [[chk:...]] references in the answer.
 
-        If the cited ID is a chunk ID (ends in :NNNN) but is not in the hit map
-        directly, strip the suffix and look up the parent source node instead.
+        Chunk IDs (ending in :NNNN) are always resolved to their parent src:
+        node — regardless of whether the chunk itself is in the hit map.
+        The previous guard (hit is None) caused chunk citations to be stored
+        as-is when the chunk was in the hit map, breaking source_correct checks.
         """
         pattern = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
         found_ids = pattern.findall(answer_text)
@@ -147,19 +149,18 @@ Rules:
 
             hit = hit_map.get(cited_id)
 
-            # If not found directly, try resolving chunk ID → parent source ID.
-            # Handles cases where the LLM uses the wrong prefix or includes the
-            # chunk suffix on a src: ID (e.g. "src:pdf/paper:0009").
-            if hit is None and self._CHUNK_SUFFIX.search(cited_id):
+            # Always resolve chunk IDs to their parent source node.
+            # Try src: prefix regardless of what the LLM wrote.
+            if self._CHUNK_SUFFIX.search(cited_id):
                 base = self._CHUNK_SUFFIX.sub("", cited_id)
-                # Try src: prefix regardless of what the LLM wrote
                 parent_id = "src:" + base.split(":", 1)[1]
-                hit = hit_map.get(parent_id)
+                parent_hit = hit_map.get(parent_id)
+                if parent_hit is not None:
+                    hit = parent_hit
 
             if hit:
-                resolved_id = hit.node_id
                 citations.append(Citation(
-                    source_id=resolved_id,
+                    source_id=hit.node_id,
                     title=hit.title,
                     excerpt=hit.excerpt[:150],
                 ))

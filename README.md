@@ -1,37 +1,61 @@
-# Research Continuity Agent
+# Research Continuity Agent (RCA)
 
-A personal research intelligence system built for a thesis on structured perception for robotic grocery bagging. It ingests research papers, experiments, code, and notes into a queryable knowledge graph, connecting them with semantic relationships so the researcher can query their own research the way you'd query a codebase. The system is retrieval-first: every piece of content receives a stable deterministic identifier, a graph node, and a vector embedding before any generation step is considered.
+A **local-first research knowledge system** that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations — built to support a Master's thesis on structured visual perception for robotic inventory generation.
+
+---
+
+## What it does
+
+Given a corpus of research PDFs, RCA:
+
+1. **Ingests** documents into a dual-store (vector embeddings + structured graph)
+2. **Rewrites** queries before retrieval to improve keyword density and recall
+3. **Retrieves** via hybrid search: semantic vector similarity + graph keyword FTS + graph neighbourhood expansion
+4. **Generates** grounded answers with inline citations enforced at the prompt level
+5. **Evaluates** answer quality against a golden Q&A set with retrieval, citation, and keyword metrics
 
 ---
 
 ## Architecture
 
-The system is organized into four functional layers.
+```
+PDF / Notes
+    │
+    ▼
+IngestFlow
+    ├── chunking + metadata extraction
+    ├── VectorStore  (ChromaDB — semantic retrieval index)
+    └── GraphStore   (SQLite — document registry, provenance, entity links)
+    │
+    ▼
+RetrieveFlow
+    ├── query rewriter  (LLM — dense keyword expansion before retrieval)
+    ├── vector search   (nomic-embed-text via Ollama)
+    ├── graph FTS       (SQLite full-text search)
+    └── graph expansion (neighbour traversal for related chunks)
+    │
+    ▼
+GenerateFlow
+    ├── grounded answer generation  (qwen2.5:14b via Ollama)
+    └── citation enforcement        (prompt-level + fallback injection)
+    │
+    ▼
+Orchestrator  (LangGraph-ready, stateless per query)
+```
 
-```
-┌─────────────────────────────────────────────┐
-│             Streamlit UI (app.py)           │
-│   Research Chat  │  Workspace  │  Ingest    │
-└─────────────────────────────────────────────┘
-                       │
-┌─────────────────────────────────────────────┐
-│              MCP Tool Layer                 │
-│   filesystem server  │  experiments server  │
-│   (ripgrep search)   │  (SQLite CRUD)       │
-└─────────────────────────────────────────────┘
-                       │
-┌─────────────────────────────────────────────┐
-│            Agent / Flow Layer               │
-│   IngestFlow  │  RetrieveFlow  │  GenerateFlow  │
-│   Extractors: PDF, Note, Git, Experiment    │
-└─────────────────────────────────────────────┘
-                       │
-┌─────────────────────────────────────────────┐
-│           Knowledge Store Layer             │
-│   GraphStore (SQLite)  │  VectorStore       │
-│   nodes + edges        │  (ChromaDB/Ollama) │
-└─────────────────────────────────────────────┘
-```
+**Why three stores?**
+
+| Store | Role | Justification |
+|---|---|---|
+| ChromaDB | Semantic retrieval index | Fast approximate nearest-neighbour over dense embeddings |
+| SQLite (graph) | Document registry, provenance, entity links | Structured traversal, explainable expansion, zero-dependency deployment |
+| SQLite (eval) | Run results, golden pairs | Reproducible evaluation without external services |
+
+Each store has a distinct function. The graph is not decorative — it enables chunk-to-source resolution, neighbour expansion for related content, and provenance tracking that vector search cannot provide alone.
+
+---
+
+## Component details
 
 **Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. `VectorStore` wraps ChromaDB with an Ollama embedding function using `nomic-embed-text` (768 dimensions, cosine similarity). When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
 
@@ -41,7 +65,7 @@ The system is organized into four functional layers.
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
 
-**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). Results are merged by node ID, then `_expand_to_sources` follows `contains` edges from chunk hits to surface parent source nodes. The final bundle contains up to 10 ranked hits (chunks + expanded sources) and the associated graph edges. Default retrieval limit is 10.
+**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). Results are merged by node ID, then `_expand_to_sources` follows `contains` edges from chunk hits to surface parent source nodes. The final bundle contains up to 10 ranked hits (chunks + expanded sources) and the associated graph edges.
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query rewriting** — the user's natural-language question is sent to the LLM to produce a dense 8–12 keyword technical search query, improving vector recall over conversational phrasing.
@@ -56,66 +80,122 @@ The system is organized into four functional layers.
 
 ---
 
-## Status
+## Storage layout
 
-The following components are implemented and have been exercised against real inputs.
+```
+.rca/
+├── vectors/          # ChromaDB persistent store
+└── graph.sqlite3     # Document graph, FTS index, metadata
+```
 
-| Component | State |
+---
+
+## Stack
+
+| Layer | Choice | Reason |
+|---|---|---|
+| Embeddings | nomic-embed-text (Ollama) | Local, fast, strong retrieval quality |
+| Generation | qwen2.5:14b (Ollama) | Best local model for structured grounded generation |
+| Vector DB | ChromaDB | Persistent, zero-infrastructure prototype |
+| Graph/metadata | SQLite | Zero-dependency, portable, easy to audit |
+| UI | Streamlit | Prototype interface — FastAPI migration planned |
+| Orchestration | Custom flows + LangGraph-ready | Modular, testable, evolvable |
+
+---
+
+## Evaluation
+
+RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, covering easy, medium, and hard questions across schema knowledge, method detail, quantitative results, error analysis, and cross-paper reasoning.
+
+### Current results (run 2026-03-13)
+
+| Metric | Value |
 |---|---|
-| Filesystem MCP server — sandboxed path resolution, `list_directory`, `read_text_file` (1 MB limit), ripgrep `search_text` | Working |
-| Experiments MCP server — `record_run`, `list_runs`, `update_run`, `get_run`, status lifecycle | Working |
-| `GraphStore` — `upsert_node`, `upsert_edge`, `get_node`, `list_edges`, `search_nodes` (LIKE on title/text) | Working |
-| `VectorStore` — ChromaDB backend with Ollama `nomic-embed-text` embeddings, cosine distance, JSON fallback | Working |
-| `IngestFlow` — PDF → text extraction → boundary-aware chunking → graph nodes + vector embeddings | Working |
-| `RetrieveFlow` — vector + lexical fusion, graph expansion to parent source nodes, scored hit bundles | Working |
-| `GenerateFlow` — LLM query rewriting, grounded answer generation, citation extraction and enforcement, chunk→source ID resolution, no-citation fallback | Working |
-| `OllamaLLMClient` — local generation via `qwen2.5:14b`, no API key | Working |
-| Streamlit UI — Research Chat, Workspace (Ingest/Map/Store tabs), dark/light theme, drag-and-drop PDF upload | Working |
-| Semantic retrieval returning similarity scores above 0.8 on real robotics-domain queries | Working |
-| Integration tests — ingest flow and generate flow end-to-end | Working |
+| Grounded rate | 100% |
+| Citation precision | 73.3% |
+| Avg keyword hit rate | 0.164 |
+| Avg latency | 16.2 s |
 
-The following are scaffolded (files exist, interfaces are defined) but not yet integrated end-to-end:
+**Breakdown by difficulty:**
 
-- Note and experiment extractors are wired into `IngestFlow` dispatch but have not been tested on real inputs at the same level as the PDF path
-- `orchestrator/` — LangGraph graph and routing logic are skeletal
-- `telemetry/` — tracing and metrics modules exist but are not instrumented across flows
-- MCP servers for `git`, `zotero`, and `arxiv` are reserved directories with no implementation
+| Difficulty | Count | Grounded | Citation precision | Keyword hit rate |
+|---|---|---|---|---|
+| Easy | 6 | 100% | 83.3% | 0.439 |
+| Medium | 15 | 100% | 80.0% | 0.107 |
+| Hard | 9 | 100% | 55.6% | 0.076 |
+
+### What the numbers mean
+
+- **73.3% citation precision** — chunk-to-source ID resolution fixed. The prior 26.7% was a code bug: `_extract_citations` skipped parent lookup when the chunk was already in the hit map, storing raw chunk IDs. Now always resolves to the parent `src:` node.
+- **Low keyword hit rate** — answers are plausible paraphrases but miss specific technical content. Retrieval is surfacing relevant documents but not always the right chunks.
+- **Hard split: 55.6%** — remaining citation misses are retrieval failures (wrong paper's chunks surface for cross-paper and detail queries), not citation logic.
+- **Root cause of remaining failures:** retrieval is the bottleneck. The LLM generates well from whatever it receives; the chunks it receives are sometimes from the wrong source.
+
+### Known failure modes
+
+| Failure class | Description |
+|---|---|
+| Query rewrite drift | Rewriter producing generic keywords instead of dense technical terms |
+| Score threshold sensitivity | 0.55 threshold excludes relevant chunks in hard queries |
+| Wrong-source retrieval | Off-topic chunks retrieved for cross-paper or detail queries, LLM cites them correctly |
+| Hallucination via wrong context | LLM generates plausible but wrong answers from off-topic chunks |
+| Cold-chain / safety attribute errors | Domain-specific failures on structured schema attributes |
+
+---
+
+## Roadmap
+
+### v1 — Local system (current)
+
+- [x] PDF ingest → chunking → dual-store (vector + graph)
+- [x] Hybrid retrieval (vector + FTS + graph expansion)
+- [x] Query rewriting before retrieval
+- [x] Grounded answer generation with citation enforcement
+- [x] Streamlit UI (chat + ingest + knowledge map + store)
+- [x] Integration tests
+- [x] Evaluation harness with golden Q&A pairs
+- [ ] **Fix citation precision** — source-ID resolution bug (priority)
+- [ ] **Retrieval ablations** — vector-only vs hybrid vs graph vs rewrite
+- [ ] **Expand golden set** — 30 → 100+ pairs
+- [ ] Observability — per-stage latency, token usage, retrieval provenance
+- [ ] arxiv MCP server
+- [ ] Zotero MCP server
+- [ ] Docker + one-command local boot
+- [ ] Weekly digest generator
+
+### v2 — Production-shaped deployment
+
+- FastAPI backend (replace Streamlit)
+- Next.js frontend
+- Background ingest worker (async)
+- Object storage for raw PDFs (S3 or equivalent)
+- Postgres + pgvector (replace ChromaDB in cloud deployment)
+- Structured logs + metrics dashboard
+- GitHub Actions CI (lint + tests + smoke deploy)
+- Docker Compose
+- Optional auth / multi-user namespaces
 
 ---
 
 ## Setup
 
-**Requirements**
-
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) — used for environment and dependency management
-- [ripgrep](https://github.com/BurntSushi/ripgrep) — required by the filesystem MCP server
-- [Ollama](https://ollama.com) — required for vector embeddings and answer generation
+**Requirements:** Python 3.11+, [uv](https://docs.astral.sh/uv/), [Ollama](https://ollama.com), [ripgrep](https://github.com/BurntSushi/ripgrep)
 
 ```bash
 brew install ripgrep
-```
 
-Install Ollama from [ollama.com](https://ollama.com), then pull both models:
-
-```bash
+# Pull models
 ollama pull nomic-embed-text   # embeddings (768-dim)
 ollama pull qwen2.5:14b        # answer generation and query rewriting
-```
 
-**Install dependencies**
+# Install dependencies
+uv sync
 
-```bash
-uv venv && uv sync
-```
-
-**Configure environment**
-
-```bash
+# Configure environment
 cp .env.example .env
 ```
 
-Edit `.env` as needed. The key variables are:
+Key environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -129,7 +209,7 @@ Edit `.env` as needed. The key variables are:
 
 Runtime directories under `.rca/` are created automatically on first use.
 
-> **Important:** always run Python through `uv run python` (or `uv run pytest`), not the system `python`. The system interpreter may lack `chromadb` and will silently fall back to the JSON vector backend, producing 0 vector hits.
+> **Always use `uv run python`.** Never bare `python` — the system Python lacks ChromaDB and silently falls back to the JSON backend, returning 0 documents.
 
 ---
 
@@ -143,7 +223,13 @@ uv run streamlit run app.py
 
 Opens at `http://localhost:8501`. Use *Research Chat* to ask questions about ingested papers. Use *Workspace → Ingest* to drag-and-drop PDFs directly from Finder.
 
-**Ingest a PDF programmatically**
+**Ingest documents**
+
+```bash
+uv run python -m rca.cli ingest path/to/papers/
+```
+
+Or programmatically:
 
 ```python
 from rca.flows.ingest_flow import IngestFlow
@@ -185,22 +271,6 @@ for hit in bundle.hits:
     print()
 ```
 
-**Query the vector store directly**
-
-```python
-from rca.store.vector_store import VectorStore
-from rca.config.settings import get_settings
-
-settings = get_settings()
-store = VectorStore(settings.vector_dir, settings.default_collection)
-
-results = store.query("structured perception for robotic manipulation", limit=5)
-for r in results:
-    print(f"[{r.score:.3f}] {r.id}")
-    print(r.document[:300])
-    print()
-```
-
 **Run tests**
 
 ```bash
@@ -209,9 +279,15 @@ uv run pytest tests/integration/test_generate_flow.py # generate pipeline only
 uv run pytest tests/integration/test_ingest_flow.py   # ingest pipeline only
 ```
 
+**Run evaluation harness**
+
+```bash
+uv run python eval/harness.py
+```
+
 ---
 
-## Project Structure
+## Project structure
 
 ```
 .
@@ -238,7 +314,7 @@ uv run pytest tests/integration/test_ingest_flow.py   # ingest pipeline only
 │       ├── zotero/             # Reserved — not implemented
 │       └── git/                # Reserved — not implemented
 ├── cli/                        # Entry points: rca-ingest, rca-query, rca-digest
-├── eval/                       # Golden question set and evaluation harness
+├── eval/                       # Golden question set, evaluation harness, and run results
 ├── tests/
 │   ├── unit/                   # Contract and store unit tests
 │   └── integration/            # End-to-end ingest and generate flow tests
@@ -247,15 +323,8 @@ uv run pytest tests/integration/test_ingest_flow.py   # ingest pipeline only
 
 ---
 
-## Roadmap
+## Project context
 
-| Phase | Status |
-|---|---|
-| Retrieve flow with graph expansion — semantic chunk retrieval + traversal to parent source nodes | ✅ Done |
-| GenerateFlow — LLM query rewriting, grounded generation, citation enforcement | ✅ Done |
-| Streamlit UI — Research Chat and Workspace with drag-and-drop ingest | ✅ Done |
-| Note and experiment extractors validated at the same level as the PDF path | Pending |
-| arxiv and Zotero MCP servers — pull papers directly and sync a Zotero library | Pending |
-| LangGraph orchestrator — replace skeletal graph with working state machine | Pending |
-| Weekly digest generator — structured summary of recent ingest activity with grounded citations | Pending |
-| Evaluation harness — run golden question set against retrieval pipeline, track precision/recall | Pending |
+Built alongside a Master's thesis at Instituto Superior Técnico on *Structured Perception for Packing-Relevant Inventory Generation* — a system that generates machine-readable grocery inventories from RGB images for robotic bagging. RCA serves as the research memory layer: ingesting related papers, tracking design decisions, and enabling grounded retrieval over the full literature corpus.
+
+The broader interest is **agent systems** — orchestration, memory, grounded reasoning, and decision-making infrastructure — not hardware robotics.
