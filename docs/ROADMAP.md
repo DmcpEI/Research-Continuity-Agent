@@ -13,7 +13,7 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 
 ---
 
-## Current state (v1 — 2026-03-14)
+## Current state (v1.1.0 — 2026-03-14)
 
 ### What works
 - [x] Project scaffold (uv, pydantic settings, stable ID system)
@@ -35,8 +35,8 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 |---|---|
 | Grounded rate | 100% |
 | Citation precision | 86.7% |
-| Avg keyword hit rate | 0.129 |
-| Avg latency | 16.0 s |
+| Avg keyword hit rate | 0.189 |
+| Avg latency | 16.8 s |
 
 Retrieval ablations — hit@5 / hit@10 (n=30):
 
@@ -44,28 +44,34 @@ Retrieval ablations — hit@5 / hit@10 (n=30):
 |---|---|---|
 | 1. vector-only | 80.0% | 96.7% |
 | 2. vector + keyword search | 80.0% | 96.7% |
-| 3. vector + keyword + expansion | 90.0% | 100.0% |
-| 4. full pipeline (+ query rewrite) | 96.7% | 100.0% |
+| 3. vector + keyword + expansion | 96.7% | 100.0% |
+| 4. full pipeline (+ query rewrite) | 100.0% | 100.0% |
 
 ### Known failure modes
-- **jampacker-001**: 1 irreducible semantic miss — chunks for "two main components of JamPacker" don't surface even at top-10. Query rewriter produces generic terms. Needs re-chunking or title-biased retrieval.
+- Citation selection drift on a small set of cases (`pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`)
+- Vector-only and keyword-only retrieval still under-rank a few questions that source expansion or rewrite recover
 - LLM generating plausible but wrong answers from off-topic chunks (keyword hit rate remains low)
 - Query rewriter drifts on queries containing specific named entities (scene names, system names)
 
 ---
 
-## v1 remaining — complete before tagging v1.0.0
+## Post-v1.1.0 backlog
 
 Priority order:
 
-### P0 — Fix citation precision ✅ 26.7% → 86.7%
+### v1.1.0 shipped
 - [x] Debug source-ID resolution — strip `:NNNN` suffix, verify parent `src:` lookup
 - [x] Re-run harness — citation precision 73.3% after code fix
 - [x] Fix golden.json typo — sgvl expected_source had `vision_language` (underscore) vs stored `vision-language` (hyphen). All 3 sgvl cases were false negatives. Citation precision 73.3% → 83.3%.
 - [x] Harden retrieval/citation ranking — lexical scoring + source expansion + rewrite sanitizer lifted precision to 86.7%.
-- [ ] Add per-chunk provenance logging to retrieval stage
+- [x] Remove partial-word false positives in title/text rescoring — exact word-token matching restored stable citation precision and pushed full-pipeline retrieval to 100.0% hit@5.
 
-### P1 — Retrieval ablations ✅ completed 2026-03-13
+### P0 — Remaining citation/observability work
+- [ ] Add per-chunk provenance logging to retrieval stage
+- [ ] Expose retrieved hit lists in harness results for easier ranking-vs-generation audits
+- [ ] Add deterministic fallback for no-answer / low-confidence citation cases
+
+### P1 — Retrieval ablations ✅ completed 2026-03-14
 
 hit@5 / hit@10 across 30 golden pairs (current):
 
@@ -73,20 +79,19 @@ hit@5 / hit@10 across 30 golden pairs (current):
 |---|---|---|
 | 1. vector-only | 80.0% | 96.7% |
 | 2. vector + keyword search | 80.0% | 96.7% |
-| 3. vector + keyword + expansion | 90.0% | 100.0% |
-| 4. full pipeline (+ query rewrite) | 96.7% | 100.0% |
+| 3. vector + keyword + expansion | 96.7% | 100.0% |
+| 4. full pipeline (+ query rewrite) | 100.0% | 100.0% |
 
 **Findings:**
 - Keyword search alone adds no lift over vector-only — same cases miss at all k. The bottleneck is embedding quality for specific queries when lexical terms don't appear verbatim in retrieved chunks.
-- Token-scored keyword search + source expansion lifts hit@5 by +10pp (80% → 90%) and achieves 100% hit@10. Once lexical hits carry real overlap scores, expanding chunk hits to parent source nodes recovers several rank-miss cases.
-- Query rewriting adds a further +6.7pp to hit@5 (90% → 96.7%) while preserving 100% hit@10. After salient-term retention in the rewrite sanitizer, named-entity drift no longer causes regressions at hit@10.
-- **1 irreducible miss: jampacker-001.** "What are the two main components of JamPacker?" fails at top-10 under all strategies. Root cause: chunks describe components by function not by name; the query vocabulary ("JamPacker") doesn't appear in the chunks that describe "Jampack" and "FRM".
+- Exact-word lexical rescoring + source expansion lift hit@5 by +16.7pp (80% → 96.7%) and achieve 100% hit@10. Removing partial-word false positives mattered as much as adding source expansion.
+- Query rewriting adds the final +3.3pp to hit@5 (96.7% → 100.0%) while preserving 100% hit@10.
+- The remaining harness misses are generation-side citation-selection problems, not full-pipeline retrieval misses.
 - Full results in `eval/results/ablations.json`.
 
 Remaining:
 - [ ] Measure: chunk size sensitivity (256 / 512 / 1024 tokens)
 - [ ] Measure: embedding model sensitivity (nomic vs alternatives)
-- [ ] Document results in `docs/EVAL.md` with real numbers
 
 ### P2 — Expand evaluation
 - [ ] Grow golden set: 30 → 100+ pairs across more papers
@@ -105,6 +110,12 @@ Remaining:
 - [ ] Answer rejection rate (grounded=False cases)
 - [ ] Export to structured logs in `eval/results/`
 
+### Open GitHub issues
+- [ ] `#1` `embed()` NotImplementedError — broken interface contract
+- [ ] `#3` Full document text stored on source node — performance / storage tradeoff
+- [ ] `#4` `_expand_to_sources` should filter by `contains` edge kind — correctness bug
+- [ ] `#5` `VectorStore` silent degradation when Chroma fails — operational hazard
+
 ### P4 — Ingestion robustness
 - [ ] Handle malformed / scanned PDFs gracefully
 - [ ] Idempotent re-ingest (skip already-indexed docs)
@@ -120,7 +131,7 @@ Remaining:
 - [ ] arxiv MCP server — pull papers by ID or search directly into RCA
 - [ ] Zotero MCP server — sync Zotero library into RCA automatically
 
-### Tag v1.0.0 when:
+### Tag v1.1.0 when:
 - Citation precision > 70% ✅ (86.7%)
 - Retrieval ablation table published ✅
 - Docker one-command boot working ✅
@@ -170,9 +181,9 @@ v2/migrate        ← v2 active development
 ```
 
 ```bash
-# Tag v1 before starting v2
-git tag v1.0.0 -m "v1: Streamlit + local Ollama + SQLite + ChromaDB"
-git push origin v1.0.0
+# Tag v1.1.0 before starting v2
+git tag v1.1.0 -m "v1.1.0: retrieval ranking hardening and eval-backed docs"
+git push origin v1.1.0
 
 # Start v2
 git checkout -b v2/migrate
@@ -202,7 +213,7 @@ git checkout -b v2/migrate
 > Built a local-first research knowledge system that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations. Designed an evaluation harness with golden queries, retrieval ablations, and failure analysis for citation errors and hallucination modes.
 
 **With numbers (v1 current):**
-> Citation precision improved from 26.7% → 86.7% across the citation-resolution fix, golden-set correction, and later retrieval/ranking hardening. Retrieval ablations (n=30): hit@5 80.0% vector-only, 90.0% with keyword expansion, 96.7% with the full pipeline; hit@10 reaches 100.0% once source expansion is enabled. One irreducible semantic miss remains (jampacker-001). Average latency is ~16.0s. 25 papers / 1826 chunks indexed.
+> Citation precision improved from 26.7% → 86.7% across the citation-resolution fix, golden-set correction, and later retrieval/ranking hardening. Retrieval ablations (n=30): hit@5 80.0% vector-only, 96.7% with graph expansion, and 100.0% with the full pipeline; hit@10 reaches 100.0% once source expansion is enabled. The remaining failures are citation-selection cases, not full-pipeline retrieval misses. Average latency is ~16.8s. 25 papers / 1826 chunks indexed.
 
 ---
 

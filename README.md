@@ -31,7 +31,7 @@ IngestFlow
 RetrieveFlow
     ├── query rewriter  (LLM — dense keyword expansion before retrieval)
     ├── vector search   (nomic-embed-text via Ollama)
-    ├── graph keyword   (SQLite `LIKE` search)
+    ├── graph keyword   (SQLite `LIKE` candidate search + exact-word rerank)
     └── graph expansion (neighbour traversal for related chunks)
     │
     ▼
@@ -43,15 +43,14 @@ GenerateFlow
 Orchestrator  (LangGraph-ready, stateless per query)
 ```
 
-**Why three stores?**
+**Why two stores?**
 
 | Store | Role | Justification |
 |---|---|---|
 | ChromaDB | Semantic retrieval index | Fast approximate nearest-neighbour over dense embeddings |
 | SQLite (graph) | Document registry, provenance, entity links | Structured traversal, explainable expansion, zero-dependency deployment |
-| SQLite (eval) | Run results, golden pairs | Reproducible evaluation without external services |
 
-Each store has a distinct function. The graph is not decorative — it enables chunk-to-source resolution, neighbour expansion for related content, and provenance tracking that vector search cannot provide alone.
+Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is not decorative — it enables chunk-to-source resolution, neighbour expansion for related content, and provenance tracking that vector search cannot provide alone.
 
 ---
 
@@ -65,7 +64,7 @@ Each store has a distinct function. The graph is not decorative — it enables c
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
 
-**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). Results are merged by node ID, then `_expand_to_sources` follows `contains` edges from chunk hits to surface parent source nodes. The final bundle contains up to 10 ranked hits (chunks + expanded sources) and the associated graph edges.
+**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). GraphStore returns lexical candidates; RetrieveFlow then reranks those candidates with exact word-token overlap over title and text before merging by node ID. `_expand_to_sources` promotes parent source nodes from chunk hits, and the final bundle contains ranked hits plus the associated graph edges.
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query rewriting** — the user's natural-language question is sent to the LLM to produce a dense 8–12 keyword technical search query, improving vector recall over conversational phrasing.
@@ -113,16 +112,16 @@ RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, cover
 |---|---|
 | Grounded rate | 100% |
 | Citation precision | 86.7% |
-| Avg keyword hit rate | 0.129 |
-| Avg latency | 16.0 s |
+| Avg keyword hit rate | 0.189 |
+| Avg latency | 16.8 s |
 
 **Breakdown by difficulty:**
 
 | Difficulty | Count | Grounded | Citation precision | Keyword hit rate |
 |---|---|---|---|---|
-| Easy | 6 | 100% | 100.0% | 0.331 |
-| Medium | 15 | 100% | 80.0% | 0.093 |
-| Hard | 9 | 100% | 88.9% | 0.054 |
+| Easy | 6 | 100% | 100.0% | 0.531 |
+| Medium | 15 | 100% | 80.0% | 0.080 |
+| Hard | 9 | 100% | 88.9% | 0.143 |
 
 **Retrieval ablations — hit@5 / hit@10 (n=30):**
 
@@ -130,32 +129,32 @@ RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, cover
 |---|---|---|
 | 1. vector-only | 80.0% | 96.7% |
 | 2. vector + keyword search | 80.0% | 96.7% |
-| 3. vector + keyword + expansion | 90.0% | 100.0% |
-| 4. full pipeline (+ query rewrite) | 96.7% | 100.0% |
+| 3. vector + keyword + expansion | 96.7% | 100.0% |
+| 4. full pipeline (+ query rewrite) | 100.0% | 100.0% |
 
 ### What the numbers mean
 
-- **86.7% citation precision** — the citation-resolution fix and golden-set correction removed the original false negatives, and the later retrieval/ranking hardening improved citation selection further.
+- **86.7% citation precision** — the citation-resolution fix and golden-set correction removed the original false negatives, and the later retrieval/ranking hardening preserved that level while improving retrieval quality.
 - **96.7% hit@10 on plain vector search** — the correct source is almost always in the index and retrievable; the bottleneck is rank position, not embedding quality.
-- **Token-scored keyword search + source expansion lifts hit@5 from 80% → 90%** — once lexical hits carry real overlap scores, expanding chunk hits to parent source nodes recovers several rank misses.
-- **Query rewriting adds a further +6.7pp** to hit@5 (90% → 96.7%) while preserving 100% hit@10.
-- **1 irreducible miss: jampacker-001** — "two main components of JamPacker" fails at top-10 under all strategies. Chunks describe components by function, not by name; the rewriter produces generic terms.
+- **Exact-word lexical rescoring + source expansion lifts hit@5 from 80% → 96.7%** — after removing partial-word false positives in title/text scoring, graph-backed retrieval recovers nearly every rank miss before rewrite is applied.
+- **Query rewriting closes the remaining top-5 miss** — the full pipeline now reaches 100.0% hit@5 / 100.0% hit@10 on the 30-case set.
+- **Remaining eval misses are generation-side citation selection cases** — `pic2-010`, `review-002`, `review-003`, and `stablebinpacking-002` still cite the wrong paper despite correct retrieval.
 - **Low keyword hit rate** — answers cite the right source but LLM paraphrases rather than quoting, missing specific technical terms. This is an answer quality issue, not a retrieval issue.
 
 ### Known failure modes
 
 | Failure class | Description |
 |---|---|
-| Named-entity rewrite drift | Rewriter replaces specific system/scene names with generic terms |
-| Rank position sensitivity | Correct chunk exists in top-10 but scores below top-5 cutoff |
-| Function-vs-name chunk mismatch | Paper describes components by function; query asks by name (jampacker-001) |
+| Citation selection drift | Correct source is retrieved but the LLM cites a distractor (`pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`) |
+| Vector-only rank miss | A few questions still need source expansion or rewrite to surface the right paper near the top (`jampacker-001`, `stablebinpacking-002`, `sgvl-003`) |
+| Named-entity rewrite drift | Rewriter can still replace specific system/scene names with generic terms |
 | LLM paraphrase | Answer cites correctly but misses specific numerical/keyword content |
 
 ---
 
 ## Roadmap
 
-### v1 — Local system (current)
+### v1.1 — Local system (current)
 
 - [x] PDF ingest → chunking → dual-store (vector + graph)
 - [x] Hybrid retrieval (vector + keyword search + graph expansion)
@@ -166,11 +165,12 @@ RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, cover
 - [x] Evaluation harness with golden Q&A pairs
 - [x] **Fix citation precision** — source-ID resolution bug
 - [x] **Retrieval ablations** — vector-only vs hybrid vs graph vs rewrite
+- [x] **Retrieval ranking hardening** — exact-word title/text rescoring to remove partial-word false positives
+- [x] Docker + one-command local boot
 - [ ] **Expand golden set** — 30 → 100+ pairs
 - [ ] Observability — per-stage latency, token usage, retrieval provenance
 - [ ] arxiv MCP server
 - [ ] Zotero MCP server
-- [ ] Docker + one-command local boot
 - [ ] Weekly digest generator
 
 ### v2 — Production-shaped deployment
@@ -236,7 +236,7 @@ Opens at `http://localhost:8501`. Use *Research Chat* to ask questions about ing
 **Ingest documents**
 
 ```bash
-uv run python -m rca.cli ingest path/to/papers/
+uv run rca-ingest path/to/papers/
 ```
 
 Or programmatically:
@@ -284,15 +284,16 @@ for hit in bundle.hits:
 **Run tests**
 
 ```bash
-uv run pytest                                          # all tests
-uv run pytest tests/integration/test_generate_flow.py # generate pipeline only
-uv run pytest tests/integration/test_ingest_flow.py   # ingest pipeline only
+uv run pytest -v
+uv run pytest tests/integration/test_ingest_flow.py
+uv run pytest tests/unit/test_retrieve_flow.py
 ```
 
 **Run evaluation harness**
 
 ```bash
 uv run python eval/harness.py
+uv run python eval/run_ablations.py
 ```
 
 ---

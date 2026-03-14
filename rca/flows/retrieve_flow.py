@@ -13,6 +13,7 @@ from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorQueryResult, VectorStore
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9][a-z0-9+_.-]*")
+TITLE_WORD_PATTERN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
     "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
@@ -136,10 +137,10 @@ class RetrieveFlow:
         if not query_tokens:
             return 0.5
 
-        title_tokens = self._tokenize(title)
-        text_tokens = self._tokenize(text)
-        title_overlap = len(query_tokens & title_tokens)
-        text_overlap = len(query_tokens & text_tokens)
+        title_word_tokens = set(TITLE_WORD_PATTERN.findall(title.lower()))
+        text_word_tokens = set(TITLE_WORD_PATTERN.findall(text.lower()))
+        title_overlap = sum(1 for token in query_tokens if token in title_word_tokens)
+        text_overlap = sum(1 for token in query_tokens if token in text_word_tokens)
 
         if title_overlap == 0 and text_overlap == 0:
             return 0.0

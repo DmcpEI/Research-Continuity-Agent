@@ -17,8 +17,8 @@ IngestFlow
     ▼
 RetrieveFlow
     ├── vector search  ← approximate nearest-neighbour (ChromaDB)
-    ├── graph keyword  ← LIKE query over chunk text (SQLite)
-    ├── score merge + dedup → ranked RetrievalBundle
+    ├── graph keyword  ← LIKE candidate query over title/text (SQLite)
+    ├── exact-word lexical rerank + dedup → ranked RetrievalBundle
     └── source expansion ← chunk → parent src: nodes
     │
     ▼
@@ -56,10 +56,11 @@ Node IDs follow the scheme defined in `rca/contracts/ids.py` — see [DATA_MODEL
 Hybrid retrieval over the dual-store. Called with a query string, returns a `RetrievalBundle`.
 
 1. **Vector search** — top-k approximate nearest-neighbour over embeddings
-2. **Graph keyword** — SQLite `LIKE` query over node title and text
-3. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
-4. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
-5. **Edge collection** — gathers related edges for the returned nodes
+2. **Graph keyword** — SQLite `LIKE` query over node title and text to fetch lexical candidates
+3. **Lexical rerank** — exact word-token overlap over title and text removes partial-word false positives before merge
+4. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
+5. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
+6. **Edge collection** — gathers related edges for the returned nodes
 
 **Ablation results** (hit@5, n=30 golden pairs):
 
@@ -67,10 +68,10 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 |---|---|---|
 | vector-only | 80.0% | 96.7% |
 | vector + keyword | 80.0% | 96.7% |
-| vector + keyword + expansion | 90.0% | 100.0% |
-| full + query rewrite | 96.7% | 100.0% |
+| vector + keyword + expansion | 96.7% | 100.0% |
+| full + query rewrite | 100.0% | 100.0% |
 
-Token-wise keyword scoring plus source expansion materially improve retrieval on edge cases; query rewriting adds a second lift on top of that.
+Exact-word lexical rescoring plus source expansion materially improve retrieval on edge cases; query rewriting closes the remaining top-5 miss on the current 30-case set.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 
@@ -90,7 +91,7 @@ Grounded answer generation with citation enforcement.
 SQLite-backed structured store. Three responsibilities:
 
 - **Document registry** — tracks all ingested sources with metadata and provenance
-- **Keyword search** — `LIKE` query over `lower(title)` and `lower(text)` for keyword retrieval
+- **Keyword search** — `LIKE` query over `lower(title)` and `lower(text)` for lexical candidate retrieval
 - **Entity graph** — nodes (papers, chunks, notes, experiments) and typed edges (contains, references, cites, related_to)
 
 See [DATA_MODEL.md](DATA_MODEL.md) for node kinds, edge kinds, and ID patterns.
@@ -123,9 +124,10 @@ User query
     │
     ├─ VectorStore.query(rewritten_query, limit=10)        → vector_hits
     ├─ GraphStore.search_nodes(rewritten_query, limit=10)  → keyword_hits
+    ├─ exact-word lexical rerank over title/text           → rescored_hits
     ├─ RetrieveFlow._expand_to_sources(...)                → source_hits
     │
-    ├─ merge(vector_hits, keyword_hits, source_hits) → RetrievalBundle
+    ├─ merge(vector_hits, rescored_hits, source_hits) → RetrievalBundle
     │
     ├─ GenerateFlow.generate_answer(query)
     │       ├─ format context from bundle.hits

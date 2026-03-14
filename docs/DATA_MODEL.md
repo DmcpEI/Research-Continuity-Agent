@@ -59,7 +59,7 @@ class Node(BaseModel):
     id: str           # unique node ID (src: or chk: scheme)
     kind: NodeKind    # one of the kinds above
     title: str        # human-readable label
-    text: str | None  # chunk text (None for source nodes)
+    text: str | None  # full extracted text for source nodes; chunk text for chunk nodes
     metadata: dict    # arbitrary key-value pairs (authors, year, venue, etc.)
     created_at: str   # ISO 8601 timestamp
 ```
@@ -79,7 +79,7 @@ Source: `rca/contracts/nodes.py` — `EdgeKind` enum
 | `related_to` | any → any | General semantic relation used for graph expansion |
 | `produced_by` | experiment/digest → source | An output was produced from a source |
 
-The `contains` edges are created at ingest time for every chunk. `derived_from`, `references`, `cites`, `related_to`, and `produced_by` are available in the contract but are not emitted by the current ingest flow. The current `RetrieveFlow` only follows chunk → source containment edges when expanding hits to parent source nodes.
+The `contains` edges are created at ingest time for every chunk. `derived_from`, `references`, `cites`, `related_to`, and `produced_by` are available in the contract but are not emitted by the current ingest flow. The intended parent-expansion relation is `contains`; issue `#4` tracks tightening `RetrieveFlow._expand_to_sources()` because the current implementation still matches any incoming edge whose target is the chunk.
 
 ### Edge fields
 
@@ -133,7 +133,7 @@ CREATE INDEX idx_edges_source  ON edges(source);
 CREATE INDEX idx_edges_target  ON edges(target);
 ```
 
-Text search over `nodes` is implemented as a token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))` — there is no FTS5 virtual table.
+Text search over `nodes` is implemented as a token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))` — there is no FTS5 virtual table. `RetrieveFlow` then reranks those SQL candidates with exact word-token overlap over title and text to avoid partial-word false positives.
 
 ---
 

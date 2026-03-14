@@ -47,16 +47,16 @@ Writes full results to `eval/results/run_<timestamp>.json`.
 |---|---|
 | Grounded rate | 100% |
 | **Citation precision** | **86.7%** |
-| Avg keyword hit rate | 0.129 |
-| Avg latency | 16.0 s |
+| Avg keyword hit rate | 0.189 |
+| Avg latency | 16.8 s |
 
 **By difficulty:**
 
 | Difficulty | Grounded | Citation precision | Keyword hit rate |
 |---|---|---|---|
-| Easy (n=6) | 100% | 100.0% | 0.331 |
-| Medium (n=15) | 100% | 80.0% | 0.093 |
-| Hard (n=9) | 100% | 88.9% | 0.054 |
+| Easy (n=6) | 100% | 100.0% | 0.531 |
+| Medium (n=15) | 100% | 80.0% | 0.080 |
+| Hard (n=9) | 100% | 88.9% | 0.143 |
 
 ### Progression
 
@@ -66,6 +66,7 @@ Writes full results to `eval/results/run_<timestamp>.json`.
 | After P0 fix | Source-ID resolution bug fixed (1 line) | 73.3% |
 | After golden fix | Typo in expected_source for sgvl papers | 83.3% |
 | After retrieval hardening | Query rewrite cleanup + lexical/source scoring fixes | 86.7% |
+| After exact-word rerank guardrails | Removed partial-word false positives in title/text rescoring | 86.7% (stable) |
 
 ---
 
@@ -83,16 +84,16 @@ Tests 4 retrieval configurations on all 30 golden pairs. Measures hit@5 and hit@
 |---|---|---|
 | 1. vector-only | 80.0% | 96.7% |
 | 2. vector + keyword | 80.0% | 96.7% |
-| 3. vector + keyword + expansion | 90.0% | 100.0% |
-| 4. full pipeline (+ query rewrite) | 96.7% | 100.0% |
+| 3. vector + keyword + expansion | 96.7% | 100.0% |
+| 4. full pipeline (+ query rewrite) | 100.0% | 100.0% |
 
 ### Interpretation
 
 **96.7% hit@10 on plain vector** — the corpus is still well-indexed, but one case remains a true semantic miss without help from graph-aware retrieval.
 
-**Source expansion now matters** — once lexical hits are token-scored instead of flattened to a constant score, expanding chunk hits to parent `src:` nodes recovers the missing paper on several edge cases and lifts hit@5 from 80.0% to 90.0%.
+**Source expansion plus exact-word lexical reranking now matter** — after removing partial-word false positives in title/text rescoring, graph-backed retrieval lifts hit@5 from 80.0% to 96.7% while preserving 100.0% hit@10.
 
-**Query rewriting still adds lift** — after cleanup and salient-term retention, full rewrite raises hit@5 from 90.0% to 96.7% while preserving 100.0% hit@10.
+**Query rewriting still adds the last increment** — after cleanup and salient-term retention, full rewrite closes the last remaining hit@5 miss and reaches 100.0% / 100.0%.
 
 ---
 
@@ -114,9 +115,13 @@ Tests 4 retrieval configurations on all 30 golden pairs. Measures hit@5 and hit@
 
 **Impact:** 73.3% → 83.3% citation precision.
 
-### Class 3 — Retrieval miss (active, 1 case)
+### Class 3 — Retrieval ranking bug (fixed)
 
-**Affected case:** `stablebinpacking-002` — the heuristic question still misses at hit@5 under the full rewrite pipeline, although top-10 now recovers it.
+**Root cause:** `RetrieveFlow._lexical_score` temporarily used raw substring membership for title and text while GraphStore candidate generation used SQL `LIKE` over tokenized query terms. That let partial-word matches such as `mode` → `models` and `jampack` → `jampacker` inflate distractor papers and reorder the top of the bundle.
+
+**Fix:** Title and text rescoring now use exact word-token membership after splitting on non-alphanumeric characters.
+
+**Impact:** The graph-backed raw retrieval path rose from 90.0% → 96.7% hit@5, and the full rewritten pipeline now reaches 100.0% hit@5 / hit@10.
 
 ### Class 4 — Citation selection miss (active, 4 cases)
 
@@ -136,6 +141,6 @@ Several questions are `source_correct=True` but `keyword_hits=0.0` — the right
 |---|---|
 | 30 golden pairs is a small evaluation set | Planned expansion to 100+ |
 | Keyword matching is case-insensitive substring — not semantic | Acceptable for technical terms, misses paraphrases |
-| `jampacker-001` is a genuine hard retrieval failure at all depths | Documented, not yet fixed |
+| A few questions still need graph expansion or rewrite to reach top-5 | Improved, but vector-only remains weaker on `jampacker-001`, `stablebinpacking-002`, and `sgvl-003` |
 | Query rewriter degrades performance on precise proper-noun queries | Needs conditional rewriting logic |
-| Generation latency ~16s | Acceptable for local Ollama; target <10s with top-5 retrieval |
+| Generation latency ~17s | Acceptable for local Ollama; target <10s with top-5 retrieval |
