@@ -86,6 +86,8 @@ Grounded answer generation with citation enforcement.
 7. **Resolve source IDs** — strips `:NNNN` suffix and resolves chunk IDs to parent `src:` nodes unconditionally
 8. **Ground check** — `grounded=True` if at least one valid citation was resolved to a returned hit
 
+**QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the six pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, and `llm_generate`. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.
+
 ### GraphStore (`rca/store/graph_store.py`)
 
 SQLite-backed structured store. Three responsibilities:

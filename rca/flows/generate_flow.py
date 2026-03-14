@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import re
+from time import perf_counter
 
 from pydantic import BaseModel, Field
 
 from rca.config.settings import Settings, get_settings
+from rca.contracts.trace import QueryTrace, StageTrace
 from rca.flows.retrieve_flow import RetrieveFlow, RetrievalBundle
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
 
@@ -22,6 +24,7 @@ class GeneratedAnswer(BaseModel):
     answer: str
     citations: list[Citation] = Field(default_factory=list)
     grounded: bool = False
+    trace: QueryTrace | None = None
 
 
 class GenerateFlow:
@@ -57,31 +60,48 @@ Rules:
         else:
             self.llm = EchoLLMClient()
 
-    def generate_answer(self, query: str, limit: int = 5) -> GeneratedAnswer:
+    def generate_answer(self, query: str, limit: int = 5, trace: QueryTrace | None = None) -> GeneratedAnswer:
+        trace = trace or QueryTrace(query=query)
+        trace.model = getattr(self.llm, "model", self.llm.__class__.__name__)
+
         # Step 1: retrieve grounded context
-        rewritten = self._rewrite_query(query)
-        bundle = self.retrieve_flow.retrieve(rewritten)
+        rewritten = self._rewrite_query(query, trace=trace)
+        if rewritten != query:
+            trace.rewritten_query = rewritten
+
+        bundle = self.retrieve_flow.retrieve(rewritten, limit=limit, trace=trace)
 
         if not bundle.hits:
+            self._append_warning(trace, "empty retrieval")
+            trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
             return GeneratedAnswer(
                 query=query,
                 answer="No relevant context found in your knowledge base.",
                 grounded=False,
+                trace=trace,
             )
 
         # Step 2: build context block for prompt
-        context = self._build_context(bundle)
+        context_hits = self._select_context_hits(bundle)
+        context = self._build_context(context_hits)
+        trace.context_node_ids = [hit.node_id for hit in context_hits]
 
         # Step 2b: fallback — if rewritten query yielded no usable context, retry with raw query
         if not context.strip() and rewritten != query:
-            bundle = self.retrieve_flow.retrieve(query)
-            context = self._build_context(bundle)
+            self._append_warning(trace, "rewritten retrieval produced empty context; retrying raw query")
+            bundle = self.retrieve_flow.retrieve(query, limit=limit, trace=trace)
+            context_hits = self._select_context_hits(bundle)
+            context = self._build_context(context_hits)
+            trace.context_node_ids = [hit.node_id for hit in context_hits]
 
         if not context.strip():
+            self._append_warning(trace, "empty retrieval context")
+            trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
             return GeneratedAnswer(
                 query=query,
                 answer="No relevant context found in your knowledge base.",
                 grounded=False,
+                trace=trace,
             )
 
         # Step 3: call LLM with strict grounding instructions
@@ -89,7 +109,16 @@ Rules:
             ChatMessage(role="system", content=self.SYSTEM_PROMPT),
             ChatMessage(role="user", content=f"Context:\n{context}\n\nQuestion: {query}"),
         ]
+        llm_started = perf_counter()
         response = self.llm.chat(messages)
+        trace.stages.append(
+            StageTrace(
+                name="llm_generate",
+                duration_ms=(perf_counter() - llm_started) * 1000.0,
+                hit_count=len(trace.context_node_ids),
+            )
+        )
+        self._accumulate_usage(trace, response.raw)
 
         # Step 4: extract citations from response
         answer_text = response.text
@@ -104,23 +133,32 @@ Rules:
         # Step 5: verify grounding
         hit_ids = {hit.node_id for hit in bundle.hits}
         grounded = len(citations) > 0 and all(c.source_id in hit_ids for c in citations)
+        trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
 
         return GeneratedAnswer(
             query=query,
             answer=answer_text,
             citations=citations,
             grounded=grounded,
+            trace=trace,
         )
 
-    def _build_context(self, bundle: RetrievalBundle) -> str:
+    def _build_context(self, hits: list) -> str:
         """Format retrieved hits into a context block for the prompt."""
         lines = []
-        for hit in bundle.hits:
-            if hit.node_id.startswith("src:") or hit.score > 0.55:
-                lines.append(f"[{hit.node_id}] {hit.title}")
-                lines.append(hit.excerpt)
-                lines.append("")
+        for hit in hits:
+            lines.append(f"[{hit.node_id}] {hit.title}")
+            lines.append(hit.excerpt)
+            lines.append("")
         return "\n".join(lines)
+
+    @staticmethod
+    def _select_context_hits(bundle: RetrievalBundle) -> list:
+        return [
+            hit
+            for hit in bundle.hits
+            if hit.node_id.startswith("src:") or hit.score > 0.55
+        ]
 
     # Matches the numeric chunk suffix, e.g. ":0009" at the end of an ID
     _CHUNK_SUFFIX = re.compile(r":\d+$")
@@ -173,8 +211,9 @@ Rules:
 
         return citations
 
-    def _rewrite_query(self, query: str) -> str:
+    def _rewrite_query(self, query: str, trace: QueryTrace | None = None) -> str:
         """Use the LLM to extract clean semantic search keywords."""
+        started_at = perf_counter() if trace is not None else None
         try:
             messages = [
                 ChatMessage(
@@ -188,8 +227,27 @@ Rules:
                 )
             ]
             response = self.llm.chat(messages)
+            if trace is not None and started_at is not None:
+                trace.stages.append(
+                    StageTrace(
+                        name="llm_rewrite",
+                        duration_ms=(perf_counter() - started_at) * 1000.0,
+                        hit_count=0,
+                    )
+                )
+                self._accumulate_usage(trace, response.raw)
             return self.sanitize_rewritten_query(query, response.text)
         except Exception as exc:
+            if trace is not None and started_at is not None:
+                trace.stages.append(
+                    StageTrace(
+                        name="llm_rewrite",
+                        duration_ms=(perf_counter() - started_at) * 1000.0,
+                        hit_count=0,
+                        notes="fallback_to_original_query",
+                    )
+                )
+                self._append_warning(trace, f"query rewrite failed: {type(exc).__name__}: {exc}")
             print(f"[_rewrite_query] LLM call failed: {exc!r} — falling back to original query")
             return query
 
@@ -235,3 +293,26 @@ Rules:
             ):
                 salient_tokens.append(token)
         return salient_tokens
+
+    @staticmethod
+    def _accumulate_usage(trace: QueryTrace, raw: dict) -> None:
+        prompt_tokens = 0
+        completion_tokens = 0
+
+        usage = raw.get("usage")
+        if isinstance(usage, dict):
+            prompt_tokens += int(usage.get("prompt_tokens", 0) or 0)
+            completion_tokens += int(
+                usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0
+            )
+
+        prompt_tokens += int(raw.get("prompt_tokens", raw.get("prompt_eval_count", 0)) or 0)
+        completion_tokens += int(raw.get("completion_tokens", raw.get("eval_count", 0)) or 0)
+
+        trace.prompt_tokens += prompt_tokens
+        trace.completion_tokens += completion_tokens
+
+    @staticmethod
+    def _append_warning(trace: QueryTrace, warning: str) -> None:
+        if warning not in trace.warnings:
+            trace.warnings.append(warning)

@@ -65,6 +65,7 @@ Priority order:
 - [x] Fix golden.json typo — sgvl expected_source had `vision_language` (underscore) vs stored `vision-language` (hyphen). All 3 sgvl cases were false negatives. Citation precision 73.3% → 83.3%.
 - [x] Harden retrieval/citation ranking — lexical scoring + source expansion + rewrite sanitizer lifted precision to 86.7%.
 - [x] Remove partial-word false positives in title/text rescoring — exact word-token matching restored stable citation precision and pushed full-pipeline retrieval to 100.0% hit@5.
+- [x] QueryTrace observability — per-stage query latency, hit provenance, token usage, and eval trace export.
 
 ### P0 — Remaining citation/observability work
 - [ ] Add per-chunk provenance logging to retrieval stage
@@ -103,12 +104,13 @@ Remaining:
   - hallucination modes
 - [ ] Per-category breakdown in harness output
 
-### P3 — Observability
-- [ ] Per-stage latency logging (ingest / embed / retrieve / rewrite / generate)
-- [ ] Token usage tracking
-- [ ] Retrieval hit provenance (which store returned each chunk)
+### P3 — Observability follow-ups
+- [x] Per-stage query latency logging (rewrite / retrieve / generate)
+- [x] Token usage tracking
+- [x] Retrieval hit provenance (vector / lexical / expansion)
+- [x] Export per-query traces to `eval/results/traces/`
+- [ ] Extend traces to ingest / embed stages
 - [ ] Answer rejection rate (grounded=False cases)
-- [ ] Export to structured logs in `eval/results/`
 
 ### Open GitHub issues
 - [ ] `#1` `embed()` NotImplementedError — broken interface contract

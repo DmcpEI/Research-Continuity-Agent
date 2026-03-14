@@ -62,6 +62,14 @@ class VectorStore:
     def backend(self) -> str:
         return "chroma" if self._collection is not None else "json"
 
+    @property
+    def backend_warning(self) -> str | None:
+        if self.backend != "json":
+            return None
+        if self._chroma_error:
+            return f"VectorStore using JSON fallback after Chroma failure: {self._chroma_error}"
+        return "VectorStore using JSON fallback backend."
+
     def upsert_texts(
         self,
         ids: list[str],

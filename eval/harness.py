@@ -42,6 +42,7 @@ class EvaluationCaseResult(BaseModel):
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     latency_ms: float
+    trace_path: str | None = None
     error: str | None = None
 
 
@@ -71,7 +72,7 @@ def load_golden_pairs(path: Path) -> list[GoldenPair]:
     return [GoldenPair.model_validate(item) for item in raw_pairs]
 
 
-def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> EvaluationCaseResult:
+def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseResult, dict[str, Any] | None]:
     started_at = perf_counter()
     try:
         generated = flow.generate_answer(pair.question)
@@ -80,38 +81,44 @@ def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> EvaluationCaseResult:
         matched_keywords, missing_keywords = keyword_matches(generated.answer, pair.expected_keywords)
         keyword_hits = calculate_keyword_hit_rate(matched_keywords, pair.expected_keywords)
 
-        return EvaluationCaseResult(
-            id=pair.id,
-            question=pair.question,
-            difficulty=pair.difficulty,
-            expected_source=pair.expected_source,
-            expected_keywords=pair.expected_keywords,
-            answer=generated.answer,
-            grounded=generated.grounded,
-            citations=citation_source_ids,
-            source_correct=pair.expected_source in citation_source_ids,
-            keyword_hits=keyword_hits,
-            matched_keywords=matched_keywords,
-            missing_keywords=missing_keywords,
-            latency_ms=latency_ms,
+        return (
+            EvaluationCaseResult(
+                id=pair.id,
+                question=pair.question,
+                difficulty=pair.difficulty,
+                expected_source=pair.expected_source,
+                expected_keywords=pair.expected_keywords,
+                answer=generated.answer,
+                grounded=generated.grounded,
+                citations=citation_source_ids,
+                source_correct=pair.expected_source in citation_source_ids,
+                keyword_hits=keyword_hits,
+                matched_keywords=matched_keywords,
+                missing_keywords=missing_keywords,
+                latency_ms=latency_ms,
+            ),
+            generated.trace.model_dump(mode="json") if generated.trace is not None else None,
         )
     except Exception as exc:
         latency_ms = (perf_counter() - started_at) * 1000.0
-        return EvaluationCaseResult(
-            id=pair.id,
-            question=pair.question,
-            difficulty=pair.difficulty,
-            expected_source=pair.expected_source,
-            expected_keywords=pair.expected_keywords,
-            answer="",
-            grounded=False,
-            citations=[],
-            source_correct=False,
-            keyword_hits=0.0,
-            matched_keywords=[],
-            missing_keywords=pair.expected_keywords,
-            latency_ms=latency_ms,
-            error=f"{type(exc).__name__}: {exc}",
+        return (
+            EvaluationCaseResult(
+                id=pair.id,
+                question=pair.question,
+                difficulty=pair.difficulty,
+                expected_source=pair.expected_source,
+                expected_keywords=pair.expected_keywords,
+                answer="",
+                grounded=False,
+                citations=[],
+                source_correct=False,
+                keyword_hits=0.0,
+                matched_keywords=[],
+                missing_keywords=pair.expected_keywords,
+                latency_ms=latency_ms,
+                error=f"{type(exc).__name__}: {exc}",
+            ),
+            None,
         )
 
 
@@ -217,15 +224,28 @@ def main(argv: list[str] | None = None) -> int:
 
     golden_pairs = load_golden_pairs(golden_path)
     flow = GenerateFlow()
-    results = [evaluate_pair(flow, pair) for pair in golden_pairs]
-    summary = aggregate_results(results)
-
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    trace_dir = output_dir / "traces" / timestamp
+    trace_dir.mkdir(parents=True, exist_ok=True)
+
+    results: list[EvaluationCaseResult] = []
+    for pair in golden_pairs:
+        result, trace_payload = evaluate_pair(flow, pair)
+        if trace_payload is not None:
+            trace_path = trace_dir / f"{pair.id}.json"
+            trace_path.write_text(json.dumps(trace_payload, indent=2), encoding="utf-8")
+            result.trace_path = str(trace_path)
+        results.append(result)
+
+    summary = aggregate_results(results)
+    summary["trace_dir"] = str(trace_dir)
+
     output_path = output_dir / f"run_{timestamp}.json"
     payload = {
         "timestamp": timestamp,
         "golden_path": str(golden_path),
         "cases": len(golden_pairs),
+        "trace_dir": str(trace_dir),
         "summary": summary,
         "results": [result.model_dump(mode="json") for result in results],
     }
