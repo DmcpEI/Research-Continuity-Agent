@@ -56,12 +56,13 @@ class IngestFlow:
         payload = self._extract(source_path)
         source_id = make_source_id(payload["metadata"]["kind"], source_path.stem if source_path.is_file() else source_path.name)
         source_kind = self._source_kind(payload["metadata"]["kind"])
+        source_preview = self._source_text_preview(payload["content"])
 
         source_node = Node(
             id=source_id,
             kind=source_kind,
             title=payload["title"],
-            text=payload["content"] or None,
+            text=source_preview or None,
             metadata=payload["metadata"],
         )
         self.graph_store.upsert_node(source_node)
@@ -169,3 +170,19 @@ class IngestFlow:
             cursor = next_cursor
 
         return chunks
+
+    def _source_text_preview(self, content: str) -> str:
+        normalized = content.strip()
+        if not normalized:
+            return ""
+
+        limit = max(1000, self.settings.chunk_size)
+        if len(normalized) <= limit:
+            return normalized
+
+        for marker in ("\n\n", "\n", " "):
+            candidate = normalized.rfind(marker, 0, limit)
+            if candidate >= max(200, limit // 2):
+                return normalized[:candidate].strip()
+
+        return normalized[:limit].strip()
