@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from rca.config.settings import Settings, get_settings
-from rca.contracts.nodes import Edge
+from rca.contracts.nodes import Edge, EdgeKind
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorQueryResult, VectorStore
 
@@ -113,7 +113,7 @@ class RetrieveFlow:
             
             edges = self.graph_store.list_edges(hit.node_id)
             for edge in edges:
-                if edge.target == hit.node_id:
+                if edge.target == hit.node_id and edge.kind == EdgeKind.contains:
                     parent = self.graph_store.get_node(edge.source)
                     if parent and edge.source not in expanded:
                         expanded[edge.source] = RetrievalHit(
