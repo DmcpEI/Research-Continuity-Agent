@@ -16,14 +16,15 @@ IngestFlow
     │
     ▼
 RetrieveFlow
-    ├── QueryRewriter  ← LLM expands query to 8-12 dense keywords
     ├── vector search  ← approximate nearest-neighbour (ChromaDB)
     ├── graph keyword  ← LIKE query over chunk text (SQLite)
-    ├── graph expansion ← neighbour traversal for related chunks
-    └── score merge + dedup → ranked RetrievalBundle
+    ├── score merge + dedup → ranked RetrievalBundle
+    └── source expansion ← chunk → parent src: nodes
     │
     ▼
 GenerateFlow
+    ├── query rewrite (inside GenerateFlow, optional)
+    ├── retrieval via RetrieveFlow
     ├── prompt assembly (system + context chunks + query)
     ├── LLM generation (qwen2.5:14b via Ollama)
     ├── citation extraction (_extract_citations)
@@ -54,12 +55,11 @@ Node IDs follow the scheme defined in `rca/contracts/ids.py` — see [DATA_MODEL
 
 Hybrid retrieval over the dual-store. Called with a query string, returns a `RetrievalBundle`.
 
-1. **Rewrite** (optional) — LLM rewrites query to dense technical keywords before search
-2. **Vector search** — top-k approximate nearest-neighbour over embeddings
-3. **Graph keyword** — SQLite `LIKE` query over chunk title and text
-4. **Graph expansion** — traverses `related_to` and `contains` edges from matched nodes
-5. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
-6. **Source expansion** — appends parent `src:` nodes to bundle for citation resolution
+1. **Vector search** — top-k approximate nearest-neighbour over embeddings
+2. **Graph keyword** — SQLite `LIKE` query over node title and text
+3. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
+4. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
+5. **Edge collection** — gathers related edges for the returned nodes
 
 **Ablation results** (hit@5, n=30 golden pairs):
 
@@ -67,21 +67,23 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 |---|---|---|
 | vector-only | 80.0% | 96.7% |
 | vector + keyword | 80.0% | 96.7% |
-| vector + keyword + expansion | 80.0% | 96.7% |
-| full + query rewrite | 90.0% | 93.3% |
+| vector + keyword + expansion | 90.0% | 100.0% |
+| full + query rewrite | 96.7% | 100.0% |
 
-Graph keyword search and expansion contribute 0% lift at hit@5 on this corpus — the bottleneck is embedding quality for specific queries, not search strategy coverage.
+Token-wise keyword scoring plus source expansion materially improve retrieval on edge cases; query rewriting adds a second lift on top of that.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 
 Grounded answer generation with citation enforcement.
 
-1. **Assemble context** — formats top-k retrieved chunks as numbered references
-2. **Prompt** — system prompt enforces citation format `[[src:paper_name]]` or `[[chk:paper:NNNN]]`
-3. **Generate** — calls `qwen2.5:14b` via Ollama
-4. **Extract citations** — parses inline citation markers from generated text
-5. **Resolve source IDs** — strips `:NNNN` suffix, resolves chunk IDs to parent `src:` nodes (unconditionally — the P0 bug was a conditional guard that skipped this step)
-6. **Ground check** — `grounded=True` if at least one valid citation was resolved
+1. **Rewrite query** — uses the LLM to derive a dense keyword query before retrieval
+2. **Retrieve** — calls `RetrieveFlow.retrieve()`
+3. **Assemble context** — formats retrieved hits into the prompt context block
+4. **Prompt** — system prompt enforces citation format `[[src:paper_name]]` or `[[chk:paper:NNNN]]`
+5. **Generate** — calls `qwen2.5:14b` via Ollama
+6. **Extract citations** — parses inline citation markers from generated text
+7. **Resolve source IDs** — strips `:NNNN` suffix and resolves chunk IDs to parent `src:` nodes unconditionally
+8. **Ground check** — `grounded=True` if at least one valid citation was resolved to a returned hit
 
 ### GraphStore (`rca/store/graph_store.py`)
 
@@ -117,19 +119,19 @@ Each store has a distinct function. The graph is not decorative — it enables c
 ```
 User query
     │
-    ├─ QueryRewriter → rewritten_query (or original if rewrite disabled)
+    ├─ GenerateFlow._rewrite_query(query) → rewritten_query
     │
     ├─ VectorStore.query(rewritten_query, limit=10)        → vector_hits
     ├─ GraphStore.search_nodes(rewritten_query, limit=10)  → keyword_hits
-    ├─ GraphStore.expand_neighbours(keyword_hits)          → expanded_hits
+    ├─ RetrieveFlow._expand_to_sources(...)                → source_hits
     │
-    ├─ merge(vector_hits, keyword_hits, expanded_hits) → RetrievalBundle
+    ├─ merge(vector_hits, keyword_hits, source_hits) → RetrievalBundle
     │
-    ├─ GenerateFlow.generate_answer(query, bundle)
-    │       ├─ format context from bundle.hits[:k]
+    ├─ GenerateFlow.generate_answer(query)
+    │       ├─ format context from bundle.hits
     │       ├─ LLM(system_prompt + context + query) → raw_answer
     │       ├─ _extract_citations(raw_answer, bundle) → citations
-    │       └─ GenerateResult(answer, citations, grounded)
+    │       └─ GeneratedAnswer(answer, citations, grounded)
     │
     └─ UI / API response with inline citations
 ```

@@ -6,7 +6,7 @@ RCA is evaluated against a golden Q&A set across two layers: retrieval quality (
 
 ## Golden set
 
-**30 Q&A pairs** across 6 source papers, covering 5 question categories and 3 difficulty levels.
+**30 Q&A pairs** across 6 source papers, covering 12 question categories and 3 difficulty levels.
 
 | Paper | Questions | Categories |
 |---|---|---|
@@ -41,22 +41,22 @@ Measures per golden pair:
 
 Writes full results to `eval/results/run_<timestamp>.json`.
 
-### Results (2026-03-13, after all fixes)
+### Results (2026-03-14, verified live run)
 
 | Metric | Value |
 |---|---|
 | Grounded rate | 100% |
-| **Citation precision** | **83.3%** |
-| Avg keyword hit rate | 0.154 |
-| Avg latency | 17.1 s |
+| **Citation precision** | **86.7%** |
+| Avg keyword hit rate | 0.129 |
+| Avg latency | 16.0 s |
 
 **By difficulty:**
 
 | Difficulty | Grounded | Citation precision | Keyword hit rate |
 |---|---|---|---|
-| Easy (n=6) | 100% | 83.3% | 0.447 |
-| Medium (n=15) | 100% | 86.7% | 0.083 |
-| Hard (n=9) | 100% | 77.8% | 0.076 |
+| Easy (n=6) | 100% | 100.0% | 0.331 |
+| Medium (n=15) | 100% | 80.0% | 0.093 |
+| Hard (n=9) | 100% | 88.9% | 0.054 |
 
 ### Progression
 
@@ -65,6 +65,7 @@ Writes full results to `eval/results/run_<timestamp>.json`.
 | Baseline | — | 26.7% |
 | After P0 fix | Source-ID resolution bug fixed (1 line) | 73.3% |
 | After golden fix | Typo in expected_source for sgvl papers | 83.3% |
+| After retrieval hardening | Query rewrite cleanup + lexical/source scoring fixes | 86.7% |
 
 ---
 
@@ -81,17 +82,17 @@ Tests 4 retrieval configurations on all 30 golden pairs. Measures hit@5 and hit@
 | Configuration | hit@5 | hit@10 |
 |---|---|---|
 | 1. vector-only | 80.0% | 96.7% |
-| 2. vector + FTS | 80.0% | 96.7% |
-| 3. vector + FTS + expansion | 80.0% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 90.0% | 93.3% |
+| 2. vector + keyword | 80.0% | 96.7% |
+| 3. vector + keyword + expansion | 90.0% | 100.0% |
+| 4. full pipeline (+ query rewrite) | 96.7% | 100.0% |
 
 ### Interpretation
 
-**96.7% hit@10 on plain vector** — the corpus is well-indexed. Coverage is not the problem; rank is. 3 of 30 questions don't find the right paper even at top-10.
+**96.7% hit@10 on plain vector** — the corpus is still well-indexed, but one case remains a true semantic miss without help from graph-aware retrieval.
 
-**FTS and graph expansion contribute 0% lift at hit@5** — all three strategies miss on exactly the same cases. The bottleneck is embedding quality for specific queries, not the search strategy. When the right chunks are embedded well enough to rank, any strategy finds them.
+**Source expansion now matters** — once lexical hits are token-scored instead of flattened to a constant score, expanding chunk hits to parent `src:` nodes recovers the missing paper on several edge cases and lifts hit@5 from 80.0% to 90.0%.
 
-**Query rewriting helps hit@5 (+10pp) but slightly hurts hit@10 (-3.3pp)** — the rewriter promotes relevant chunks higher in ranking for most queries, but drifts on queries with specific proper nouns (scene names, model names). Net effect is positive for a top-5 window, negative for a top-10 window.
+**Query rewriting still adds lift** — after cleanup and salient-term retention, full rewrite raises hit@5 from 90.0% to 96.7% while preserving 100.0% hit@10.
 
 ---
 
@@ -113,31 +114,19 @@ Tests 4 retrieval configurations on all 30 golden pairs. Measures hit@5 and hit@
 
 **Impact:** 73.3% → 83.3% citation precision.
 
-### Class 3 — Retrieval rank miss (active)
+### Class 3 — Retrieval miss (active, 1 case)
 
-**Affected cases:** `jampacker-003`, `jampacker-004`, `stablebinpacking-001`, `stablebinpacking-002`, `sgvl-003` — correct chunks exist in the index but rank 6–9, just below the top-5 cutoff.
+**Affected case:** `stablebinpacking-002` — the heuristic question still misses at hit@5 under the full rewrite pipeline, although top-10 now recovers it.
 
-**Fix:** Increasing retrieval window to top-10 recovers these. Current system uses top-5 for generation latency; top-10 is better for evaluation.
+### Class 4 — Citation selection miss (active, 4 cases)
 
-### Class 4 — Genuine semantic miss (active, 1 case)
+**Affected cases:** `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`.
 
-**Affected case:** `jampacker-001` — *"What are the two main components of JamPacker?"*
-
-The paper describes components as "Jampack" (the algorithm) and "FRM" (Fault Recovery Module) — internal brand names. The question uses "JamPacker" (the system name). The query rewriter output was: *"JamPacker architecture components problem solving techniques optimization performance enhancement"* — preserves the system name but loses the component names. No chunk in the index scores high enough under any retrieval strategy at any depth.
-
-**Root cause:** Terminology mismatch between question vocabulary and chunk vocabulary. Not fixable with rewriting alone.
-
-**Potential fixes:** Title-boosted retrieval (upweight chunks from papers whose title matches query terms), finer chunk granularity (abstract + section headers as separate retrievable units), or BM25 keyword matching as an additional signal.
+In these cases the correct paper is retrieved strongly enough for grounding, but generation still cites a different source. Retrieval is no longer the main bottleneck here; citation selection is.
 
 ### Class 5 — Answer quality miss (active)
 
-Several questions are `source_correct=True` but `keyword_hits=0.0` — the right paper was retrieved and cited, but the answer paraphrases without including the specific technical terms in `expected_keywords`.
-
-**Examples:** `pic2-001` retrieves the PIC2 report but answers "The context does not provide specific details about two local perception pipelines" despite relevant chunks being present. The LLM is being too conservative — it hedges rather than synthesising from the retrieved context.
-
-**Root cause:** The retrieved chunk for that question (`:0035`) covers introduction-level content, not the methodology section where pipeline names appear. The specific content is in a different chunk that didn't rank in top-5.
-
-**Fix:** Increase top-k for generation, or implement a second-pass retrieval that targets section-specific chunks when the first pass returns introductory material.
+Several questions are `source_correct=True` but `keyword_hits=0.0` — the right paper is retrieved and cited, but the answer paraphrases without including the exact technical terms tracked by `expected_keywords`.
 
 ---
 
@@ -149,4 +138,4 @@ Several questions are `source_correct=True` but `keyword_hits=0.0` — the right
 | Keyword matching is case-insensitive substring — not semantic | Acceptable for technical terms, misses paraphrases |
 | `jampacker-001` is a genuine hard retrieval failure at all depths | Documented, not yet fixed |
 | Query rewriter degrades performance on precise proper-noun queries | Needs conditional rewriting logic |
-| Generation latency ~17s | Acceptable for local Ollama; target <10s with top-5 retrieval |
+| Generation latency ~16s | Acceptable for local Ollama; target <10s with top-5 retrieval |

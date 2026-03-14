@@ -6,7 +6,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 import mcp.server.stdio
@@ -53,7 +53,7 @@ class ExperimentServer:
         record = ExperimentRecord(
             run_id=run_id or uuid4().hex,
             name=name,
-            status=status,
+            status=self._normalize_status(status),
             metrics=metrics or {},
             metadata=metadata or {},
             created_at=datetime.now(timezone.utc),
@@ -103,7 +103,7 @@ class ExperimentServer:
     def update_run(
         self,
         run_id: str,
-        status: Literal["pending", "running", "complete", "failed"] | None = None,
+        status: str | None = None,
         metrics: dict[str, float] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> ExperimentRecord:
@@ -114,7 +114,7 @@ class ExperimentServer:
             raise ValueError(f"No experiment found with run_id: {run_id}")
 
         # Merge — only overwrite fields that were explicitly passed
-        new_status = status if status is not None else existing.status
+        new_status = self._normalize_status(status) if status is not None else existing.status
         new_metrics = {**existing.metrics, **(metrics or {})}
         new_metadata = {**existing.metadata, **(metadata or {})}
         updated_at = datetime.now(timezone.utc).isoformat()
@@ -158,6 +158,14 @@ class ExperimentServer:
             "metadata": json.loads(row["metadata"]),
             "created_at": row["created_at"],
         })
+
+    @staticmethod
+    def _normalize_status(status: str) -> Literal["pending", "running", "complete", "failed"]:
+        normalized = "complete" if status == "completed" else status
+        allowed = {"pending", "running", "complete", "failed"}
+        if normalized not in allowed:
+            raise ValueError(f"Unsupported experiment status: {status}")
+        return cast(Literal["pending", "running", "complete", "failed"], normalized)
     
 # --- MCP Server setup ---
 

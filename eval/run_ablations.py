@@ -3,8 +3,8 @@
 Configs
 -------
 1. vector-only          : VectorStore.query() only
-2. vector + FTS         : vector + GraphStore.search_nodes(), no expansion
-3. vector + FTS + expand: full RetrieveFlow.retrieve(), no query rewrite
+2. vector + keyword     : vector + GraphStore.search_nodes(), no expansion
+3. vector + keyword + expand: full RetrieveFlow.retrieve(), no query rewrite
 4. full pipeline        : LLM query rewrite + full RetrieveFlow.retrieve()
 
 Metrics:
@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 
 from rca.config.settings import get_settings
+from rca.flows.generate_flow import GenerateFlow
 from rca.flows.retrieve_flow import RetrieveFlow, RetrievalHit
 from rca.llm.client import ChatMessage, OllamaLLMClient
 from rca.store.graph_store import GraphStore
@@ -56,15 +57,14 @@ def rewrite_query(llm: OllamaLLMClient, question: str) -> str:
             )
         ]
         response = llm.chat(messages)
-        cleaned = response.text.strip().split("\n")[0]
-        return cleaned if len(cleaned) > 5 else question
+        return GenerateFlow.sanitize_rewritten_query(question, response.text)
     except Exception as exc:
         print(f"  [rewrite] failed: {exc!r} — using original")
         return question
 
 
 def run_config1(question: str, vector_store: VectorStore, graph_store: GraphStore) -> list[RetrievalHit]:
-    """Vector-only: no graph FTS, no expansion."""
+    """Vector-only: no graph keyword search, no expansion."""
     hits = []
     for r in vector_store.query(question, limit=FETCH_K):
         node = graph_store.get_node(r.id)
@@ -78,7 +78,7 @@ def run_config1(question: str, vector_store: VectorStore, graph_store: GraphStor
 
 
 def run_config2(question: str, vector_store: VectorStore, graph_store: GraphStore) -> list[RetrievalHit]:
-    """Vector + FTS merge, no expansion."""
+    """Vector + keyword-search merge, no expansion."""
     hit_map: dict[str, RetrievalHit] = {}
     for r in vector_store.query(question, limit=FETCH_K):
         node = graph_store.get_node(r.id)
@@ -119,7 +119,7 @@ def main() -> None:
     print(f"Loaded {len(golden_pairs)} golden pairs | vector backend: {vector_store.backend}")
     print()
 
-    config_keys = ["1_vector_only", "2_vector_fts", "3_vector_fts_expand", "4_full_rewrite"]
+    config_keys = ["1_vector_only", "2_vector_keyword", "3_vector_keyword_expand", "4_full_rewrite"]
     # track hits at both k=5 and k=10
     hits5: dict[str, list[bool]] = {k: [] for k in config_keys}
     hits10: dict[str, list[bool]] = {k: [] for k in config_keys}
@@ -155,18 +155,18 @@ def main() -> None:
         })
         h5  = [int(hits5[k][-1])  for k in config_keys]
         h10 = [int(hits10[k][-1]) for k in config_keys]
-        print(f"  @5  vector={h5[0]}  +fts={h5[1]}  +expand={h5[2]}  +rewrite={h5[3]}")
-        print(f"  @10 vector={h10[0]}  +fts={h10[1]}  +expand={h10[2]}  +rewrite={h10[3]}")
+        print(f"  @5  vector={h5[0]}  +keyword={h5[1]}  +expand={h5[2]}  +rewrite={h5[3]}")
+        print(f"  @10 vector={h10[0]}  +keyword={h10[1]}  +expand={h10[2]}  +rewrite={h10[3]}")
 
     n = len(golden_pairs)
     summary5  = {k: round(sum(v) / n, 4) for k, v in hits5.items()}
     summary10 = {k: round(sum(v) / n, 4) for k, v in hits10.items()}
 
     rows = [
-        ("1. vector-only",                 "1_vector_only"),
-        ("2. vector + FTS",                "2_vector_fts"),
-        ("3. vector + FTS + expansion",    "3_vector_fts_expand"),
-        ("4. full pipeline (+ rewrite)",   "4_full_rewrite"),
+        ("1. vector-only",                     "1_vector_only"),
+        ("2. vector + keyword",                "2_vector_keyword"),
+        ("3. vector + keyword + expansion",    "3_vector_keyword_expand"),
+        ("4. full pipeline (+ rewrite)",       "4_full_rewrite"),
     ]
 
     print()

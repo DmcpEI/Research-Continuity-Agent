@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
 from rca.contracts.nodes import Edge, Node
+
+TOKEN_PATTERN = re.compile(r"[a-z0-9][a-z0-9+_.-]*")
+STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
+    "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
+    "with",
+}
 
 
 class GraphStore:
@@ -114,18 +122,49 @@ class GraphStore:
             for row in rows
         ]
 
+    @staticmethod
+    def _escape_like(token: str) -> str:
+        """Escape SQL LIKE special characters so _ and % are treated as literals."""
+        return token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
     def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
-        token = f"%{query.lower()}%"
+        tokens = [
+            token
+            for token in TOKEN_PATTERN.findall(query.lower())
+            if len(token) >= 3 and token not in STOPWORDS
+        ]
+        if not tokens:
+            tokens = [query.lower().strip()]
+
+        score_clauses = []
+        score_params: list[str] = []
+        where_clauses = []
+        where_params: list[str] = []
+
+        for token in tokens:
+            pattern = f"%{self._escape_like(token)}%"
+            score_clauses.append(
+                "(CASE WHEN lower(title) LIKE ? ESCAPE '\\' THEN 3 ELSE 0 END + "
+                "CASE WHEN lower(coalesce(text, '')) LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END)"
+            )
+            score_params.extend([pattern, pattern])
+            where_clauses.append(
+                "(lower(title) LIKE ? ESCAPE '\\' OR lower(coalesce(text, '')) LIKE ? ESCAPE '\\')"
+            )
+            where_params.extend([pattern, pattern])
+
+        score_sql = " + ".join(score_clauses)
+        where_sql = " OR ".join(where_clauses)
         with self.connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 SELECT id, kind, title, text, metadata, created_at
                 FROM nodes
-                WHERE lower(title) LIKE ? OR lower(coalesce(text, '')) LIKE ?
-                ORDER BY created_at DESC
+                WHERE {where_sql}
+                ORDER BY {score_sql} DESC, created_at DESC
                 LIMIT ?
                 """,
-                (token, token, limit),
+                [*where_params, *score_params, limit],
             ).fetchall()
         return [
             Node.model_validate(

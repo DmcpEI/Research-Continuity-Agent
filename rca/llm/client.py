@@ -53,9 +53,12 @@ def _stable_embedding(text: str, dimensions: int) -> list[float]:
 class OllamaLLMClient(LLMClient):
     """Local generation via Ollama — free, private, no API key needed."""
 
-    def __init__(self, base_url: str, model: str) -> None:
+    def __init__(self, base_url: str, model: str, options: dict[str, Any] | None = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.options = {"temperature": 0}
+        if options:
+            self.options.update(options)
 
     def chat(self, messages: list[ChatMessage]) -> ChatResponse:
         import json
@@ -65,6 +68,7 @@ class OllamaLLMClient(LLMClient):
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "stream": False,
+            "options": self.options,
         }
         data = json.dumps(payload).encode()
         req = urllib.request.Request(

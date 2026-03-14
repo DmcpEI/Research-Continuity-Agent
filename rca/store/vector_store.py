@@ -37,6 +37,7 @@ class VectorStore:
         self._fallback_path = self.persist_dir / f"{self.collection_name}.json"
         self._documents = self._load_fallback_documents()
         self._collection = None
+        self._chroma_error: str | None = None
 
         if chromadb is not None:
             from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
@@ -72,34 +73,56 @@ class VectorStore:
             payload: dict[str, Any] = {"ids": ids, "documents": documents, "metadatas": metadatas}
             if embeddings is not None:
                 payload["embeddings"] = embeddings
-            self._collection.upsert(**payload)
-            return
+            try:
+                self._collection.upsert(**payload)
+                return
+            except Exception as exc:
+                self._disable_chroma(exc, operation="upsert")
 
+        self._upsert_fallback(ids, documents, metadatas)
+
+    def query(self, query_text: str, limit: int = 5) -> list[VectorQueryResult]:
+        if self._collection is not None:
+            try:
+                result = self._collection.query(
+                    query_texts=[query_text],
+                    n_results=limit,
+                    include=["documents", "metadatas", "distances"],
+                )
+                ids = result.get("ids", [[]])[0]
+                documents = result.get("documents", [[]])[0]
+                metadatas = result.get("metadatas", [[]])[0]
+                distances = result.get("distances", [[]])[0]
+                return [
+                    VectorQueryResult(
+                        id=record_id,
+                        score=1.0 - float(distance),
+                        document=document,
+                        metadata=metadata or {},
+                    )
+                    for record_id, document, metadata, distance in zip(ids, documents, metadatas, distances, strict=True)
+                ]
+            except Exception as exc:
+                self._disable_chroma(exc, operation="query")
+
+        return self._query_fallback(query_text, limit)
+
+    def _load_fallback_documents(self) -> dict[str, dict[str, Any]]:
+        if not self._fallback_path.exists():
+            return {}
+        return json.loads(self._fallback_path.read_text(encoding="utf-8"))
+
+    def _upsert_fallback(
+        self,
+        ids: list[str],
+        documents: list[str],
+        metadatas: list[dict[str, Any]],
+    ) -> None:
         for record_id, document, metadata in zip(ids, documents, metadatas, strict=True):
             self._documents[record_id] = {"document": document, "metadata": metadata}
         self._fallback_path.write_text(json.dumps(self._documents, indent=2, sort_keys=True), encoding="utf-8")
 
-    def query(self, query_text: str, limit: int = 5) -> list[VectorQueryResult]:
-        if self._collection is not None:
-            result = self._collection.query(
-                query_texts=[query_text],
-                n_results=limit,
-                include=["documents", "metadatas", "distances"],
-            )
-            ids = result.get("ids", [[]])[0]
-            documents = result.get("documents", [[]])[0]
-            metadatas = result.get("metadatas", [[]])[0]
-            distances = result.get("distances", [[]])[0]
-            return [
-                VectorQueryResult(
-                    id=record_id,
-                    score=1.0 - float(distance),
-                    document=document,
-                    metadata=metadata or {},
-                )
-                for record_id, document, metadata, distance in zip(ids, documents, metadatas, distances, strict=True)
-            ]
-
+    def _query_fallback(self, query_text: str, limit: int) -> list[VectorQueryResult]:
         query_counter = Counter(self._tokenize(query_text))
         results: list[VectorQueryResult] = []
         for record_id, payload in self._documents.items():
@@ -117,10 +140,9 @@ class VectorStore:
         results.sort(key=lambda item: item.score, reverse=True)
         return results[:limit]
 
-    def _load_fallback_documents(self) -> dict[str, dict[str, Any]]:
-        if not self._fallback_path.exists():
-            return {}
-        return json.loads(self._fallback_path.read_text(encoding="utf-8"))
+    def _disable_chroma(self, exc: Exception, operation: str) -> None:
+        self._chroma_error = f"{type(exc).__name__}: {exc}"
+        self._collection = None
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:

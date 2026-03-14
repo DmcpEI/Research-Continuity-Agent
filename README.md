@@ -10,7 +10,7 @@ Given a corpus of research PDFs, RCA:
 
 1. **Ingests** documents into a dual-store (vector embeddings + structured graph)
 2. **Rewrites** queries before retrieval to improve keyword density and recall
-3. **Retrieves** via hybrid search: semantic vector similarity + graph keyword FTS + graph neighbourhood expansion
+3. **Retrieves** via hybrid search: semantic vector similarity + graph keyword search + graph neighbourhood expansion
 4. **Generates** grounded answers with inline citations enforced at the prompt level
 5. **Evaluates** answer quality against a golden Q&A set with retrieval, citation, and keyword metrics
 
@@ -31,7 +31,7 @@ IngestFlow
 RetrieveFlow
     ├── query rewriter  (LLM — dense keyword expansion before retrieval)
     ├── vector search   (nomic-embed-text via Ollama)
-    ├── graph FTS       (SQLite full-text search)
+    ├── graph keyword   (SQLite `LIKE` search)
     └── graph expansion (neighbour traversal for related chunks)
     │
     ▼
@@ -85,7 +85,7 @@ Each store has a distinct function. The graph is not decorative — it enables c
 ```
 .rca/
 ├── vectors/          # ChromaDB persistent store
-└── graph.sqlite3     # Document graph, FTS index, metadata
+└── graph.sqlite3     # Document graph and metadata
 ```
 
 ---
@@ -107,37 +107,38 @@ Each store has a distinct function. The graph is not decorative — it enables c
 
 RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, covering easy, medium, and hard questions across schema knowledge, method detail, quantitative results, error analysis, and cross-paper reasoning.
 
-### Current results (run 2026-03-13)
+### Current results (run 2026-03-14)
 
 | Metric | Value |
 |---|---|
 | Grounded rate | 100% |
-| Citation precision | 83.3% |
-| Avg keyword hit rate | 0.154 |
-| Avg latency | 17.1 s |
+| Citation precision | 86.7% |
+| Avg keyword hit rate | 0.129 |
+| Avg latency | 16.0 s |
 
 **Breakdown by difficulty:**
 
 | Difficulty | Count | Grounded | Citation precision | Keyword hit rate |
 |---|---|---|---|---|
-| Easy | 6 | 100% | 83.3% | 0.447 |
-| Medium | 15 | 100% | 86.7% | 0.083 |
-| Hard | 9 | 100% | 77.8% | 0.076 |
+| Easy | 6 | 100% | 100.0% | 0.331 |
+| Medium | 15 | 100% | 80.0% | 0.093 |
+| Hard | 9 | 100% | 88.9% | 0.054 |
 
 **Retrieval ablations — hit@5 / hit@10 (n=30):**
 
 | Configuration | hit@5 | hit@10 |
 |---|---|---|
 | 1. vector-only | 80.0% | 96.7% |
-| 2. vector + FTS | 80.0% | 96.7% |
-| 3. vector + FTS + expansion | 80.0% | 96.7% |
-| 4. full pipeline (+ rewrite) | 90.0% | 93.3% |
+| 2. vector + keyword search | 80.0% | 96.7% |
+| 3. vector + keyword + expansion | 90.0% | 100.0% |
+| 4. full pipeline (+ query rewrite) | 96.7% | 100.0% |
 
 ### What the numbers mean
 
-- **83.3% citation precision** — two fixes applied: (1) `_extract_citations` code bug where chunk IDs bypassed parent resolution (26.7% → 73.3%); (2) golden.json typo where `vision_language` should be `vision-language` in 3 sgvl expected_source fields (73.3% → 83.3%).
+- **86.7% citation precision** — the citation-resolution fix and golden-set correction removed the original false negatives, and the later retrieval/ranking hardening improved citation selection further.
 - **96.7% hit@10 on plain vector search** — the correct source is almost always in the index and retrievable; the bottleneck is rank position, not embedding quality.
-- **Query rewriting improves hit@5 (+10pp)** but slightly hurts hit@10 (-3.3%) by drifting on queries with specific named entities.
+- **Token-scored keyword search + source expansion lifts hit@5 from 80% → 90%** — once lexical hits carry real overlap scores, expanding chunk hits to parent source nodes recovers several rank misses.
+- **Query rewriting adds a further +6.7pp** to hit@5 (90% → 96.7%) while preserving 100% hit@10.
 - **1 irreducible miss: jampacker-001** — "two main components of JamPacker" fails at top-10 under all strategies. Chunks describe components by function, not by name; the rewriter produces generic terms.
 - **Low keyword hit rate** — answers cite the right source but LLM paraphrases rather than quoting, missing specific technical terms. This is an answer quality issue, not a retrieval issue.
 
@@ -157,14 +158,14 @@ RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, cover
 ### v1 — Local system (current)
 
 - [x] PDF ingest → chunking → dual-store (vector + graph)
-- [x] Hybrid retrieval (vector + FTS + graph expansion)
+- [x] Hybrid retrieval (vector + keyword search + graph expansion)
 - [x] Query rewriting before retrieval
 - [x] Grounded answer generation with citation enforcement
 - [x] Streamlit UI (chat + ingest + knowledge map + store)
 - [x] Integration tests
 - [x] Evaluation harness with golden Q&A pairs
-- [ ] **Fix citation precision** — source-ID resolution bug (priority)
-- [ ] **Retrieval ablations** — vector-only vs hybrid vs graph vs rewrite
+- [x] **Fix citation precision** — source-ID resolution bug
+- [x] **Retrieval ablations** — vector-only vs hybrid vs graph vs rewrite
 - [ ] **Expand golden set** — 30 → 100+ pairs
 - [ ] Observability — per-stage latency, token usage, retrieval provenance
 - [ ] arxiv MCP server

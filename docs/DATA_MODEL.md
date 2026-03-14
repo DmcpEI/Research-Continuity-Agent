@@ -79,7 +79,7 @@ Source: `rca/contracts/nodes.py` — `EdgeKind` enum
 | `related_to` | any → any | General semantic relation used for graph expansion |
 | `produced_by` | experiment/digest → source | An output was produced from a source |
 
-The `contains` / `derived_from` edges are created at ingest time for every chunk. `related_to` edges are used by the graph expansion step in `RetrieveFlow`.
+The `contains` edges are created at ingest time for every chunk. `derived_from`, `references`, `cites`, `related_to`, and `produced_by` are available in the contract but are not emitted by the current ingest flow. The current `RetrieveFlow` only follows chunk → source containment edges when expanding hits to parent source nodes.
 
 ### Edge fields
 
@@ -133,7 +133,7 @@ CREATE INDEX idx_edges_source  ON edges(source);
 CREATE INDEX idx_edges_target  ON edges(target);
 ```
 
-Text search over `nodes` is implemented with `WHERE lower(title) LIKE ? OR lower(coalesce(text, '')) LIKE ?` — there is no FTS5 virtual table.
+Text search over `nodes` is implemented as a token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))` — there is no FTS5 virtual table.
 
 ---
 

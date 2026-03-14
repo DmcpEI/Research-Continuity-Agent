@@ -66,7 +66,7 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer="No relevant context found in your knowledge base.",
-                grounded=True,
+                grounded=False,
             )
 
         # Step 2: build context block for prompt
@@ -81,7 +81,7 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer="No relevant context found in your knowledge base.",
-                grounded=True,
+                grounded=False,
             )
 
         # Step 3: call LLM with strict grounding instructions
@@ -124,6 +124,12 @@ Rules:
 
     # Matches the numeric chunk suffix, e.g. ":0009" at the end of an ID
     _CHUNK_SUFFIX = re.compile(r":\d+$")
+    _REWRITE_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+_.-]*")
+    _REWRITE_STOPWORDS = {
+        "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
+        "how", "in", "is", "it", "of", "on", "or", "s", "the", "to", "what",
+        "which", "with",
+    }
 
     def _extract_citations(
         self, answer_text: str, bundle: RetrievalBundle
@@ -182,8 +188,50 @@ Rules:
                 )
             ]
             response = self.llm.chat(messages)
-            cleaned = response.text.strip().split("\n")[0]
-            return cleaned if len(cleaned) > 5 else query
+            return self.sanitize_rewritten_query(query, response.text)
         except Exception as exc:
             print(f"[_rewrite_query] LLM call failed: {exc!r} — falling back to original query")
             return query
+
+    @classmethod
+    def sanitize_rewritten_query(cls, original_query: str, rewritten_query: str) -> str:
+        """Keep dense keywords while preserving salient proper nouns from the original query."""
+
+        llm_tokens = cls._extract_rewrite_tokens(rewritten_query)
+        original_tokens = cls._extract_salient_original_tokens(original_query)
+
+        merged_tokens: list[str] = []
+        seen: set[str] = set()
+        for token in original_tokens + llm_tokens:
+            normalized = token.casefold()
+            if normalized in seen or normalized in cls._REWRITE_STOPWORDS:
+                continue
+            seen.add(normalized)
+            merged_tokens.append(token)
+            if len(merged_tokens) >= 12:
+                break
+
+        if len(merged_tokens) < 4:
+            return original_query
+        return " ".join(merged_tokens)
+
+    @classmethod
+    def _extract_rewrite_tokens(cls, rewritten_query: str) -> list[str]:
+        return cls._REWRITE_TOKEN.findall(rewritten_query)
+
+    @classmethod
+    def _extract_salient_original_tokens(cls, original_query: str) -> list[str]:
+        salient_tokens: list[str] = []
+        for token in cls._REWRITE_TOKEN.findall(original_query):
+            normalized = token.casefold()
+            if normalized in cls._REWRITE_STOPWORDS:
+                continue
+            if (
+                any(char.isdigit() for char in token)
+                or any(char in token for char in "+-_")
+                or token.isupper()
+                or any(char.isupper() for char in token[1:])
+                or len(token) >= 8
+            ):
+                salient_tokens.append(token)
+        return salient_tokens

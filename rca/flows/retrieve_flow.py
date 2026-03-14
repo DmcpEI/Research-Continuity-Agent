@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,13 @@ from rca.config.settings import Settings, get_settings
 from rca.contracts.nodes import Edge
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorQueryResult, VectorStore
+
+TOKEN_PATTERN = re.compile(r"[a-z0-9][a-z0-9+_.-]*")
+STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
+    "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
+    "with",
+}
 
 
 class RetrievalHit(BaseModel):
@@ -42,16 +50,18 @@ class RetrieveFlow:
     def retrieve(self, query: str, limit: int = 10) -> RetrievalBundle:
         hit_map: dict[str, RetrievalHit] = {}
         related_edges: list[Edge] = []
+        query_tokens = self._tokenize(query)
 
         for result in self.vector_store.query(query, limit=limit):
             self._merge_vector_hit(hit_map, result)
 
         for node in self.graph_store.search_nodes(query, limit=limit):
+            lexical_score = self._lexical_score(query_tokens, node.title, node.text or "")
             current = hit_map.get(node.id)
-            score = current.score if current is not None else 0.5
+            score = current.score if current is not None else lexical_score
             hit_map[node.id] = RetrievalHit(
                 node_id=node.id,
-                score=max(score, 0.5),
+                score=max(score, lexical_score),
                 title=node.title,
                 excerpt=(node.text or "")[:240],
                 metadata=node.metadata,
@@ -113,3 +123,25 @@ class RetrieveFlow:
                             metadata={**parent.metadata, "expanded_from": hit.node_id},
                         )
         return list(expanded.values())
+
+    @staticmethod
+    def _tokenize(text: str) -> set[str]:
+        return {
+            token
+            for token in TOKEN_PATTERN.findall(text.lower())
+            if len(token) >= 3 and token not in STOPWORDS
+        }
+
+    def _lexical_score(self, query_tokens: set[str], title: str, text: str) -> float:
+        if not query_tokens:
+            return 0.5
+
+        title_tokens = self._tokenize(title)
+        text_tokens = self._tokenize(text)
+        title_overlap = len(query_tokens & title_tokens)
+        text_overlap = len(query_tokens & text_tokens)
+
+        if title_overlap == 0 and text_overlap == 0:
+            return 0.0
+
+        return min(0.95, 0.45 + (0.12 * title_overlap) + (0.04 * text_overlap))
