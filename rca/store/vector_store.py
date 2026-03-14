@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 from collections import Counter
@@ -17,6 +18,7 @@ except ImportError:
 
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -142,6 +144,11 @@ class VectorStore:
 
     def _disable_chroma(self, exc: Exception, operation: str) -> None:
         self._chroma_error = f"{type(exc).__name__}: {exc}"
+        LOGGER.warning(
+            "Disabling Chroma backend during %s; falling back to JSON store (%s)",
+            operation,
+            self._chroma_error,
+        )
         self._collection = None
 
     @staticmethod
