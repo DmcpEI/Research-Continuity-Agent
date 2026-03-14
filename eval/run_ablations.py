@@ -8,8 +8,8 @@ Configs
 4. full pipeline        : LLM query rewrite + full RetrieveFlow.retrieve()
 
 Metrics:
-  hit@5  — expected_source in top-5 resolved source IDs
-  hit@10 — expected_source in top-10 resolved source IDs
+  hit@5  — all expected sources in top-5 resolved source IDs
+  hit@10 — all expected sources in top-10 resolved source IDs
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from rca.config.settings import get_settings
 from rca.flows.generate_flow import GenerateFlow
@@ -38,9 +39,96 @@ def resolve_to_source(node_id: str) -> str:
     return "src:" + base.split(":", 1)[1]
 
 
-def hit_at_k(hits: list[RetrievalHit], expected_source: str, k: int = 5) -> bool:
+def expected_source_ids(pair: dict[str, Any]) -> list[str]:
+    sources = [source for source in pair.get("expected_sources", []) if source]
+    if sources:
+        return sources
+    source = pair.get("expected_source")
+    return [source] if source else []
+
+
+def is_retrieval_case(pair: dict[str, Any]) -> bool:
+    return pair.get("answerable", True) and bool(expected_source_ids(pair))
+
+
+def hit_at_k(hits: list[RetrievalHit], expected_sources: list[str], k: int = 5) -> bool:
     source_ids = {resolve_to_source(h.node_id) for h in hits[:k]}
-    return expected_source in source_ids
+    return all(source in source_ids for source in expected_sources)
+
+
+def summarize_subset(cases: list[dict[str, Any]], config_keys: list[str]) -> dict[str, Any]:
+    total = len(cases)
+    if total == 0:
+        return {
+            "cases": 0,
+            "summary_hit_at_5": {key: 0.0 for key in config_keys},
+            "summary_hit_at_10": {key: 0.0 for key in config_keys},
+        }
+    return {
+        "cases": total,
+        "summary_hit_at_5": {
+            key: round(sum(case["hit_at_5"][key] for case in cases) / total, 4) for key in config_keys
+        },
+        "summary_hit_at_10": {
+            key: round(sum(case["hit_at_10"][key] for case in cases) / total, 4) for key in config_keys
+        },
+    }
+
+
+def build_bucket_summary(
+    per_case: list[dict[str, Any]], config_keys: list[str], field: str, ordered_values: list[str] | None = None
+) -> dict[str, dict[str, Any]]:
+    evaluated = [case for case in per_case if not case["skipped"]]
+    if ordered_values is None:
+        ordered_values = []
+        seen: set[str] = set()
+        for case in evaluated:
+            value = case.get(field)
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            ordered_values.append(value)
+
+    summary: dict[str, dict[str, Any]] = {}
+    for value in ordered_values:
+        subset = [case for case in evaluated if case.get(field) == value]
+        if not subset:
+            continue
+        summary[value] = summarize_subset(subset, config_keys)
+    return summary
+
+
+def print_bucket_table(
+    title: str,
+    summary: dict[str, dict[str, Any]],
+    rows: list[tuple[str, str]],
+    left_header: str,
+) -> None:
+    print("=" * 118)
+    print(title)
+    print(
+        f"{left_header:<18} {'n':>3}  "
+        f"{'vector@5':>8} {'vector@10':>9}  "
+        f"{'+keyword@5':>10} {'+keyword@10':>11}  "
+        f"{'+expand@5':>9} {'+expand@10':>10}  "
+        f"{'+rewrite@5':>10} {'+rewrite@10':>11}"
+    )
+    print("-" * 118)
+    for label, key in rows:
+        metrics = summary.get(key)
+        if metrics is None:
+            continue
+        hit5 = metrics["summary_hit_at_5"]
+        hit10 = metrics["summary_hit_at_10"]
+        print(
+            f"  {label:<16} {metrics['cases']:>3}  "
+            f"{hit5['1_vector_only']:>8.1%} {hit10['1_vector_only']:>9.1%}  "
+            f"{hit5['2_vector_keyword']:>10.1%} {hit10['2_vector_keyword']:>11.1%}  "
+            f"{hit5['3_vector_keyword_expand']:>9.1%} {hit10['3_vector_keyword_expand']:>10.1%}  "
+            f"{hit5['4_full_rewrite']:>10.1%} {hit10['4_full_rewrite']:>11.1%}"
+        )
+    print("=" * 118)
+    print()
 
 
 def rewrite_query(llm: OllamaLLMClient, question: str) -> str:
@@ -125,10 +213,29 @@ def main() -> None:
     hits10: dict[str, list[bool]] = {k: [] for k in config_keys}
     per_case: list[dict] = []
 
+    evaluated_cases = 0
+
     for i, pair in enumerate(golden_pairs):
         question = pair["question"]
-        expected = pair["expected_source"]
+        expected = expected_source_ids(pair)
         print(f"[{i+1:02d}/{len(golden_pairs)}] {pair['id']}: {question[:65]}...")
+
+        if not is_retrieval_case(pair):
+            skip_reason = "unanswerable" if not pair.get("answerable", True) else "missing expected source"
+            per_case.append({
+                "id": pair["id"],
+                "difficulty": pair["difficulty"],
+                "category": pair.get("category"),
+                "bucket": pair.get("category"),
+                "expected_source": pair.get("expected_source"),
+                "expected_sources": expected,
+                "skipped": True,
+                "skip_reason": skip_reason,
+            })
+            print(f"  skipped ({skip_reason})")
+            continue
+
+        evaluated_cases += 1
 
         hits1 = run_config1(question, vector_store, graph_store)
         hits2 = run_config2(question, vector_store, graph_store)
@@ -148,19 +255,27 @@ def main() -> None:
         per_case.append({
             "id": pair["id"],
             "difficulty": pair["difficulty"],
-            "expected_source": expected,
+            "category": pair.get("category"),
+            "bucket": pair.get("category"),
+            "expected_source": pair.get("expected_source"),
+            "expected_sources": expected,
             "rewritten_query": rewritten if rewritten != question else None,
             "hit_at_5":  {k: hits5[k][-1]  for k in config_keys},
             "hit_at_10": {k: hits10[k][-1] for k in config_keys},
+            "skipped": False,
         })
         h5  = [int(hits5[k][-1])  for k in config_keys]
         h10 = [int(hits10[k][-1]) for k in config_keys]
         print(f"  @5  vector={h5[0]}  +keyword={h5[1]}  +expand={h5[2]}  +rewrite={h5[3]}")
         print(f"  @10 vector={h10[0]}  +keyword={h10[1]}  +expand={h10[2]}  +rewrite={h10[3]}")
 
-    n = len(golden_pairs)
-    summary5  = {k: round(sum(v) / n, 4) for k, v in hits5.items()}
-    summary10 = {k: round(sum(v) / n, 4) for k, v in hits10.items()}
+    n = evaluated_cases
+    if n == 0:
+        summary5 = {k: 0.0 for k in config_keys}
+        summary10 = {k: 0.0 for k in config_keys}
+    else:
+        summary5 = {k: round(sum(v) / n, 4) for k, v in hits5.items()}
+        summary10 = {k: round(sum(v) / n, 4) for k, v in hits10.items()}
 
     rows = [
         ("1. vector-only",                     "1_vector_only"),
@@ -168,10 +283,17 @@ def main() -> None:
         ("3. vector + keyword + expansion",    "3_vector_keyword_expand"),
         ("4. full pipeline (+ rewrite)",       "4_full_rewrite"),
     ]
+    category_summary = build_bucket_summary(per_case, config_keys, "category")
+    difficulty_summary = build_bucket_summary(
+        per_case,
+        config_keys,
+        "difficulty",
+        ordered_values=["easy", "medium", "hard"],
+    )
 
     print()
     print("=" * 68)
-    print(f"Retrieval ablations — n={n}")
+    print(f"Retrieval ablations — n={n} evaluated / {len(golden_pairs)} loaded")
     print(f"{'Configuration':<35}  {'hit@5':>6}  {'hit@10':>7}")
     print("-" * 68)
     for label, key in rows:
@@ -179,11 +301,28 @@ def main() -> None:
     print("=" * 68)
     print()
 
+    print_bucket_table(
+        "Retrieval ablations by category",
+        category_summary,
+        [(key.replace("_", " "), key) for key in category_summary.keys()],
+        "Category",
+    )
+    print_bucket_table(
+        "Retrieval ablations by difficulty",
+        difficulty_summary,
+        [(key, key) for key in ["easy", "medium", "hard"]],
+        "Difficulty",
+    )
+
     output = {
         "fetch_k": FETCH_K,
+        "loaded_cases": len(golden_pairs),
         "cases": n,
+        "skipped_cases": len(golden_pairs) - n,
         "summary_hit_at_5":  summary5,
         "summary_hit_at_10": summary10,
+        "summary_by_category": category_summary,
+        "summary_by_difficulty": difficulty_summary,
         "per_case": per_case,
     }
     out_path = Path("eval/results/ablations.json")

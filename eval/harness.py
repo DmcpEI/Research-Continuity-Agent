@@ -20,10 +20,19 @@ class GoldenPair(BaseModel):
     id: str
     question: str
     expected_keywords: list[str] = Field(default_factory=list)
-    expected_source: str
+    expected_source: str | None = None
+    expected_sources: list[str] = Field(default_factory=list)
     difficulty: Literal["easy", "medium", "hard"]
+    category: str | None = None
+    answerable: bool = True
+    notes: str | None = None
 
     model_config = {"extra": "ignore"}
+
+    def expected_source_ids(self) -> list[str]:
+        if self.expected_sources:
+            return self.expected_sources
+        return [self.expected_source] if self.expected_source else []
 
 
 class EvaluationCaseResult(BaseModel):
@@ -32,7 +41,10 @@ class EvaluationCaseResult(BaseModel):
     id: str
     question: str
     difficulty: str
-    expected_source: str
+    category: str | None = None
+    answerable: bool = True
+    expected_source: str | None = None
+    expected_sources: list[str] = Field(default_factory=list)
     expected_keywords: list[str] = Field(default_factory=list)
     answer: str
     grounded: bool
@@ -74,24 +86,34 @@ def load_golden_pairs(path: Path) -> list[GoldenPair]:
 
 def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseResult, dict[str, Any] | None]:
     started_at = perf_counter()
+    expected_sources = pair.expected_source_ids()
     try:
         generated = flow.generate_answer(pair.question)
         latency_ms = (perf_counter() - started_at) * 1000.0
         citation_source_ids = [citation.source_id for citation in generated.citations]
         matched_keywords, missing_keywords = keyword_matches(generated.answer, pair.expected_keywords)
         keyword_hits = calculate_keyword_hit_rate(matched_keywords, pair.expected_keywords)
+        if not pair.answerable:
+            source_correct = (not generated.grounded) and not citation_source_ids
+        elif expected_sources:
+            source_correct = all(source in citation_source_ids for source in expected_sources)
+        else:
+            source_correct = False
 
         return (
             EvaluationCaseResult(
                 id=pair.id,
                 question=pair.question,
                 difficulty=pair.difficulty,
+                category=pair.category,
+                answerable=pair.answerable,
                 expected_source=pair.expected_source,
+                expected_sources=expected_sources,
                 expected_keywords=pair.expected_keywords,
                 answer=generated.answer,
                 grounded=generated.grounded,
                 citations=citation_source_ids,
-                source_correct=pair.expected_source in citation_source_ids,
+                source_correct=source_correct,
                 keyword_hits=keyword_hits,
                 matched_keywords=matched_keywords,
                 missing_keywords=missing_keywords,
@@ -106,7 +128,10 @@ def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseR
                 id=pair.id,
                 question=pair.question,
                 difficulty=pair.difficulty,
+                category=pair.category,
+                answerable=pair.answerable,
                 expected_source=pair.expected_source,
+                expected_sources=expected_sources,
                 expected_keywords=pair.expected_keywords,
                 answer="",
                 grounded=False,
