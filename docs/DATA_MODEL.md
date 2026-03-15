@@ -79,7 +79,7 @@ Source: `rca/contracts/nodes.py` — `EdgeKind` enum
 | `related_to` | any → any | General semantic relation used for graph expansion |
 | `produced_by` | experiment/digest → source | An output was produced from a source |
 
-The `contains` edges are created at ingest time for every chunk. `derived_from`, `references`, `cites`, `related_to`, and `produced_by` are available in the contract but are not emitted by the current ingest flow. The intended parent-expansion relation is `contains`; issue `#4` tracks tightening `RetrieveFlow._expand_to_sources()` because the current implementation still matches any incoming edge whose target is the chunk.
+The `contains` edges are created at ingest time for every chunk. `derived_from`, `references`, `cites`, `related_to`, and `produced_by` are available in the contract but are not emitted by the current ingest flow. The parent-expansion relation is `contains`, and `RetrieveFlow._expand_to_sources()` now filters to that edge kind explicitly.
 
 ### Edge fields
 
@@ -131,9 +131,21 @@ CREATE TABLE edges (
 CREATE INDEX idx_nodes_kind    ON nodes(kind);
 CREATE INDEX idx_edges_source  ON edges(source);
 CREATE INDEX idx_edges_target  ON edges(target);
+
+CREATE VIRTUAL TABLE nodes_fts USING fts5(
+    title,
+    text,
+    content='nodes',
+    content_rowid='rowid',
+    tokenize = "unicode61 tokenchars '._-+'"
+);
+
+CREATE TRIGGER nodes_ai AFTER INSERT ON nodes ...;
+CREATE TRIGGER nodes_ad AFTER DELETE ON nodes ...;
+CREATE TRIGGER nodes_au AFTER UPDATE ON nodes ...;
 ```
 
-Text search over `nodes` is implemented as a token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))` — there is no FTS5 virtual table. `RetrieveFlow` then reranks those SQL candidates with exact word-token overlap over title and text to avoid partial-word false positives.
+The production lexical path still uses a token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))`, followed by exact word-token reranking in `RetrieveFlow` to avoid partial-word false positives. The schema now also includes an FTS5 virtual table (`nodes_fts`) plus triggers so BM25 can be measured as an explicit retrieval baseline without changing the production search path.
 
 ---
 

@@ -35,6 +35,7 @@ class GraphStore:
         schema_sql = self.schema_path.read_text(encoding="utf-8")
         with self.connect() as connection:
             connection.executescript(schema_sql)
+            self._sync_fts_index(connection)
 
     def upsert_node(self, node: Node) -> None:
         with self.connect() as connection:
@@ -127,12 +128,38 @@ class GraphStore:
         """Escape SQL LIKE special characters so _ and % are treated as literals."""
         return token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
-    def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
-        tokens = [
+    @staticmethod
+    def _tokenize_query(query: str) -> list[str]:
+        return [
             token
             for token in TOKEN_PATTERN.findall(query.lower())
             if len(token) >= 3 and token not in STOPWORDS
         ]
+
+    @staticmethod
+    def _rows_to_nodes(rows: list[sqlite3.Row]) -> list[Node]:
+        return [
+            Node.model_validate(
+                {
+                    "id": row["id"],
+                    "kind": row["kind"],
+                    "title": row["title"],
+                    "text": row["text"],
+                    "metadata": json.loads(row["metadata"]),
+                    "created_at": row["created_at"],
+                }
+            )
+            for row in rows
+        ]
+
+    @staticmethod
+    def _sync_fts_index(connection: sqlite3.Connection) -> None:
+        # Rebuild is idempotent and ensures older databases created before the
+        # FTS5 table/triggers existed are fully indexed for BM25 baseline runs.
+        connection.execute("INSERT INTO nodes_fts(nodes_fts) VALUES ('rebuild')")
+
+    def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+        tokens = self._tokenize_query(query)
         if not tokens:
             tokens = [query.lower().strip()]
 
@@ -166,16 +193,27 @@ class GraphStore:
                 """,
                 [*where_params, *score_params, limit],
             ).fetchall()
-        return [
-            Node.model_validate(
-                {
-                    "id": row["id"],
-                    "kind": row["kind"],
-                    "title": row["title"],
-                    "text": row["text"],
-                    "metadata": json.loads(row["metadata"]),
-                    "created_at": row["created_at"],
-                }
-            )
-            for row in rows
-        ]
+        return self._rows_to_nodes(rows)
+
+    def search_nodes_fts5(self, query: str, limit: int = 10) -> list[Node]:
+        tokens = self._tokenize_query(query)
+        if not tokens:
+            stripped = query.strip()
+            if not stripped:
+                return []
+            tokens = [stripped.lower()]
+
+        match_query = " OR ".join(f'"{token}"' for token in tokens)
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT n.id, n.kind, n.title, n.text, n.metadata, n.created_at
+                FROM nodes_fts
+                JOIN nodes AS n ON n.rowid = nodes_fts.rowid
+                WHERE nodes_fts MATCH ?
+                ORDER BY bm25(nodes_fts), n.created_at DESC
+                LIMIT ?
+                """,
+                (match_query, limit),
+            ).fetchall()
+        return self._rows_to_nodes(rows)

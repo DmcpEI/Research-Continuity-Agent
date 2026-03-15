@@ -31,13 +31,13 @@ IngestFlow
 RetrieveFlow
     ├── query rewriter  (LLM — dense keyword expansion before retrieval)
     ├── vector search   (nomic-embed-text via Ollama)
-    ├── graph keyword   (SQLite `LIKE` candidate search + exact-word rerank)
+    ├── graph keyword   (SQLite `LIKE` production path + FTS5 BM25 baseline)
     └── graph expansion (neighbour traversal for related chunks)
     │
     ▼
 GenerateFlow
     ├── grounded answer generation  (qwen2.5:14b via Ollama)
-    └── citation enforcement        (prompt-level + fallback injection)
+    └── citation + abstention logic (prompt-level enforcement + two-gate abstention)
     │
     ▼
 Direct flow orchestration  (RetrieveFlow + GenerateFlow, stateless per query)
@@ -58,7 +58,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Component details
 
-**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. `VectorStore` wraps ChromaDB with an Ollama embedding function using `nomic-embed-text` (768 dimensions, cosine similarity). When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
+**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database now also maintains an FTS5 virtual table for BM25 baseline evaluation, while the production lexical path still uses token-wise `LIKE`. `VectorStore` wraps ChromaDB with an Ollama embedding function using `nomic-embed-text` (768 dimensions, cosine similarity). When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
 
 **ID system.** All identifiers are stable and deterministic. Source nodes follow the pattern `src:namespace/name` (e.g., `src:pdf/attention-is-all-you-need`). Chunk nodes derive from their source: `chk:namespace/name:0000`. Identifiers are validated with regular expressions at the contract boundary so invalid IDs cannot enter the stores.
 
@@ -66,12 +66,12 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
 
-**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). GraphStore returns lexical candidates; RetrieveFlow then reranks those candidates with exact word-token overlap over title and text before merging by node ID. `_expand_to_sources` promotes parent source nodes from chunk hits, and the final bundle contains ranked hits plus the associated graph edges.
+**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). GraphStore also exposes an FTS5/BM25 search path for evaluation baselines, but that is not yet the production retrieval path. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID. `_expand_to_sources` promotes parent source nodes from chunk hits, and the final bundle contains ranked hits plus the associated graph edges.
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query rewriting** — the user's natural-language question is sent to the LLM to produce a dense 8–12 keyword technical search query, improving vector recall over conversational phrasing.
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
-3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source when needed. If the LLM produces no citations despite having context, the top-scoring source hit is injected as a fallback citation.
+3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source when needed. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
 
 **LLM client.** `OllamaLLMClient` calls the Ollama `/api/chat` endpoint locally — no external API key needed. The generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. `EchoLLMClient` is a deterministic stub for tests.
 
@@ -106,50 +106,48 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Evaluation
 
-RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, covering easy, medium, and hard questions across schema knowledge, method detail, quantitative results, error analysis, and cross-paper reasoning.
+RCA is currently evaluated on **65 golden questions**: `60` answerable and `5` explicit negative / unanswerable queries.
 
-### Current results (run 2026-03-14)
+### Current generation results
+
+Live harness artifact: `eval/results/run_20260315T145602Z.json`
 
 | Metric | Value |
 |---|---|
-| Grounded rate | 100% |
-| Citation precision | 86.7% |
-| Avg keyword hit rate | 0.189 |
-| Avg latency | 16.8 s |
+| Citation precision (answerable, non-abstained) | 91.8% over 49 cases |
+| Negative abstention recall | 2/5 (40.0%) |
+| Meaningful grounded rate | 49/60 = 81.7% |
+| Avg keyword hit rate | 0.167 |
+| Avg latency | 12.5 s |
 
-**Breakdown by difficulty:**
+The generation pipeline now includes explicit abstention detection. That makes the current grounding metric more honest than the older `100% grounded` runs, but it also exposes a real limitation: three unsupported questions still retrieve plausible enough context that score-based abstention does not trigger.
 
-| Difficulty | Count | Grounded | Citation precision | Keyword hit rate |
-|---|---|---|---|---|
-| Easy | 6 | 100% | 100.0% | 0.531 |
-| Medium | 15 | 100% | 80.0% | 0.080 |
-| Hard | 9 | 100% | 88.9% | 0.143 |
-
-**Retrieval ablations — hit@5 / hit@10 (n=30):**
+### Retrieval baselines — hit@5 / hit@10 (n=60 answerable)
 
 | Configuration | hit@5 | hit@10 |
-|---|---|---|
-| 1. vector-only | 80.0% | 96.7% |
-| 2. vector + keyword search | 80.0% | 96.7% |
-| 3. vector + keyword + expansion | 96.7% | 100.0% |
-| 4. full pipeline (+ query rewrite) | 100.0% | 100.0% |
+|---|---:|---:|
+| 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
+| 1. vector-only (dense baseline) | 76.7% | 91.7% |
+| 2. vector + keyword (LIKE) | 76.7% | 91.7% |
+| 3. vector + keyword + expansion | 86.7% | 91.7% |
+| 4. full pipeline (+ query rewrite) | 80.0% | 90.0% |
 
 ### What the numbers mean
 
-- **86.7% citation precision** — the citation-resolution fix and golden-set correction removed the original false negatives, and the later retrieval/ranking hardening preserved that level while improving retrieval quality.
-- **96.7% hit@10 on plain vector search** — the correct source is almost always in the index and retrievable; the bottleneck is rank position, not embedding quality.
-- **Exact-word lexical rescoring + source expansion lifts hit@5 from 80% → 96.7%** — after removing partial-word false positives in title/text scoring, graph-backed retrieval recovers nearly every rank miss before rewrite is applied.
-- **Query rewriting closes the remaining top-5 miss** — the full pipeline now reaches 100.0% hit@5 / 100.0% hit@10 on the 30-case set.
-- **Remaining eval misses are generation-side citation selection cases** — `pic2-010`, `review-002`, `review-003`, and `stablebinpacking-002` still cite the wrong paper despite correct retrieval.
-- **Low keyword hit rate** — answers cite the right source but LLM paraphrases rather than quoting, missing specific technical terms. This is an answer quality issue, not a retrieval issue.
+- **FTS5/BM25 is the strongest retrieval baseline measured so far**. On the current 60 answerable questions, it beats the production `LIKE` path by `+18.3pp` at hit@5 and even beats the current expansion configuration by `+8.3pp`.
+- **The current production lexical path is no longer the best measured lexical choice.** The repo keeps `LIKE` as the production path for now because this work was scoped as an evaluation/baseline addition, not a retrieval migration.
+- **Dense retrieval is still useful as a baseline**, but on this corpus the questions are lexically anchored enough that BM25 performs much better.
+- **Query rewrite remains mixed**. It helps some sparse technical queries, but still hurts several paraphrase and cross-paper questions.
+- **Generation is more honest than before**. The current harness no longer counts all negative questions as grounded, but abstention is still heuristic and not fully calibrated.
 
 ### Known failure modes
 
 | Failure class | Description |
 |---|---|
-| Citation selection drift | Correct source is retrieved but the LLM cites a distractor (`pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`) |
-| Vector-only rank miss | A few questions still need source expansion or rewrite to surface the right paper near the top (`jampacker-001`, `stablebinpacking-002`, `sgvl-003`) |
-| Named-entity rewrite drift | Rewriter can still replace specific system/scene names with generic terms |
+| Citation selection drift | Correct source is retrieved but the LLM cites a distractor or answers around the wrong detail |
+| Abstention calibration gap | Three negative questions still look plausible enough by score that abstention does not trigger |
+| Detail-level abstention on answerable questions | The model sometimes correctly notices a missing metric/detail instead of giving the broader paper-level answer |
+| Query rewrite drift | Rewriter can still replace specific system/scene names with generic terms |
 | LLM paraphrase | Answer cites correctly but misses specific numerical/keyword content |
 
 ---
@@ -166,11 +164,12 @@ RCA is evaluated against **30 golden Q&A pairs** spanning 6 source papers, cover
 - [x] Integration tests
 - [x] Evaluation harness with golden Q&A pairs
 - [x] **Fix citation precision** — source-ID resolution bug
-- [x] **Retrieval ablations** — vector-only vs hybrid vs graph vs rewrite
+- [x] **Retrieval baselines and ablations** — FTS5/BM25, dense-only, LIKE, graph expansion, rewrite
 - [x] **Retrieval ranking hardening** — exact-word title/text rescoring to remove partial-word false positives
+- [x] **Expand golden set** — 30 → 65 stratified questions
+- [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
-- [ ] **Expand golden set** — 30 → 100+ pairs
-- [ ] Observability — per-stage latency, token usage, retrieval provenance
+- [ ] **Expand golden set further** — 65 → 80–100+ pairs
 - [ ] arxiv MCP server
 - [ ] Zotero MCP server
 - [ ] Weekly digest generator

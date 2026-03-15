@@ -59,3 +59,33 @@ def test_graph_store_like_underscore_is_literal(tmp_path) -> None:
 
     assert exact_id in hit_ids, "exact underscore title should match"
     assert wild_id not in hit_ids, "_ in token must not act as SQL wildcard matching bertXbase"
+
+
+def test_graph_store_fts5_returns_ranked_results(tmp_path) -> None:
+    store = GraphStore(tmp_path / "graph.sqlite3")
+
+    source_id = make_source_id("pdf", "fault-recovery-paper")
+    distractor_id = make_source_id("pdf", "irrelevant-paper")
+
+    store.upsert_node(
+        Node(
+            id=source_id,
+            kind=NodeKind.paper,
+            title="Fault Recovery Module for JamPacker",
+            text="The fault recovery module improves execution reliability.",
+        )
+    )
+    store.upsert_node(
+        Node(
+            id=distractor_id,
+            kind=NodeKind.paper,
+            title="Unrelated Planning Paper",
+            text="This paper discusses scene graphs and planning.",
+        )
+    )
+
+    hits = store.search_nodes_fts5("fault recovery module", limit=5)
+
+    assert hits
+    assert hits[0].id == source_id
+    assert distractor_id not in [hit.id for hit in hits[:1]]

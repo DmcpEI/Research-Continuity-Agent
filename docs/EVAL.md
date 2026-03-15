@@ -99,15 +99,46 @@ Current aggregate retrieval results:
 
 | Configuration | hit@5 | hit@10 |
 |---|---:|---:|
-| 1. vector-only | `76.7%` | `91.7%` |
-| 2. vector + keyword | `76.7%` | `91.7%` |
+| 0. fts5-only (BM25 baseline) | `95.0%` | `98.3%` |
+| 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
+| 2. vector + keyword (LIKE) | `76.7%` | `91.7%` |
 | 3. vector + keyword + expansion | `86.7%` | `91.7%` |
 | 4. full pipeline (+ rewrite) | `80.0%` | `90.0%` |
 
 Interpretation:
-- vector retrieval remains a strong baseline
-- graph expansion is still the best raw retrieval setting on the expanded 65-question set
-- query rewrite is mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
+- FTS5/BM25 is currently the strongest single-method baseline on the expanded 65-question set
+- the production LIKE path adds no lift over dense-only retrieval in config 2
+- graph expansion improves the current production path but still underperforms the FTS5 baseline
+- query rewrite remains mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
+
+## Retrieval Baselines
+
+The retrieval baseline question is now answered explicitly rather than by architectural preference.
+
+| Configuration | hit@5 | hit@10 |
+|---|---:|---:|
+| 0. fts5-only (BM25 baseline) | `95.0%` | `98.3%` |
+| 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
+| 2. vector + keyword (LIKE) | `76.7%` | `91.7%` |
+| 3. vector + keyword + expansion | `86.7%` | `91.7%` |
+| 4. full pipeline (+ rewrite) | `80.0%` | `90.0%` |
+
+Examiner question: why did the system not use FTS5 earlier?
+
+Honest answer:
+- the production retrieval path was originally built around transparent token-wise `LIKE` candidate generation plus vector composition
+- after implementing an explicit BM25 baseline, FTS5 now measures better than the current `LIKE` path
+- on this 60-question answerable set, FTS5-only beats the current `LIKE`-based dense hybrid by `+18.3pp` at hit@5 (`95.0%` vs `76.7%`)
+- it also beats the current expansion configuration by `+8.3pp` at hit@5 (`95.0%` vs `86.7%`)
+
+So the current answer is not “LIKE was better.” The measured result is the opposite:
+- FTS5 significantly outperforms the hand-rolled `LIKE` baseline
+- FTS5 is now a future migration candidate for the lexical stage
+- this repo intentionally keeps `search_nodes()` unchanged for now because this change was scoped as an evaluation/baseline exercise rather than a production retrieval migration
+
+One important consequence:
+- the composed pipeline does **not** currently outperform all single-method baselines
+- FTS5-only is the best retrieval configuration measured so far on hit@5 and hit@10
 
 ---
 
@@ -188,7 +219,7 @@ This is the practical ceiling of the current phrase-plus-score heuristic. It is 
 | Query rewrite still hurts some paraphrase and cross-paper questions | Active |
 | Keyword hit rate is lexical, not semantic | Acceptable but limited |
 | Category counts are still small in several buckets | Active |
-| No explicit lexical-only FTS/BM25 baseline yet | Planned |
+| Production lexical path still uses `LIKE` even though FTS5 now measures better | Active |
 
 ---
 
@@ -196,6 +227,6 @@ This is the practical ceiling of the current phrase-plus-score heuristic. It is 
 
 - add calibrated confidence scoring or a dedicated abstention classifier
 - run the generation harness again after any abstention-model change, not just retrieval ablations
-- add lexical-only baseline comparisons
+- decide whether to migrate the production lexical path from `LIKE` to FTS5/BM25
 - report confidence intervals or small-sample caveats for tiny categories
 - continue expanding the question set with externally written prompts

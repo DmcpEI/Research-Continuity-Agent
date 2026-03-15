@@ -1,7 +1,8 @@
-"""Retrieval ablation study — 4 configurations, hit@5 and hit@10 on golden pairs.
+"""Retrieval ablation study — 5 configurations, hit@5 and hit@10 on golden pairs.
 
 Configs
 -------
+0. fts5-only            : GraphStore.search_nodes_fts5() only
 1. vector-only          : VectorStore.query() only
 2. vector + keyword     : vector + GraphStore.search_nodes(), no expansion
 3. vector + keyword + expand: full RetrieveFlow.retrieve(), no query rewrite
@@ -104,16 +105,17 @@ def print_bucket_table(
     rows: list[tuple[str, str]],
     left_header: str,
 ) -> None:
-    print("=" * 118)
+    print("=" * 140)
     print(title)
     print(
         f"{left_header:<18} {'n':>3}  "
-        f"{'vector@5':>8} {'vector@10':>9}  "
-        f"{'+keyword@5':>10} {'+keyword@10':>11}  "
+        f"{'fts5@5':>8} {'fts5@10':>9}  "
+        f"{'dense@5':>9} {'dense@10':>10}  "
+        f"{'+like@5':>8} {'+like@10':>9}  "
         f"{'+expand@5':>9} {'+expand@10':>10}  "
         f"{'+rewrite@5':>10} {'+rewrite@10':>11}"
     )
-    print("-" * 118)
+    print("-" * 140)
     for label, key in rows:
         metrics = summary.get(key)
         if metrics is None:
@@ -122,12 +124,13 @@ def print_bucket_table(
         hit10 = metrics["summary_hit_at_10"]
         print(
             f"  {label:<16} {metrics['cases']:>3}  "
-            f"{hit5['1_vector_only']:>8.1%} {hit10['1_vector_only']:>9.1%}  "
-            f"{hit5['2_vector_keyword']:>10.1%} {hit10['2_vector_keyword']:>11.1%}  "
+            f"{hit5['0_fts5_only']:>8.1%} {hit10['0_fts5_only']:>9.1%}  "
+            f"{hit5['1_vector_only']:>9.1%} {hit10['1_vector_only']:>10.1%}  "
+            f"{hit5['2_vector_keyword']:>8.1%} {hit10['2_vector_keyword']:>9.1%}  "
             f"{hit5['3_vector_keyword_expand']:>9.1%} {hit10['3_vector_keyword_expand']:>10.1%}  "
             f"{hit5['4_full_rewrite']:>10.1%} {hit10['4_full_rewrite']:>11.1%}"
         )
-    print("=" * 118)
+    print("=" * 140)
     print()
 
 
@@ -162,6 +165,22 @@ def run_config1(question: str, vector_store: VectorStore, graph_store: GraphStor
             node_id=r.id, score=r.score, title=title,
             excerpt=r.document[:240], metadata=metadata,
         ))
+    return hits
+
+
+def run_config0(question: str, graph_store: GraphStore) -> list[RetrievalHit]:
+    """FTS5-only BM25 baseline: lexical search without vector, expansion, or rewrite."""
+    hits = []
+    for rank, node in enumerate(graph_store.search_nodes_fts5(question, limit=FETCH_K), start=1):
+        hits.append(
+            RetrievalHit(
+                node_id=node.id,
+                score=max(0.0, 1.0 - ((rank - 1) * 0.01)),
+                title=node.title,
+                excerpt=(node.text or "")[:240],
+                metadata=node.metadata,
+            )
+        )
     return hits
 
 
@@ -207,7 +226,13 @@ def main() -> None:
     print(f"Loaded {len(golden_pairs)} golden pairs | vector backend: {vector_store.backend}")
     print()
 
-    config_keys = ["1_vector_only", "2_vector_keyword", "3_vector_keyword_expand", "4_full_rewrite"]
+    config_keys = [
+        "0_fts5_only",
+        "1_vector_only",
+        "2_vector_keyword",
+        "3_vector_keyword_expand",
+        "4_full_rewrite",
+    ]
     # track hits at both k=5 and k=10
     hits5: dict[str, list[bool]] = {k: [] for k in config_keys}
     hits10: dict[str, list[bool]] = {k: [] for k in config_keys}
@@ -237,6 +262,7 @@ def main() -> None:
 
         evaluated_cases += 1
 
+        hits0 = run_config0(question, graph_store)
         hits1 = run_config1(question, vector_store, graph_store)
         hits2 = run_config2(question, vector_store, graph_store)
         bundle3 = retrieve_flow.retrieve(question)
@@ -247,7 +273,7 @@ def main() -> None:
         if pair["id"] == "jampacker-001":
             print(f"  [jampacker-001 rewrite] → {rewritten!r}")
 
-        all_hits = [hits1, hits2, bundle3.hits, bundle4.hits]
+        all_hits = [hits0, hits1, hits2, bundle3.hits, bundle4.hits]
         for key, hit_list in zip(config_keys, all_hits):
             hits5[key].append(hit_at_k(hit_list, expected, k=5))
             hits10[key].append(hit_at_k(hit_list, expected, k=10))
@@ -266,8 +292,8 @@ def main() -> None:
         })
         h5  = [int(hits5[k][-1])  for k in config_keys]
         h10 = [int(hits10[k][-1]) for k in config_keys]
-        print(f"  @5  vector={h5[0]}  +keyword={h5[1]}  +expand={h5[2]}  +rewrite={h5[3]}")
-        print(f"  @10 vector={h10[0]}  +keyword={h10[1]}  +expand={h10[2]}  +rewrite={h10[3]}")
+        print(f"  @5  fts5={h5[0]}  dense={h5[1]}  +like={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}")
+        print(f"  @10 fts5={h10[0]}  dense={h10[1]}  +like={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}")
 
     n = evaluated_cases
     if n == 0:
@@ -278,8 +304,9 @@ def main() -> None:
         summary10 = {k: round(sum(v) / n, 4) for k, v in hits10.items()}
 
     rows = [
-        ("1. vector-only",                     "1_vector_only"),
-        ("2. vector + keyword",                "2_vector_keyword"),
+        ("0. fts5-only (BM25 baseline)",       "0_fts5_only"),
+        ("1. vector-only (dense baseline)",    "1_vector_only"),
+        ("2. vector + keyword (LIKE)",         "2_vector_keyword"),
         ("3. vector + keyword + expansion",    "3_vector_keyword_expand"),
         ("4. full pipeline (+ rewrite)",       "4_full_rewrite"),
     ]
@@ -292,13 +319,13 @@ def main() -> None:
     )
 
     print()
-    print("=" * 68)
+    print("=" * 74)
     print(f"Retrieval ablations — n={n} evaluated / {len(golden_pairs)} loaded")
-    print(f"{'Configuration':<35}  {'hit@5':>6}  {'hit@10':>7}")
-    print("-" * 68)
+    print(f"{'Configuration':<39}  {'hit@5':>6}  {'hit@10':>7}")
+    print("-" * 74)
     for label, key in rows:
-        print(f"  {label:<33}  {summary5[key]:>6.1%}  {summary10[key]:>7.1%}")
-    print("=" * 68)
+        print(f"  {label:<37}  {summary5[key]:>6.1%}  {summary10[key]:>7.1%}")
+    print("=" * 74)
     print()
 
     print_bucket_table(

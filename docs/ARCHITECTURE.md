@@ -12,12 +12,13 @@ IngestFlow
     ├── chunking (size=1200 chars, overlap=150)
     ├── metadata extraction (title, authors, source ID)
     ├── VectorStore  ← dense embeddings (nomic-embed-text via Ollama)
-    └── GraphStore   ← document registry + keyword search index (SQLite)
+    └── GraphStore   ← document registry + lexical indices (SQLite)
     │
     ▼
 RetrieveFlow
     ├── vector search  ← approximate nearest-neighbour (ChromaDB)
-    ├── graph keyword  ← LIKE candidate query over title/text (SQLite)
+    ├── graph keyword  ← LIKE candidate query over title/text (production)
+    ├── fts5 baseline  ← BM25 over title/text (evaluation only)
     ├── exact-word lexical rerank + dedup → ranked RetrievalBundle
     └── source expansion ← chunk → parent src: nodes
     │
@@ -29,6 +30,7 @@ GenerateFlow
     ├── LLM generation (qwen2.5:14b via Ollama)
     ├── citation extraction (_extract_citations)
     ├── source-ID resolution (chunk ID → parent src: node)
+    ├── abstention check (hedge phrases + retrieval confidence)
     └── grounding check → GenerateResult(answer, citations, grounded)
     │
     ▼
@@ -58,22 +60,23 @@ Node IDs follow the scheme defined in `rca/contracts/ids.py` — see [DATA_MODEL
 Hybrid retrieval over the dual-store. Called with a query string, returns a `RetrievalBundle`.
 
 1. **Vector search** — top-k approximate nearest-neighbour over embeddings
-2. **Graph keyword** — SQLite `LIKE` query over node title and text to fetch lexical candidates
+2. **Graph keyword** — SQLite `LIKE` query over node title and text to fetch lexical candidates on the production path
 3. **Lexical rerank** — exact word-token overlap over title and text removes partial-word false positives before merge
 4. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
 5. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
 6. **Edge collection** — gathers related edges for the returned nodes
 
-**Ablation results** (hit@5, n=30 golden pairs):
+**Ablation results** (hit@5 / hit@10, n=60 answerable pairs):
 
 | Config | hit@5 | hit@10 |
 |---|---|---|
-| vector-only | 80.0% | 96.7% |
-| vector + keyword | 80.0% | 96.7% |
-| vector + keyword + expansion | 96.7% | 100.0% |
-| full + query rewrite | 100.0% | 100.0% |
+| fts5-only (BM25 baseline) | 95.0% | 98.3% |
+| vector-only (dense baseline) | 76.7% | 91.7% |
+| vector + keyword (LIKE) | 76.7% | 91.7% |
+| vector + keyword + expansion | 86.7% | 91.7% |
+| full + query rewrite | 80.0% | 90.0% |
 
-Exact-word lexical rescoring plus source expansion materially improve retrieval on edge cases; query rewriting closes the remaining top-5 miss on the current 30-case set.
+The important current result is that FTS5/BM25 outperforms the production `LIKE` lexical path and also outperforms the current composed retrieval pipeline on hit@5.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 
@@ -86,7 +89,8 @@ Grounded answer generation with citation enforcement.
 5. **Generate** — calls `qwen2.5:14b` via Ollama
 6. **Extract citations** — parses inline citation markers from generated text
 7. **Resolve source IDs** — strips `:NNNN` suffix and resolves chunk IDs to parent `src:` nodes unconditionally
-8. **Ground check** — `grounded=True` if at least one valid citation was resolved to a returned hit
+8. **Abstention gate** — unsupported answers can be suppressed using hedge phrases plus retrieval confidence
+9. **Ground check** — `grounded=True` if at least one valid citation was resolved to a returned hit
 
 **QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the six pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, and `llm_generate`. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.
 
@@ -95,7 +99,8 @@ Grounded answer generation with citation enforcement.
 SQLite-backed structured store. Three responsibilities:
 
 - **Document registry** — tracks all ingested sources with metadata and provenance
-- **Keyword search** — `LIKE` query over `lower(title)` and `lower(text)` for lexical candidate retrieval
+- **Keyword search** — token-wise `LIKE` query over `lower(title)` and `lower(text)` for the production lexical path
+- **FTS5 baseline** — BM25 over an SQLite FTS5 virtual table (`nodes_fts`) for explicit evaluation baselines
 - **Entity graph** — nodes (papers, chunks, notes, experiments) and typed edges (contains, references, cites, related_to)
 
 See [DATA_MODEL.md](DATA_MODEL.md) for node kinds, edge kinds, and ID patterns.
@@ -112,8 +117,8 @@ In v2, this will be replaced by `pgvector` in Postgres for a unified store with 
 
 | Store | Role | Why not the other |
 |---|---|---|
-| ChromaDB | Semantic retrieval — approximate nearest-neighbour over dense embeddings | SQLite LIKE can't do semantic similarity |
-| SQLite | Document registry, keyword search, graph traversal, provenance, eval results | ChromaDB has no structured query, no graph, no foreign keys |
+| ChromaDB | Semantic retrieval — approximate nearest-neighbour over dense embeddings | SQLite lexical indices can't do semantic similarity |
+| SQLite | Document registry, keyword search, graph traversal, provenance | ChromaDB has no structured query, no graph, no foreign keys |
 
 Each store has a distinct function. The graph is not decorative — it enables chunk-to-source resolution, structured traversal for related content, and provenance tracking that vector search cannot provide.
 
@@ -127,7 +132,8 @@ User query
     ├─ GenerateFlow._rewrite_query(query) → rewritten_query
     │
     ├─ VectorStore.query(rewritten_query, limit=10)        → vector_hits
-    ├─ GraphStore.search_nodes(rewritten_query, limit=10)  → keyword_hits
+    ├─ GraphStore.search_nodes(rewritten_query, limit=10)  → keyword_hits (production)
+    ├─ GraphStore.search_nodes_fts5(query, limit=10)       → bm25_hits (baseline only)
     ├─ exact-word lexical rerank over title/text           → rescored_hits
     ├─ RetrieveFlow._expand_to_sources(...)                → source_hits
     │
@@ -137,6 +143,7 @@ User query
     │       ├─ format context from bundle.hits
     │       ├─ LLM(system_prompt + context + query) → raw_answer
     │       ├─ _extract_citations(raw_answer, bundle) → citations
+    │       ├─ abstention gate → optional no-answer result
     │       └─ GeneratedAnswer(answer, citations, grounded)
     │
     └─ UI / API response with inline citations

@@ -20,3 +20,28 @@ CREATE TABLE IF NOT EXISTS edges (
 CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind);
 CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source);
 CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
+    title,
+    text,
+    content='nodes',
+    content_rowid='rowid',
+    tokenize = "unicode61 tokenchars '._-+'"
+);
+
+CREATE TRIGGER IF NOT EXISTS nodes_ai AFTER INSERT ON nodes BEGIN
+    INSERT INTO nodes_fts(rowid, title, text)
+    VALUES (new.rowid, new.title, coalesce(new.text, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS nodes_ad AFTER DELETE ON nodes BEGIN
+    INSERT INTO nodes_fts(nodes_fts, rowid, title, text)
+    VALUES ('delete', old.rowid, old.title, coalesce(old.text, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS nodes_au AFTER UPDATE ON nodes BEGIN
+    INSERT INTO nodes_fts(nodes_fts, rowid, title, text)
+    VALUES ('delete', old.rowid, old.title, coalesce(old.text, ''));
+    INSERT INTO nodes_fts(rowid, title, text)
+    VALUES (new.rowid, new.title, coalesce(new.text, ''));
+END;
