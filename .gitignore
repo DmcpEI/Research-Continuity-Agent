@@ -13,5 +13,6 @@ __pycache__/
 .DS_Store
 .rca/
 eval/results/*.json
+eval/results/traces/
 !eval/results/.gitkeep
 .claude/
