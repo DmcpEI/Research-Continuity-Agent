@@ -273,7 +273,7 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 
 🔴 Critical — before thesis defence / CV:
 
-- Abstention / grounding detection — a two-gate abstention check now exists, but it is still under-calibrated. Current results are `1/5` negative recall with `8` answerable abstentions on the 65-question run. The next step is calibrated confidence scoring or a dedicated abstention classifier.
+- [x] Abstention / grounding detection — a two-gate abstention check now exists, but it is still under-calibrated. Current results are `1/5` negative recall with `8` answerable abstentions on the 65-question run. The next step is calibrated confidence scoring or a dedicated abstention classifier.
 - [x] Expand generation evaluation to the full 65-question set — answer-level metrics now use the same 65-question corpus as retrieval ablations.
 - [x] Explicit baselines added to evaluation — config 0 is now an FTS5/BM25 lexical baseline and config 1 is labeled explicitly as the dense baseline. All five retrieval configs are reported in one table.
 - [x] FTS5 investigation completed — FTS5/BM25 measured better than the earlier `LIKE` path and has now replaced it on the production lexical path.
@@ -284,10 +284,10 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 🟡 Important — before thesis submission:
 
 - [x] Coefficient sweep — completed with a held-out split. The current lexical reranker moved from `(title=0.12, text=0.04)` to `(title=0.12, text=0.05)` after a `+5.3pp` held-out hit@5 gain.
-- README architecture diagram + one-command eval — add a compact system diagram and ensure `uv run python eval/run_ablations.py` reproduces the reported numbers from a clean state.
+- [x] README architecture diagram + one-command eval — the README now includes a Mermaid system diagram plus explicit `uv run python eval/run_ablations.py` and `uv run python eval/harness.py` reproduction commands.
 - Question independence — have at least 10 golden questions written by someone else (labmate, advisor, reviewer) to reduce self-bias in the eval set.
-- API backend config option — add an OpenAI-compatible base-URL / model configuration path in `rca/llm/client.py` so local-first is clearly a deliberate deployment choice, not a hard product limitation.
-- Confidence intervals on per-category metrics — several categories have very small `n`, so per-category hit rates should either include confidence intervals or be explicitly caveated as small-sample results.
+- [x] API backend config option — `rca/llm/client.py` now supports configurable `RCA_LLM_BASE_URL` / `RCA_LLM_API_KEY` for OpenAI-compatible endpoints while keeping the default Ollama path unchanged.
+- [x] Confidence intervals on per-category metrics — per-category ablation output now reports 95% Wilson confidence intervals and flags small-sample categories with explicit caution.
 
 🟢 Roadmap — after core gaps are closed:
 
