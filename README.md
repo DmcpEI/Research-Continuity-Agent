@@ -129,14 +129,15 @@ The generation pipeline now includes explicit abstention detection. That makes t
 | 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
 | 2. vector + keyword (FTS5) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 93.3% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 91.7% | 96.7% |
+| 3. vector + keyword + expansion | 95.0% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 93.3% | 96.7% |
 
 ### What the numbers mean
 
 - **FTS5/BM25 is now the production lexical backbone**. The repo originally shipped with a transparent token-wise `LIKE` lexical stage, then added an explicit FTS5/BM25 baseline, and finally migrated production retrieval after BM25 consistently outperformed the older path.
-- **Pure FTS5-only is still the strongest retrieval configuration measured so far.** The current composed pipeline improved after the migration, but it still trails the pure BM25 baseline by `1.7pp` at hit@5 and `1.6pp` at hit@10.
+- **Pure FTS5-only remains an unusually strong baseline on this corpus.** After the coefficient sweep, the composed pipeline now matches BM25-only at hit@5 (`95.0%`) but still trails at hit@10 (`96.7%` vs `98.3%`).
 - **Dense retrieval is still useful as a baseline**, but on this corpus the questions are lexically anchored enough that BM25 performs much better.
+- **Source expansion is the main contributor after the lexical backbone itself.** Config 3 gains `+18.3pp` over vector-only at hit@5.
 - **Query rewrite remains mixed**. It helps some sparse technical queries, but still hurts several paraphrase and cross-paper questions.
 - **Generation improved on answerable citation precision after the lexical migration**, but abstention got worse. The stronger lexical backbone surfaces plausible context more often, which helps answerable questions but makes unsupported questions harder to reject with the current phrase-plus-score abstention heuristic.
 

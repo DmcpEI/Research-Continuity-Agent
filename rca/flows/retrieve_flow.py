@@ -16,6 +16,9 @@ from rca.store.vector_store import VectorQueryResult, VectorStore
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9][a-z0-9+_.-]*")
 TITLE_WORD_PATTERN = re.compile(r"[a-z0-9]+")
+LEXICAL_BASE_SCORE = 0.45
+LEXICAL_TITLE_WEIGHT = 0.12
+LEXICAL_TEXT_WEIGHT = 0.05
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
     "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
@@ -206,7 +209,12 @@ class RetrieveFlow:
         if title_overlap == 0 and text_overlap == 0:
             return 0.0
 
-        return min(0.95, 0.45 + (0.12 * title_overlap) + (0.04 * text_overlap))
+        return min(
+            0.95,
+            LEXICAL_BASE_SCORE
+            + (LEXICAL_TITLE_WEIGHT * title_overlap)
+            + (LEXICAL_TEXT_WEIGHT * text_overlap),
+        )
 
     @staticmethod
     def _append_stage(

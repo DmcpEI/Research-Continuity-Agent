@@ -1,0 +1,27 @@
+{
+  "split": "test",
+  "seed": 42,
+  "count": 20,
+  "ids": [
+    "stablebinpacking-001",
+    "densepack-001",
+    "moma-001",
+    "cross-006",
+    "cross-004",
+    "pic2-010",
+    "pic2-008",
+    "review-002",
+    "vlmsurvey-004",
+    "jampacker-002",
+    "densepack-002",
+    "neg-001",
+    "para-002",
+    "densepack-003",
+    "pic2-004",
+    "autobag-003",
+    "sgvl-003",
+    "pic2-009",
+    "synth-005",
+    "synth-002"
+  ]
+}

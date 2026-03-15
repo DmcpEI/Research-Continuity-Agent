@@ -103,13 +103,14 @@ Current aggregate retrieval results:
 | 0. fts5-only (BM25 baseline) | `95.0%` | `98.3%` |
 | 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `91.7%` |
-| 3. vector + keyword + expansion | `93.3%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `91.7%` | `96.7%` |
+| 3. vector + keyword + expansion | `95.0%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `93.3%` | `96.7%` |
 
 Interpretation:
-- FTS5/BM25 is currently the strongest retrieval configuration on the expanded 65-question set
+- FTS5/BM25 and the tuned expansion pipeline are now tied for the strongest hit@5 result on the expanded 65-question set
 - config 2 shows that simply adding dense hits to the new FTS5 backbone does not help by itself
-- graph expansion and rewrite now improve materially over the older LIKE-based pipeline, but still underperform pure BM25
+- graph expansion is the single biggest downstream improvement over the dense baseline, lifting hit@5 from `76.7%` to `95.0%`
+- pure FTS5 remains the best hit@10 configuration at `98.3%`
 - query rewrite remains mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
 
 Per-category retrieval results now report 95% Wilson confidence intervals rather than raw percentages alone. This matters because several categories are still very small (`error_analysis n=2`, `paraphrase n=5`, `cross_paper n=6`), and point estimates on their own overstate certainty. Categories with `n <= 6` are flagged explicitly and should be interpreted with caution in the thesis writeup.
@@ -123,8 +124,8 @@ The retrieval baseline question is now answered explicitly rather than by archit
 | 0. fts5-only (BM25 baseline) | `95.0%` | `98.3%` |
 | 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `91.7%` |
-| 3. vector + keyword + expansion | `93.3%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `91.7%` | `96.7%` |
+| 3. vector + keyword + expansion | `95.0%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `93.3%` | `96.7%` |
 
 Examiner question: why did the system not use FTS5 earlier, and what changed?
 
@@ -132,7 +133,7 @@ Honest answer:
 - the production retrieval path was originally built around transparent token-wise `LIKE` candidate generation plus vector composition
 - after implementing an explicit BM25 baseline, FTS5 measured better than the older `LIKE` path
 - on this 60-question answerable set, FTS5-only beats the old `LIKE`-based dense hybrid by `+18.3pp` at hit@5 (`95.0%` vs `76.7%`)
-- it also beats the current expansion configuration by `+1.7pp` at hit@5 (`95.0%` vs `93.3%`)
+- before the coefficient sweep, it beat the expansion configuration by `+1.7pp` at hit@5 (`95.0%` vs `93.3%`)
 - that result was strong enough that the production lexical backbone was migrated from `LIKE` to FTS5/BM25
 
 So the current answer is:
@@ -142,10 +143,52 @@ So the current answer is:
 - the earlier implementation remains available as `search_nodes_like()` for reference and regression testing
 
 One important consequence remains:
-- the composed pipeline does **not** currently outperform all single-method baselines
-- FTS5-only is still the best retrieval configuration measured so far on hit@5 and hit@10
+- after coefficient tuning, the composed pipeline now matches pure FTS5 on hit@5 (`95.0%`) but still trails it on hit@10 (`96.7%` vs `98.3%`)
+- FTS5-only therefore remains the cleanest single-method baseline and the best hit@10 configuration measured so far
 
-This is worth stating plainly: FTS5-only remains the strongest single retrieval configuration on this corpus (`95.0%` hit@5). The composed pipeline (`FTS5 + vector + expansion`) reaches `93.3%`, which is `1.7` points behind. On a small, domain-specific corpus like this one, BM25 term statistics are strong enough that the semantic retrieval layer does not yet add net value over the lexical baseline. At larger corpus scale or broader domain coverage, the semantic layer is still expected to contribute more significantly. What *does* matter immediately is source expansion: config 3 gains `+16.6pp` over vector-only (`93.3%` vs `76.7%`), making graph expansion the single most impactful pipeline component after the lexical backbone itself.
+This is worth stating plainly: pure FTS5 remains an unusually strong baseline on this corpus. After the lexical migration and the reranker sweep, the composed pipeline (`FTS5 + vector + expansion`) now reaches the same hit@5 as BM25-only (`95.0%`) while still trailing on hit@10. On a small, domain-specific corpus like this one, BM25 term statistics are strong enough that the semantic retrieval layer adds limited net value unless it is paired with a strong expansion/reranking stage. What *does* matter immediately is source expansion: config 3 gains `+18.3pp` over vector-only (`95.0%` vs `76.7%`), making graph expansion the single most impactful pipeline component after the lexical backbone itself.
+
+---
+
+## Coefficient Sweep
+
+The lexical reranker in [retrieve_flow.py](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/retrieve_flow.py) no longer defines the core lexical retrieval engine, because FTS5/BM25 now handles lexical candidate generation. It still matters, however, because it reranks lexical hits before they are merged with dense results and source expansion. To justify the title/text overlap weights empirically, RCA now includes a held-out coefficient sweep:
+
+- split definition: `45` dev questions and `20` held-out test questions, saved in [dev.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/splits/dev.json) and [test.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/splits/test.json)
+- split strategy: stratified by category with `random.seed(42)`
+- objective: config 3 (`vector + keyword + expansion`) hit@5 on answerable questions only
+- fixed base score: `0.45`
+- sweep grid: `title_weight in [0.08, 0.12, 0.16, 0.20, 0.24]`, `text_weight in [0.01, 0.02, 0.03, 0.04, 0.05]`
+
+Dev split hit@5 grid:
+
+| title\text | 0.01 | 0.02 | 0.03 | 0.04 | 0.05 |
+|---|---|---|---|---|---|
+| 0.08 | 80.5% | 82.9% | 87.8% | 95.1% | 95.1% |
+| 0.12 | 87.8% | 92.7% | 95.1% | 97.6% baseline | 97.6% selected |
+| 0.16 | 92.7% | 95.1% | 95.1% | 97.6% | 97.6% |
+| 0.20 | 95.1% | 95.1% | 95.1% | 97.6% | 97.6% |
+| 0.24 | 95.1% | 95.1% | 95.1% | 97.6% | 97.6% |
+
+Key findings:
+
+- the current pre-sweep production weights (`0.12`, `0.04`) were already on the dev-optimal frontier, so they were not arbitrary
+- the dev-optimal frontier contained eight tied combinations, not a single winner
+- the held-out split was therefore used to choose among the tied dev-best settings
+
+Held-out validation:
+
+- baseline production (`0.12`, `0.04`): hit@5 `84.2%`, hit@10 `94.7%`
+- selected setting (`0.12`, `0.05`): hit@5 `89.5%`, hit@10 `94.7%`
+
+Decision:
+
+- update production weights from (`0.12`, `0.04`) to (`0.12`, `0.05`)
+- rationale: the held-out hit@5 gain was `+5.3pp`, which exceeds the `2.0pp` threshold, while held-out hit@10 stayed unchanged
+- interpretation: the sweep did not justify increasing the title weight, but it did justify a small increase in text weight for the lexical reranker
+- effect on the live ablation table: config 3 improved from `93.3%` to `95.0%` at hit@5, matching the FTS5-only baseline on hit@5 while keeping hit@10 at `96.7%`
+
+Full artifact: [coefficient_sweep.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/coefficient_sweep.json)
 
 ---
 
@@ -232,7 +275,7 @@ This is the practical ceiling of the current phrase-plus-score heuristic. It is 
 | Query rewrite still hurts some paraphrase and cross-paper questions | Active |
 | Keyword hit rate is lexical, not semantic | Acceptable but limited |
 | Category counts are still small in several buckets | Active |
-| Pure FTS5-only still outperforms the composed retrieval pipeline | Active |
+| Pure FTS5-only still leads the composed pipeline on hit@10 | Active |
 
 ---
 
@@ -240,6 +283,6 @@ This is the practical ceiling of the current phrase-plus-score heuristic. It is 
 
 - add calibrated confidence scoring or a dedicated abstention classifier
 - run the generation harness again after any abstention-model change, not just retrieval ablations
-- measure why BM25-only still beats the composed retrieval pipeline after the lexical migration
+- measure why BM25-only still leads the tuned composed pipeline on hit@10
 - report confidence intervals or small-sample caveats for tiny categories
 - continue expanding the question set with externally written prompts

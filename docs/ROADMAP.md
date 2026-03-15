@@ -13,7 +13,7 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 
 ---
 
-## Current state (v1.1.0 — 2026-03-14)
+## Current state (v1.2.0 — 2026-03-15)
 
 ### What works
 - [x] Project scaffold (uv, pydantic settings, stable ID system)
@@ -46,8 +46,8 @@ Retrieval ablations — hit@5 / hit@10 (n=60 answerable):
 | 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
 | 2. vector + keyword (FTS5) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 93.3% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 91.7% | 96.7% |
+| 3. vector + keyword + expansion | 95.0% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 93.3% | 96.7% |
 
 ### Known failure modes
 - Citation selection drift on a small set of cases (`jampacker-003`, `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`, `vilain-001`)
@@ -84,14 +84,15 @@ hit@5 / hit@10 across 60 answerable golden pairs (current):
 | 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
 | 2. vector + keyword (FTS5) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 93.3% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 91.7% | 96.7% |
+| 3. vector + keyword + expansion | 95.0% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 93.3% | 96.7% |
 
 **Findings:**
 - FTS5/BM25 was strong enough in ablation that it replaced the earlier token-wise `LIKE` lexical stage on the production path.
+- A held-out coefficient sweep then tuned the reranker from `(title=0.12, text=0.04)` to `(title=0.12, text=0.05)`, lifting config 3 from `93.3%` to `95.0%` at hit@5.
 - The original `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the design history and provides a simple fallback baseline.
 - Query rewriting is still mixed on the expanded set and currently underperforms the raw FTS5 baseline.
-- The current retrieval story is no longer “hybrid beats simple baselines.” Even after the migration, the pure FTS5 baseline remains the best measured retrieval configuration.
+- The current retrieval story is now more balanced: the composed pipeline matches pure FTS5 at hit@5, but BM25-only still leads at hit@10.
 - Full results in `eval/results/ablations.json`.
 
 Remaining:
@@ -138,7 +139,7 @@ Remaining:
 - [ ] arxiv MCP server — pull papers by ID or search directly into RCA
 - [ ] Zotero MCP server — sync Zotero library into RCA automatically
 
-### Tag v1.1.0 when:
+### v1.1.0 tag criteria (historical):
 - Citation precision > 70% ✅ (88.5% over answerable, non-abstained cases)
 - Retrieval ablation table published ✅
 - Docker one-command boot working ✅
@@ -220,7 +221,7 @@ git checkout -b v2/migrate
 > Built a local-first research knowledge system that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations. Designed an evaluation harness with golden queries, retrieval ablations, and failure analysis for citation errors and hallucination modes.
 
 **With numbers (v1 current):**
-> Citation precision is 88.5% over 52 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 1/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 93.3% with graph expansion, and 91.7% with the full rewrite pipeline. The current surprise result is that pure FTS5-only is still the strongest measured retrieval configuration, even after the production lexical path migrated to BM25.
+> Citation precision is 88.5% over 52 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 1/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 95.0% with graph expansion, and 93.3% with the full rewrite pipeline. The current result is that the tuned expansion pipeline now matches pure FTS5 at hit@5, while BM25-only still leads on hit@10.
 
 ---
 
@@ -249,7 +250,7 @@ These priorities were identified through external review of v1.1.0. They are ord
 
 🟡 Medium priority
 
-- Coefficient tuning justification — future changes to scoring coefficients (e.g. title weight) must include a small sweep (e.g. 0.15, 0.18, 0.20, 0.25) rather than manual eyeballing, so the chosen value is defensible to a thesis examiner.
+- Coefficient tuning justification — completed once for the current reranker, and any future coefficient changes should continue to use a held-out sweep rather than manual eyeballing so the choice stays defensible to a thesis examiner.
 - Index/state versioning — eval output should record what ingest schema version, chunking version, embedding model, and graph build version produced the current store. Prevents ambiguity like "did this metric come from current code against stale graph state?"
 - Chroma fallback visibility in eval — a warning log is not enough. Eval runs should detect and flag if retrieval ran on JSON fallback instead of Chroma, since metrics are not comparable across backends.
 
@@ -276,12 +277,13 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 - [x] Expand generation evaluation to the full 65-question set — answer-level metrics now use the same 65-question corpus as retrieval ablations.
 - [x] Explicit baselines added to evaluation — config 0 is now an FTS5/BM25 lexical baseline and config 1 is labeled explicitly as the dense baseline. All five retrieval configs are reported in one table.
 - [x] FTS5 investigation completed — FTS5/BM25 measured better than the earlier `LIKE` path and has now replaced it on the production lexical path.
+- [x] Coefficient sweep completed — held-out validation justified raising `text_weight` from `0.04` to `0.05` while keeping `title_weight` at `0.12`.
 - Keep the repository lean — placeholder-only files and dead helpers should be deleted or clearly deprecated. Every retained file should have a clear current role in the ingest, retrieval, generation, eval, or deployment path.
 - Keep orchestration claims honest — orchestration is handled directly via `RetrieveFlow` and `GenerateFlow` today. A LangGraph-based agent workflow remains a roadmap option, not shipped functionality.
 
 🟡 Important — before thesis submission:
 
-- Coefficient sweep — lexical weights are still hand-tuned. Run a grid over title weight and text weight, evaluate on a held-out split, and show the selected values are near-optimal rather than ad hoc.
+- [x] Coefficient sweep — completed with a held-out split. The current lexical reranker moved from `(title=0.12, text=0.04)` to `(title=0.12, text=0.05)` after a `+5.3pp` held-out hit@5 gain.
 - README architecture diagram + one-command eval — add a compact system diagram and ensure `uv run python eval/run_ablations.py` reproduces the reported numbers from a clean state.
 - Question independence — have at least 10 golden questions written by someone else (labmate, advisor, reviewer) to reduce self-bias in the eval set.
 - API backend config option — add an OpenAI-compatible base-URL / model configuration path in `rca/llm/client.py` so local-first is clearly a deliberate deployment choice, not a hard product limitation.

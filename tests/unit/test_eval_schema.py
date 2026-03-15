@@ -169,3 +169,20 @@ def test_ablation_summary_includes_wilson_intervals() -> None:
     assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["lower"] >= 0.0
     assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["upper"] <= 1.0
     assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["margin"] > 0.0
+
+
+def test_coefficient_sweep_splits_exist_and_cover_golden_set() -> None:
+    golden = json.loads((ROOT / "eval" / "golden.json").read_text(encoding="utf-8"))
+    golden_ids = {pair["id"] for pair in golden}
+
+    dev = json.loads((ROOT / "eval" / "splits" / "dev.json").read_text(encoding="utf-8"))
+    test = json.loads((ROOT / "eval" / "splits" / "test.json").read_text(encoding="utf-8"))
+
+    dev_ids = set(dev["ids"])
+    test_ids = set(test["ids"])
+
+    assert dev["count"] == 45
+    assert test["count"] == 20
+    assert not (dev_ids & test_ids)
+    assert len(dev_ids | test_ids) == 65
+    assert dev_ids | test_ids == golden_ids
