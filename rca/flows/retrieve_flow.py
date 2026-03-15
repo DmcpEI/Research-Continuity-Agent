@@ -19,7 +19,7 @@ TITLE_WORD_PATTERN = re.compile(r"[a-z0-9]+")
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
     "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
-    "with",
+    "with", "easy", "error", "most", "observed", "scene", "specific",
 }
 
 

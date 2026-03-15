@@ -163,3 +163,110 @@ def test_retrieve_populates_trace_stages_provenance_and_latency() -> None:
     assert all(stage.duration_ms > 0.0 for stage in trace.stages)
     assert trace.total_latency_ms > 0.0
     assert [item.stage for item in trace.provenance] == ["vector", "lexical", "expansion"]
+
+
+def test_lexical_only_hits_do_not_push_strong_vector_hits_out_of_top_k() -> None:
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            return [
+                VectorQueryResult(id="chk:pdf/wrong-a:0000", score=0.66, document="wrong a", metadata={}),
+                VectorQueryResult(id="chk:pdf/wrong-b:0000", score=0.64, document="wrong b", metadata={}),
+                VectorQueryResult(id="chk:pdf/wrong-c:0000", score=0.63, document="wrong c", metadata={}),
+                VectorQueryResult(id="chk:pdf/wrong-d:0000", score=0.62, document="wrong d", metadata={}),
+                VectorQueryResult(id="chk:pdf/correct:0000", score=0.61, document="correct", metadata={}),
+            ]
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return [
+                Node(
+                    id="chk:pdf/lexical-only:0000",
+                    kind=NodeKind.chunk,
+                    title="Generic scene error node",
+                    text="dangerous attribute error observed scene",
+                )
+            ]
+
+        def get_node(self, node_id: str) -> Node | None:
+            return Node(
+                id=node_id,
+                kind=NodeKind.chunk,
+                title=f"title for {node_id}",
+                text="chunk text",
+                metadata={"source_id": node_id.replace("chk:", "src:").rsplit(":", 1)[0]},
+            )
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            return []
+
+    flow = object.__new__(RetrieveFlow)
+    flow.graph_store = StubGraphStore()
+    flow.vector_store = StubVectorStore()
+
+    bundle = flow.retrieve(
+        "What is the most dangerous attribute error observed in the scene?",
+        limit=5,
+    )
+
+    top_ids = [hit.node_id for hit in bundle.hits[:5]]
+
+    assert "chk:pdf/correct:0000" in top_ids
+    assert "chk:pdf/lexical-only:0000" not in top_ids
+
+
+def test_salient_lexical_only_hits_can_still_enter_top_k() -> None:
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            return [
+                VectorQueryResult(id="chk:pdf/wrong-a:0000", score=0.66, document="wrong a", metadata={}),
+                VectorQueryResult(id="chk:pdf/wrong-b:0000", score=0.64, document="wrong b", metadata={}),
+                VectorQueryResult(id="chk:pdf/wrong-c:0000", score=0.63, document="wrong c", metadata={}),
+                VectorQueryResult(id="chk:pdf/wrong-d:0000", score=0.62, document="wrong d", metadata={}),
+            ]
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return [
+                Node(
+                    id="chk:pdf/lexical-only-generic:0000",
+                    kind=NodeKind.chunk,
+                    title="Generic scene error node",
+                    text="components problem scene",
+                ),
+                Node(
+                    id="chk:pdf/lexical-only-salient:0000",
+                    kind=NodeKind.chunk,
+                    title="JamPacker system chunk",
+                    text="problem details",
+                ),
+            ]
+
+        def get_node(self, node_id: str) -> Node | None:
+            return Node(
+                id=node_id,
+                kind=NodeKind.chunk,
+                title=f"title for {node_id}",
+                text="chunk text",
+                metadata={"source_id": node_id.replace("chk:", "src:").rsplit(":", 1)[0]},
+            )
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            return []
+
+    flow = object.__new__(RetrieveFlow)
+    flow.graph_store = StubGraphStore()
+    flow.vector_store = StubVectorStore()
+
+    bundle = flow.retrieve(
+        "What are the two main components of JamPacker and what problem does each solve?",
+        limit=5,
+    )
+
+    top_ids = [hit.node_id for hit in bundle.hits[:5]]
+
+    assert "chk:pdf/lexical-only-salient:0000" in top_ids
+    assert "chk:pdf/lexical-only-generic:0000" not in top_ids
