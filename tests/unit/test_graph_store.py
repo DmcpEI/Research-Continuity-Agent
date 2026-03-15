@@ -84,8 +84,50 @@ def test_graph_store_fts5_returns_ranked_results(tmp_path) -> None:
         )
     )
 
-    hits = store.search_nodes_fts5("fault recovery module", limit=5)
+    hits = store.search_nodes("fault recovery module", limit=5)
 
     assert hits
     assert hits[0].id == source_id
     assert distractor_id not in [hit.id for hit in hits[:1]]
+
+
+def test_graph_store_like_search_remains_available_for_reference(tmp_path) -> None:
+    store = GraphStore(tmp_path / "graph.sqlite3")
+
+    source_id = make_source_id("pdf", "like-reference-paper")
+    store.upsert_node(
+        Node(
+            id=source_id,
+            kind=NodeKind.paper,
+            title="Reference LIKE Search Paper",
+            text="This text mentions fault recovery and jam packing.",
+        )
+    )
+
+    hits = store.search_nodes_like("fault recovery", limit=5)
+
+    assert hits
+    assert hits[0].id == source_id
+
+
+def test_graph_store_create_schema_populates_fts_index(tmp_path) -> None:
+    store = GraphStore(tmp_path / "graph.sqlite3")
+    source_id = make_source_id("pdf", "fts-rebuild-paper")
+    store.upsert_node(
+        Node(
+            id=source_id,
+            kind=NodeKind.paper,
+            title="FTS Rebuild Paper",
+            text="The rebuild path should repopulate the fts table.",
+        )
+    )
+
+    with store.connect() as connection:
+        connection.execute("DELETE FROM nodes_fts")
+
+    store.create_schema()
+
+    with store.connect() as connection:
+        fts_rows = connection.execute("SELECT count(*) FROM nodes_fts").fetchone()[0]
+
+    assert fts_rows == 1

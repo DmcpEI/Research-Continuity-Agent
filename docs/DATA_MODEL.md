@@ -145,7 +145,7 @@ CREATE TRIGGER nodes_ad AFTER DELETE ON nodes ...;
 CREATE TRIGGER nodes_au AFTER UPDATE ON nodes ...;
 ```
 
-The production lexical path still uses a token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))`, followed by exact word-token reranking in `RetrieveFlow` to avoid partial-word false positives. The schema now also includes an FTS5 virtual table (`nodes_fts`) plus triggers so BM25 can be measured as an explicit retrieval baseline without changing the production search path.
+The production lexical path now uses the FTS5 virtual table (`nodes_fts`) with BM25 ranking. The original token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))` is still retained in `GraphStore.search_nodes_like()` for reference and regression testing because it documents the earlier production implementation. `RetrieveFlow` still applies exact word-token reranking on the returned lexical candidates to avoid partial-word false positives.
 
 ---
 

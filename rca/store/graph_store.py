@@ -158,7 +158,7 @@ class GraphStore:
         # FTS5 table/triggers existed are fully indexed for BM25 baseline runs.
         connection.execute("INSERT INTO nodes_fts(nodes_fts) VALUES ('rebuild')")
 
-    def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+    def search_nodes_like(self, query: str, limit: int = 10) -> list[Node]:
         tokens = self._tokenize_query(query)
         if not tokens:
             tokens = [query.lower().strip()]
@@ -195,7 +195,7 @@ class GraphStore:
             ).fetchall()
         return self._rows_to_nodes(rows)
 
-    def search_nodes_fts5(self, query: str, limit: int = 10) -> list[Node]:
+    def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
         tokens = self._tokenize_query(query)
         if not tokens:
             stripped = query.strip()

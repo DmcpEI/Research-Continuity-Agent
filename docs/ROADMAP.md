@@ -21,7 +21,7 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 - [x] Knowledge store — SQLite graph + ChromaDB vector store
 - [x] PDF extractor + boundary-aware chunker
 - [x] Ingest flow — PDF → chunks → graph nodes + vector embeddings
-- [x] Retrieve flow — hybrid vector + keyword search + graph expansion
+- [x] Retrieve flow — hybrid vector + FTS5 lexical search + graph expansion
 - [x] Generate flow — grounded answer generation with citation enforcement
 - [x] Query rewriter — LLM rewrites natural language to dense keywords before retrieval
 - [x] Citation resolution — chunk IDs resolved to source IDs
@@ -33,11 +33,11 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | 91.8% over 49 cases |
-| Negative abstention recall | 2/5 (40.0%) |
-| Meaningful grounded rate | 49/60 = 81.7% |
-| Avg keyword hit rate | 0.167 |
-| Avg latency | 12.5 s |
+| Citation precision (answerable, non-abstained) | 88.5% over 52 cases |
+| Negative abstention recall | 1/5 (20.0%) |
+| Meaningful grounded rate | 52/60 = 86.7% |
+| Avg keyword hit rate | 0.181 |
+| Avg latency | 12.2 s |
 
 Retrieval ablations — hit@5 / hit@10 (n=60 answerable):
 
@@ -45,15 +45,16 @@ Retrieval ablations — hit@5 / hit@10 (n=60 answerable):
 |---|---|---|
 | 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
-| 2. vector + keyword (LIKE) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 86.7% | 91.7% |
-| 4. full pipeline (+ query rewrite) | 80.0% | 90.0% |
+| 2. vector + keyword (FTS5) | 76.7% | 91.7% |
+| 3. vector + keyword + expansion | 93.3% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 91.7% | 96.7% |
 
 ### Known failure modes
-- Citation selection drift on a small set of cases (`pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`)
+- Citation selection drift on a small set of cases (`jampacker-003`, `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`, `vilain-001`)
 - Vector-only and keyword-only retrieval still under-rank a few questions that source expansion or rewrite recover
 - LLM generating plausible but wrong answers from off-topic chunks (keyword hit rate remains low)
 - Query rewriter drifts on queries containing specific named entities (scene names, system names)
+- Abstention remains under-calibrated after the FTS5 migration: answerable citation precision improved, but negative recall fell to `1/5`
 
 ---
 
@@ -74,7 +75,7 @@ Priority order:
 - [ ] Expose retrieved hit lists in harness results for easier ranking-vs-generation audits
 - [ ] Add deterministic fallback for no-answer / low-confidence citation cases
 
-### P1 — Retrieval ablations ✅ completed 2026-03-15
+### P1 — Retrieval baselines and lexical migration ✅ completed 2026-03-15
 
 hit@5 / hit@10 across 60 answerable golden pairs (current):
 
@@ -82,19 +83,19 @@ hit@5 / hit@10 across 60 answerable golden pairs (current):
 |---|---|---|
 | 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
-| 2. vector + keyword (LIKE) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 86.7% | 91.7% |
-| 4. full pipeline (+ query rewrite) | 80.0% | 90.0% |
+| 2. vector + keyword (FTS5) | 76.7% | 91.7% |
+| 3. vector + keyword + expansion | 93.3% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 91.7% | 96.7% |
 
 **Findings:**
-- FTS5/BM25 is now the strongest measured retrieval baseline. It beats the current `LIKE` path by `+18.3pp` at hit@5 and also beats the current expansion configuration by `+8.3pp`.
-- The current production `LIKE` path adds no lift over vector-only in config 2.
-- Query rewriting is mixed on the expanded set and currently underperforms the raw FTS5 baseline.
-- The current retrieval story is no longer “hybrid beats simple baselines.” The evaluation result is that a better lexical baseline exists and should be considered for migration.
+- FTS5/BM25 was strong enough in ablation that it replaced the earlier token-wise `LIKE` lexical stage on the production path.
+- The original `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the design history and provides a simple fallback baseline.
+- Query rewriting is still mixed on the expanded set and currently underperforms the raw FTS5 baseline.
+- The current retrieval story is no longer “hybrid beats simple baselines.” Even after the migration, the pure FTS5 baseline remains the best measured retrieval configuration.
 - Full results in `eval/results/ablations.json`.
 
 Remaining:
-- [ ] Evaluate migration from token-wise `LIKE` lexical retrieval to FTS5/BM25 on the production path
+- [ ] Diagnose why pure FTS5-only still beats the composed retrieval pipeline after the lexical migration
 - [ ] Measure: chunk size sensitivity (256 / 512 / 1024 tokens)
 - [ ] Measure: embedding model sensitivity (nomic vs alternatives)
 
@@ -138,7 +139,7 @@ Remaining:
 - [ ] Zotero MCP server — sync Zotero library into RCA automatically
 
 ### Tag v1.1.0 when:
-- Citation precision > 70% ✅ (86.7%)
+- Citation precision > 70% ✅ (88.5% over answerable, non-abstained cases)
 - Retrieval ablation table published ✅
 - Docker one-command boot working ✅
 - All integration tests passing
@@ -219,7 +220,7 @@ git checkout -b v2/migrate
 > Built a local-first research knowledge system that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations. Designed an evaluation harness with golden queries, retrieval ablations, and failure analysis for citation errors and hallucination modes.
 
 **With numbers (v1 current):**
-> Citation precision is 91.8% over 49 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 2/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + LIKE, 86.7% with graph expansion, and 80.0% with the full rewrite pipeline. The current surprise result is that FTS5-only is the strongest measured retrieval configuration, making it a production migration candidate rather than a rejected alternative.
+> Citation precision is 88.5% over 52 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 1/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 93.3% with graph expansion, and 91.7% with the full rewrite pipeline. The current surprise result is that pure FTS5-only is still the strongest measured retrieval configuration, even after the production lexical path migrated to BM25.
 
 ---
 
@@ -271,10 +272,10 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 
 🔴 Critical — before thesis defence / CV:
 
-- Abstention / grounding detection — the system currently defaults to answering whenever retrieval returns context, and `GenerateFlow` can inject a fallback citation when the model emits none. The current `100% grounded` figure therefore overstates evidence sufficiency. Add a retrieval-confidence check (for example, mean top-3 score) and return "insufficient evidence" with `grounded=False` below threshold. Tune on the 5 negative questions and report abstention precision / recall.
-- Expand generation evaluation to the full 65-question set — `eval/golden.json` and retrieval ablations now cover 65 questions, but the last reported generation metrics in docs/results are still from the older 30-question run. Regenerate answer-level metrics on the full set so retrieval and generation sections are directly comparable.
+- Abstention / grounding detection — a two-gate abstention check now exists, but it is still under-calibrated. Current results are `1/5` negative recall with `8` answerable abstentions on the 65-question run. The next step is calibrated confidence scoring or a dedicated abstention classifier.
+- [x] Expand generation evaluation to the full 65-question set — answer-level metrics now use the same 65-question corpus as retrieval ablations.
 - [x] Explicit baselines added to evaluation — config 0 is now an FTS5/BM25 lexical baseline and config 1 is labeled explicitly as the dense baseline. All five retrieval configs are reported in one table.
-- [x] FTS5 investigation completed — FTS5/BM25 now measures better than the current `LIKE` production path and is documented as a future migration candidate rather than an unanswered design question.
+- [x] FTS5 investigation completed — FTS5/BM25 measured better than the earlier `LIKE` path and has now replaced it on the production lexical path.
 - Keep the repository lean — placeholder-only files and dead helpers should be deleted or clearly deprecated. Every retained file should have a clear current role in the ingest, retrieval, generation, eval, or deployment path.
 - Keep orchestration claims honest — orchestration is handled directly via `RetrieveFlow` and `GenerateFlow` today. A LangGraph-based agent workflow remains a roadmap option, not shipped functionality.
 

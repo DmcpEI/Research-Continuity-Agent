@@ -17,8 +17,8 @@ IngestFlow
     ▼
 RetrieveFlow
     ├── vector search  ← approximate nearest-neighbour (ChromaDB)
-    ├── graph keyword  ← LIKE candidate query over title/text (production)
-    ├── fts5 baseline  ← BM25 over title/text (evaluation only)
+    ├── graph keyword  ← FTS5 / BM25 over title/text (production)
+    ├── like fallback  ← token-wise LIKE kept for reference/testing
     ├── exact-word lexical rerank + dedup → ranked RetrievalBundle
     └── source expansion ← chunk → parent src: nodes
     │
@@ -60,7 +60,7 @@ Node IDs follow the scheme defined in `rca/contracts/ids.py` — see [DATA_MODEL
 Hybrid retrieval over the dual-store. Called with a query string, returns a `RetrievalBundle`.
 
 1. **Vector search** — top-k approximate nearest-neighbour over embeddings
-2. **Graph keyword** — SQLite `LIKE` query over node title and text to fetch lexical candidates on the production path
+2. **Graph keyword** — SQLite FTS5/BM25 query over node title and text to fetch lexical candidates on the production path
 3. **Lexical rerank** — exact word-token overlap over title and text removes partial-word false positives before merge
 4. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
 5. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
@@ -72,11 +72,11 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 |---|---|---|
 | fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | vector-only (dense baseline) | 76.7% | 91.7% |
-| vector + keyword (LIKE) | 76.7% | 91.7% |
-| vector + keyword + expansion | 86.7% | 91.7% |
-| full + query rewrite | 80.0% | 90.0% |
+| vector + keyword (FTS5) | 76.7% | 91.7% |
+| vector + keyword + expansion | 93.3% | 96.7% |
+| full + query rewrite | 91.7% | 96.7% |
 
-The important current result is that FTS5/BM25 outperforms the production `LIKE` lexical path and also outperforms the current composed retrieval pipeline on hit@5.
+The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. Even after that migration, the pure BM25 baseline still beats the composed retrieval pipeline on hit@5.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 
@@ -99,8 +99,8 @@ Grounded answer generation with citation enforcement.
 SQLite-backed structured store. Three responsibilities:
 
 - **Document registry** — tracks all ingested sources with metadata and provenance
-- **Keyword search** — token-wise `LIKE` query over `lower(title)` and `lower(text)` for the production lexical path
-- **FTS5 baseline** — BM25 over an SQLite FTS5 virtual table (`nodes_fts`) for explicit evaluation baselines
+- **Keyword search** — BM25 over an SQLite FTS5 virtual table (`nodes_fts`) for the production lexical path
+- **Historical baseline** — token-wise `LIKE` search retained as `search_nodes_like()` for reference/testing and comparison against the earlier implementation
 - **Entity graph** — nodes (papers, chunks, notes, experiments) and typed edges (contains, references, cites, related_to)
 
 See [DATA_MODEL.md](DATA_MODEL.md) for node kinds, edge kinds, and ID patterns.
@@ -132,8 +132,8 @@ User query
     ├─ GenerateFlow._rewrite_query(query) → rewritten_query
     │
     ├─ VectorStore.query(rewritten_query, limit=10)        → vector_hits
-    ├─ GraphStore.search_nodes(rewritten_query, limit=10)  → keyword_hits (production)
-    ├─ GraphStore.search_nodes_fts5(query, limit=10)       → bm25_hits (baseline only)
+    ├─ GraphStore.search_nodes(rewritten_query, limit=10)  → keyword_hits (FTS5 production)
+    ├─ GraphStore.search_nodes_like(query, limit=10)       → like_hits (reference only)
     ├─ exact-word lexical rerank over title/text           → rescored_hits
     ├─ RetrieveFlow._expand_to_sources(...)                → source_hits
     │

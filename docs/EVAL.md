@@ -53,7 +53,7 @@ It writes a run artifact to `eval/results/run_<timestamp>.json` and per-question
 ### Current Generation Results
 
 Live run artifact:
-- [run_20260315T145602Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260315T145602Z.json)
+- [run_20260315T160649Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260315T160649Z.json)
 
 Headline metrics:
 
@@ -62,25 +62,26 @@ Headline metrics:
 | Overall harness coverage | `65` questions |
 | Answerable questions | `60` |
 | Negative questions | `5` |
-| Answerable questions answered with citation | `49/60` |
-| Answerable abstentions or failures | `11/60` |
-| Citation precision (answerable, non-abstained) | `91.8%` over `49` cases |
-| Negative abstention recall | `2/5` (`40.0%`) |
-| Meaningful grounded rate | `49/60 = 81.7%` |
-| Average keyword hit rate | `0.167` |
-| Average latency | `12.5 s` |
+| Answerable questions answered with citation | `52/60` |
+| Answerable abstentions or failures | `8/60` |
+| Citation precision (answerable, non-abstained) | `88.5%` over `52` cases |
+| Negative abstention recall | `1/5` (`20.0%`) |
+| Meaningful grounded rate | `52/60 = 86.7%` |
+| Average keyword hit rate | `0.181` |
+| Average latency | `12.2 s` |
 
 Notes:
 - The harness summary field `overall_grounded_rate` is now lower than historical runs because abstentions correctly set `grounded=False`.
-- For thesis reporting, `49/60 = 81.7%` is the more useful grounded-rate definition: answerable questions where the model produced a cited answer.
+- For thesis reporting, `52/60 = 86.7%` is the more useful grounded-rate definition: answerable questions where the model produced a cited answer.
+- Compared with the pre-migration abstention run, answerable citation precision improved but negative abstention recall fell. Stronger lexical retrieval helps the model find relevant-looking context even on unsupported questions.
 
 ### Difficulty Breakdown
 
 | Difficulty | Grounded | Citation precision | Abstention recall | Answerable abstentions | Keyword hit rate |
 |---|---|---|---|---:|---:|
-| Easy | `100.0%` | `100.0%` | `0.0%` | `0` | `0.340` |
-| Medium | `78.6%` | `95.0%` | `0.0%` | `6` | `0.082` |
-| Hard | `76.7%` | `86.4%` | `66.7%` | `5` | `0.205` |
+| Easy | `85.7%` | `100.0%` | `0.0%` | `1` | `0.269` |
+| Medium | `85.7%` | `90.9%` | `0.0%` | `4` | `0.121` |
+| Hard | `86.7%` | `83.3%` | `33.3%` | `3` | `0.216` |
 
 ---
 
@@ -101,14 +102,14 @@ Current aggregate retrieval results:
 |---|---:|---:|
 | 0. fts5-only (BM25 baseline) | `95.0%` | `98.3%` |
 | 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
-| 2. vector + keyword (LIKE) | `76.7%` | `91.7%` |
-| 3. vector + keyword + expansion | `86.7%` | `91.7%` |
-| 4. full pipeline (+ rewrite) | `80.0%` | `90.0%` |
+| 2. vector + keyword (FTS5) | `76.7%` | `91.7%` |
+| 3. vector + keyword + expansion | `93.3%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `91.7%` | `96.7%` |
 
 Interpretation:
-- FTS5/BM25 is currently the strongest single-method baseline on the expanded 65-question set
-- the production LIKE path adds no lift over dense-only retrieval in config 2
-- graph expansion improves the current production path but still underperforms the FTS5 baseline
+- FTS5/BM25 is currently the strongest retrieval configuration on the expanded 65-question set
+- config 2 shows that simply adding dense hits to the new FTS5 backbone does not help by itself
+- graph expansion and rewrite now improve materially over the older LIKE-based pipeline, but still underperform pure BM25
 - query rewrite remains mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
 
 ## Retrieval Baselines
@@ -119,26 +120,28 @@ The retrieval baseline question is now answered explicitly rather than by archit
 |---|---:|---:|
 | 0. fts5-only (BM25 baseline) | `95.0%` | `98.3%` |
 | 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
-| 2. vector + keyword (LIKE) | `76.7%` | `91.7%` |
-| 3. vector + keyword + expansion | `86.7%` | `91.7%` |
-| 4. full pipeline (+ rewrite) | `80.0%` | `90.0%` |
+| 2. vector + keyword (FTS5) | `76.7%` | `91.7%` |
+| 3. vector + keyword + expansion | `93.3%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `91.7%` | `96.7%` |
 
-Examiner question: why did the system not use FTS5 earlier?
+Examiner question: why did the system not use FTS5 earlier, and what changed?
 
 Honest answer:
 - the production retrieval path was originally built around transparent token-wise `LIKE` candidate generation plus vector composition
-- after implementing an explicit BM25 baseline, FTS5 now measures better than the current `LIKE` path
-- on this 60-question answerable set, FTS5-only beats the current `LIKE`-based dense hybrid by `+18.3pp` at hit@5 (`95.0%` vs `76.7%`)
-- it also beats the current expansion configuration by `+8.3pp` at hit@5 (`95.0%` vs `86.7%`)
+- after implementing an explicit BM25 baseline, FTS5 measured better than the older `LIKE` path
+- on this 60-question answerable set, FTS5-only beats the old `LIKE`-based dense hybrid by `+18.3pp` at hit@5 (`95.0%` vs `76.7%`)
+- it also beats the current expansion configuration by `+1.7pp` at hit@5 (`95.0%` vs `93.3%`)
+- that result was strong enough that the production lexical backbone was migrated from `LIKE` to FTS5/BM25
 
-So the current answer is not “LIKE was better.” The measured result is the opposite:
-- FTS5 significantly outperforms the hand-rolled `LIKE` baseline
-- FTS5 is now a future migration candidate for the lexical stage
-- this repo intentionally keeps `search_nodes()` unchanged for now because this change was scoped as an evaluation/baseline exercise rather than a production retrieval migration
+So the current answer is:
+- the repo did try the simpler `LIKE` design first because it was transparent and easy to audit
+- FTS5 significantly outperformed it once measured directly
+- production retrieval now uses `GraphStore.search_nodes()` backed by FTS5/BM25
+- the earlier implementation remains available as `search_nodes_like()` for reference and regression testing
 
-One important consequence:
+One important consequence remains:
 - the composed pipeline does **not** currently outperform all single-method baselines
-- FTS5-only is the best retrieval configuration measured so far on hit@5 and hit@10
+- FTS5-only is still the best retrieval configuration measured so far on hit@5 and hit@10
 
 ---
 
@@ -163,19 +166,25 @@ What it does not catch:
 - answerable questions where the model correctly notices that a specific metric or detail is absent, even though the broader paper is still the right source
 
 Current abstention outcomes:
-- Negative abstention recall: `2/5`
-- False positives on answerable questions: `2`
-  - `vlmsurvey-001`
-  - `autobag-003`
+- Negative abstention recall: `1/5`
+- Answerable abstentions: `8`
+  - `pic2-009`
+  - `jampacker-002`
+  - `para-003`
+  - `cross-005`
+  - `densepack-002`
+  - `sayplan-001`
+  - `moma-001`
+  - `vilain-003`
 
-Interpretation of the two false positives:
-- these are not random hallucinations by the detector
-- in both cases the LLM identified that the requested detail was not supported by the retrieved context and emitted a clean abstention with no citation marker
-- the harness counts them as answerable misses because the golden set expects the broader paper to still support a valid answer
+Interpretation of the answerable abstentions:
+- some are likely genuine retrieval or generation misses
+- some are detail-level abstentions where the model decides the requested fact is not sufficiently supported by the retrieved context, even though the paper-level answer is still expected by the golden set
+- the harness treats all of them as answerable misses because the evaluation target is still a cited answer, not a hedge
 
 Current limitation:
-- the three negative failures (`neg-002`, `neg-004`, `neg-005`) have top retrieval scores in the `0.69–0.73` range, which overlaps with ordinary successful retrievals
-- score alone is therefore not a reliable separator between valid evidence and unsupported-but-plausible retrieval bundles
+- after the FTS5 migration, four negative failures (`neg-002`, `neg-003`, `neg-004`, `neg-005`) still retrieve plausible enough context that the current abstention gate does not fire
+- score alone is therefore not a reliable separator between valid evidence and unsupported-but-plausible retrieval bundles, especially once lexical retrieval gets stronger
 - fixing this cleanly will require calibrated confidence scoring, a dedicated abstention classifier, or both
 
 This is the practical ceiling of the current phrase-plus-score heuristic. It is good enough to expose unsupported answers honestly, but not yet strong enough to serve as a final confidence model.
@@ -219,7 +228,7 @@ This is the practical ceiling of the current phrase-plus-score heuristic. It is 
 | Query rewrite still hurts some paraphrase and cross-paper questions | Active |
 | Keyword hit rate is lexical, not semantic | Acceptable but limited |
 | Category counts are still small in several buckets | Active |
-| Production lexical path still uses `LIKE` even though FTS5 now measures better | Active |
+| Pure FTS5-only still outperforms the composed retrieval pipeline | Active |
 
 ---
 
@@ -227,6 +236,6 @@ This is the practical ceiling of the current phrase-plus-score heuristic. It is 
 
 - add calibrated confidence scoring or a dedicated abstention classifier
 - run the generation harness again after any abstention-model change, not just retrieval ablations
-- decide whether to migrate the production lexical path from `LIKE` to FTS5/BM25
+- measure why BM25-only still beats the composed retrieval pipeline after the lexical migration
 - report confidence intervals or small-sample caveats for tiny categories
 - continue expanding the question set with externally written prompts

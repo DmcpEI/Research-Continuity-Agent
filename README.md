@@ -31,7 +31,7 @@ IngestFlow
 RetrieveFlow
     ├── query rewriter  (LLM — dense keyword expansion before retrieval)
     ├── vector search   (nomic-embed-text via Ollama)
-    ├── graph keyword   (SQLite `LIKE` production path + FTS5 BM25 baseline)
+    ├── graph keyword   (SQLite FTS5 / BM25 production path)
     └── graph expansion (neighbour traversal for related chunks)
     │
     ▼
@@ -58,7 +58,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Component details
 
-**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database now also maintains an FTS5 virtual table for BM25 baseline evaluation, while the production lexical path still uses token-wise `LIKE`. `VectorStore` wraps ChromaDB with an Ollama embedding function using `nomic-embed-text` (768 dimensions, cosine similarity). When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
+**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database also maintains an FTS5 virtual table, and BM25 is now the production lexical search path. The original token-wise `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the earlier design that was later outperformed in ablation. `VectorStore` wraps ChromaDB with an Ollama embedding function using `nomic-embed-text` (768 dimensions, cosine similarity). When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
 
 **ID system.** All identifiers are stable and deterministic. Source nodes follow the pattern `src:namespace/name` (e.g., `src:pdf/attention-is-all-you-need`). Chunk nodes derive from their source: `chk:namespace/name:0000`. Identifiers are validated with regular expressions at the contract boundary so invalid IDs cannot enter the stores.
 
@@ -66,7 +66,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
 
-**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search (`LIKE` on title/text). GraphStore also exposes an FTS5/BM25 search path for evaluation baselines, but that is not yet the production retrieval path. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID. `_expand_to_sources` promotes parent source nodes from chunk hits, and the final bundle contains ranked hits plus the associated graph edges.
+**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search over SQLite FTS5/BM25. The earlier token-wise `LIKE` path is still available as `GraphStore.search_nodes_like()` for reference/testing, but it is no longer the production retrieval backbone because explicit evaluation showed BM25 was materially stronger. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID. `_expand_to_sources` promotes parent source nodes from chunk hits, and the final bundle contains ranked hits plus the associated graph edges.
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query rewriting** — the user's natural-language question is sent to the LLM to produce a dense 8–12 keyword technical search query, improving vector recall over conversational phrasing.
@@ -110,17 +110,17 @@ RCA is currently evaluated on **65 golden questions**: `60` answerable and `5` e
 
 ### Current generation results
 
-Live harness artifact: `eval/results/run_20260315T145602Z.json`
+Live harness artifact: `eval/results/run_20260315T160649Z.json`
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | 91.8% over 49 cases |
-| Negative abstention recall | 2/5 (40.0%) |
-| Meaningful grounded rate | 49/60 = 81.7% |
-| Avg keyword hit rate | 0.167 |
-| Avg latency | 12.5 s |
+| Citation precision (answerable, non-abstained) | 88.5% over 52 cases |
+| Negative abstention recall | 1/5 (20.0%) |
+| Meaningful grounded rate | 52/60 = 86.7% |
+| Avg keyword hit rate | 0.181 |
+| Avg latency | 12.2 s |
 
-The generation pipeline now includes explicit abstention detection. That makes the current grounding metric more honest than the older `100% grounded` runs, but it also exposes a real limitation: three unsupported questions still retrieve plausible enough context that score-based abstention does not trigger.
+The generation pipeline now includes explicit abstention detection. That makes the current grounding metric more honest than the older `100% grounded` runs, but it also exposes a real limitation: four unsupported questions still retrieve plausible enough context that score-based abstention does not trigger.
 
 ### Retrieval baselines — hit@5 / hit@10 (n=60 answerable)
 
@@ -128,17 +128,17 @@ The generation pipeline now includes explicit abstention detection. That makes t
 |---|---:|---:|
 | 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
-| 2. vector + keyword (LIKE) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 86.7% | 91.7% |
-| 4. full pipeline (+ query rewrite) | 80.0% | 90.0% |
+| 2. vector + keyword (FTS5) | 76.7% | 91.7% |
+| 3. vector + keyword + expansion | 93.3% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 91.7% | 96.7% |
 
 ### What the numbers mean
 
-- **FTS5/BM25 is the strongest retrieval baseline measured so far**. On the current 60 answerable questions, it beats the production `LIKE` path by `+18.3pp` at hit@5 and even beats the current expansion configuration by `+8.3pp`.
-- **The current production lexical path is no longer the best measured lexical choice.** The repo keeps `LIKE` as the production path for now because this work was scoped as an evaluation/baseline addition, not a retrieval migration.
+- **FTS5/BM25 is now the production lexical backbone**. The repo originally shipped with a transparent token-wise `LIKE` lexical stage, then added an explicit FTS5/BM25 baseline, and finally migrated production retrieval after BM25 consistently outperformed the older path.
+- **Pure FTS5-only is still the strongest retrieval configuration measured so far.** The current composed pipeline improved after the migration, but it still trails the pure BM25 baseline by `1.7pp` at hit@5 and `1.6pp` at hit@10.
 - **Dense retrieval is still useful as a baseline**, but on this corpus the questions are lexically anchored enough that BM25 performs much better.
 - **Query rewrite remains mixed**. It helps some sparse technical queries, but still hurts several paraphrase and cross-paper questions.
-- **Generation is more honest than before**. The current harness no longer counts all negative questions as grounded, but abstention is still heuristic and not fully calibrated.
+- **Generation improved on answerable citation precision after the lexical migration**, but abstention got worse. The stronger lexical backbone surfaces plausible context more often, which helps answerable questions but makes unsupported questions harder to reject with the current phrase-plus-score abstention heuristic.
 
 ### Known failure modes
 

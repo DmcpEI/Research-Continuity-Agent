@@ -2,7 +2,7 @@
 
 Configs
 -------
-0. fts5-only            : GraphStore.search_nodes_fts5() only
+0. fts5-only            : GraphStore.search_nodes() only
 1. vector-only          : VectorStore.query() only
 2. vector + keyword     : vector + GraphStore.search_nodes(), no expansion
 3. vector + keyword + expand: full RetrieveFlow.retrieve(), no query rewrite
@@ -111,7 +111,7 @@ def print_bucket_table(
         f"{left_header:<18} {'n':>3}  "
         f"{'fts5@5':>8} {'fts5@10':>9}  "
         f"{'dense@5':>9} {'dense@10':>10}  "
-        f"{'+like@5':>8} {'+like@10':>9}  "
+        f"{'+fts5@5':>8} {'+fts5@10':>9}  "
         f"{'+expand@5':>9} {'+expand@10':>10}  "
         f"{'+rewrite@5':>10} {'+rewrite@10':>11}"
     )
@@ -171,7 +171,7 @@ def run_config1(question: str, vector_store: VectorStore, graph_store: GraphStor
 def run_config0(question: str, graph_store: GraphStore) -> list[RetrievalHit]:
     """FTS5-only BM25 baseline: lexical search without vector, expansion, or rewrite."""
     hits = []
-    for rank, node in enumerate(graph_store.search_nodes_fts5(question, limit=FETCH_K), start=1):
+    for rank, node in enumerate(graph_store.search_nodes(question, limit=FETCH_K), start=1):
         hits.append(
             RetrievalHit(
                 node_id=node.id,
@@ -306,7 +306,7 @@ def main() -> None:
     rows = [
         ("0. fts5-only (BM25 baseline)",       "0_fts5_only"),
         ("1. vector-only (dense baseline)",    "1_vector_only"),
-        ("2. vector + keyword (LIKE)",         "2_vector_keyword"),
+        ("2. vector + keyword (FTS5)",         "2_vector_keyword"),
         ("3. vector + keyword + expansion",    "3_vector_keyword_expand"),
         ("4. full pipeline (+ rewrite)",       "4_full_rewrite"),
     ]
