@@ -4,6 +4,67 @@ A **local-first research knowledge system** that ingests technical PDFs, perform
 
 ---
 
+## System Diagram
+
+```mermaid
+flowchart TD
+    subgraph Ingest["Ingest Pipeline"]
+        PDF["PDF file"]
+        IF["IngestFlow"]
+        Extract["extract text<br/>chunk<br/>embed"]
+        PDF --> IF --> Extract
+    end
+
+    subgraph Storage["Persistent Stores"]
+        GS["GraphStore (SQLite)<br/>source node + chunk nodes + contains edges"]
+        VS["VectorStore (ChromaDB)<br/>chunk embeddings"]
+    end
+
+    subgraph Query["Query Pipeline"]
+        UQ["User query"]
+        RW["LLM query rewriter<br/>(optional)"]
+        RF["RetrieveFlow"]
+        VQ["VectorStore semantic search<br/>ranked chunk hits"]
+        FTS["GraphStore FTS5/BM25 search<br/>ranked hits"]
+        LEX["_lexical_score() reranking<br/>title 0.12 / text 0.05"]
+        MERGE["Score merge by node_id<br/>max score wins"]
+        EXPAND["Source expansion<br/>contains edges only"]
+        GF["GenerateFlow"]
+        CTX["Context assembly<br/>top-k hits"]
+        LLM["LLM generation<br/>qwen2.5:14b via Ollama"]
+        ABS["Abstention detection<br/>two-gate"]
+        CITE["Citation extraction"]
+        OUT["GeneratedAnswer<br/>text + citations + QueryTrace"]
+
+        UQ --> RW --> RF
+        RF --> VQ --> MERGE
+        RF --> FTS --> LEX --> MERGE
+        MERGE --> EXPAND --> GF
+        GF --> CTX --> LLM --> ABS --> CITE --> OUT
+    end
+
+    Extract --> GS
+    Extract --> VS
+    GS -. "serves lexical search and graph edges" .-> RF
+    VS -. "serves semantic search" .-> RF
+```
+
+The system composes FTS5/BM25 lexical search, dense vector retrieval, and source graph expansion into a single ranked bundle. A two-gate abstention mechanism detects when the corpus lacks sufficient evidence. All query stages are traced with per-stage latency and retrieval provenance.
+
+## Reproducing Results
+
+```bash
+# Run retrieval ablations (65 questions, 5 configs including baselines)
+uv run python eval/run_ablations.py
+
+# Run generation harness (citation precision, abstention recall)
+uv run python eval/harness.py
+```
+
+Current reference results on the checked-in 65-question corpus: hit@5 `95.0%` for config 3, citation precision `88.5%`, negative abstention recall `1/5`.
+
+---
+
 ## What it does
 
 Given a corpus of research PDFs, RCA:
@@ -14,34 +75,7 @@ Given a corpus of research PDFs, RCA:
 4. **Generates** grounded answers with inline citations enforced at the prompt level
 5. **Evaluates** answer quality against a golden Q&A set with retrieval, citation, and keyword metrics
 
----
-
-## Architecture
-
-```
-PDF / Notes
-    │
-    ▼
-IngestFlow
-    ├── chunking + metadata extraction
-    ├── VectorStore  (ChromaDB — semantic retrieval index)
-    └── GraphStore   (SQLite — document registry, provenance, entity links)
-    │
-    ▼
-RetrieveFlow
-    ├── query rewriter  (LLM — dense keyword expansion before retrieval)
-    ├── vector search   (nomic-embed-text via Ollama)
-    ├── graph keyword   (SQLite FTS5 / BM25 production path)
-    └── graph expansion (neighbour traversal for related chunks)
-    │
-    ▼
-GenerateFlow
-    ├── grounded answer generation  (qwen2.5:14b via Ollama)
-    └── citation + abstention logic (prompt-level enforcement + two-gate abstention)
-    │
-    ▼
-Direct flow orchestration  (RetrieveFlow + GenerateFlow, stateless per query)
-```
+## Design notes
 
 Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`. A LangGraph-based agent workflow is on the roadmap.
 
