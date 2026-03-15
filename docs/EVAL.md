@@ -112,6 +112,8 @@ Interpretation:
 - graph expansion and rewrite now improve materially over the older LIKE-based pipeline, but still underperform pure BM25
 - query rewrite remains mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
 
+Per-category retrieval results now report 95% Wilson confidence intervals rather than raw percentages alone. This matters because several categories are still very small (`error_analysis n=2`, `paraphrase n=5`, `cross_paper n=6`), and point estimates on their own overstate certainty. Categories with `n <= 6` are flagged explicitly and should be interpreted with caution in the thesis writeup.
+
 ## Retrieval Baselines
 
 The retrieval baseline question is now answered explicitly rather than by architectural preference.

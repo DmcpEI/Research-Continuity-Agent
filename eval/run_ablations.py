@@ -32,6 +32,24 @@ FETCH_K = 10   # how many results to retrieve per config
 HIT_AT = (5, 10)  # report both hit@5 and hit@10
 
 
+def wilson_interval(hits: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    if n == 0:
+        return 0.0, 0.0
+    p = hits / n
+    denominator = 1 + z**2 / n
+    center = (p + z**2 / (2 * n)) / denominator
+    margin = (z * (p * (1 - p) / n + z**2 / (4 * n**2)) ** 0.5) / denominator
+    return max(0.0, center - margin), min(1.0, center + margin)
+
+
+def wilson_margin(hits: int, n: int, z: float = 1.96) -> float:
+    if n == 0:
+        return 0.0
+    lower, upper = wilson_interval(hits, n, z=z)
+    observed = hits / n
+    return max(observed - lower, upper - observed)
+
+
 def resolve_to_source(node_id: str) -> str:
     """Return the parent src: ID for a chunk node, or the ID itself if already src:."""
     if node_id.startswith("src:"):
@@ -64,14 +82,40 @@ def summarize_subset(cases: list[dict[str, Any]], config_keys: list[str]) -> dic
             "cases": 0,
             "summary_hit_at_5": {key: 0.0 for key in config_keys},
             "summary_hit_at_10": {key: 0.0 for key in config_keys},
+            "summary_hit_at_5_ci": {
+                key: {"lower": 0.0, "upper": 0.0, "margin": 0.0} for key in config_keys
+            },
+            "summary_hit_at_10_ci": {
+                key: {"lower": 0.0, "upper": 0.0, "margin": 0.0} for key in config_keys
+            },
         }
+
+    hit_counts_5 = {key: sum(case["hit_at_5"][key] for case in cases) for key in config_keys}
+    hit_counts_10 = {key: sum(case["hit_at_10"][key] for case in cases) for key in config_keys}
+
     return {
         "cases": total,
         "summary_hit_at_5": {
-            key: round(sum(case["hit_at_5"][key] for case in cases) / total, 4) for key in config_keys
+            key: round(hit_counts_5[key] / total, 4) for key in config_keys
         },
         "summary_hit_at_10": {
-            key: round(sum(case["hit_at_10"][key] for case in cases) / total, 4) for key in config_keys
+            key: round(hit_counts_10[key] / total, 4) for key in config_keys
+        },
+        "summary_hit_at_5_ci": {
+            key: {
+                "lower": round(wilson_interval(hit_counts_5[key], total)[0], 4),
+                "upper": round(wilson_interval(hit_counts_5[key], total)[1], 4),
+                "margin": round(wilson_margin(hit_counts_5[key], total), 4),
+            }
+            for key in config_keys
+        },
+        "summary_hit_at_10_ci": {
+            key: {
+                "lower": round(wilson_interval(hit_counts_10[key], total)[0], 4),
+                "upper": round(wilson_interval(hit_counts_10[key], total)[1], 4),
+                "margin": round(wilson_margin(hit_counts_10[key], total), 4),
+            }
+            for key in config_keys
         },
     }
 
@@ -104,33 +148,69 @@ def print_bucket_table(
     summary: dict[str, dict[str, Any]],
     rows: list[tuple[str, str]],
     left_header: str,
+    show_confidence: bool = False,
 ) -> None:
-    print("=" * 140)
+    def format_rate(rate: float, margin: float | None = None) -> str:
+        if margin is None:
+            return f"{rate:.1%}"
+        return f"{rate:.1%} ± {margin:.1%}"
+
+    width = 220 if show_confidence else 140
+    print("=" * width)
     print(title)
-    print(
-        f"{left_header:<18} {'n':>3}  "
-        f"{'fts5@5':>8} {'fts5@10':>9}  "
-        f"{'dense@5':>9} {'dense@10':>10}  "
-        f"{'+fts5@5':>8} {'+fts5@10':>9}  "
-        f"{'+expand@5':>9} {'+expand@10':>10}  "
-        f"{'+rewrite@5':>10} {'+rewrite@10':>11}"
-    )
-    print("-" * 140)
+    if show_confidence:
+        print(
+            f"{left_header:<18} {'n':>3}  "
+            f"{'fts5@5':>15} {'fts5@10':>15}  "
+            f"{'dense@5':>15} {'dense@10':>15}  "
+            f"{'+fts5@5':>15} {'+fts5@10':>15}  "
+            f"{'+expand@5':>15} {'+expand@10':>15}  "
+            f"{'+rewrite@5':>15} {'+rewrite@10':>15}"
+        )
+    else:
+        print(
+            f"{left_header:<18} {'n':>3}  "
+            f"{'fts5@5':>8} {'fts5@10':>9}  "
+            f"{'dense@5':>9} {'dense@10':>10}  "
+            f"{'+fts5@5':>8} {'+fts5@10':>9}  "
+            f"{'+expand@5':>9} {'+expand@10':>10}  "
+            f"{'+rewrite@5':>10} {'+rewrite@10':>11}"
+        )
+    print("-" * width)
     for label, key in rows:
         metrics = summary.get(key)
         if metrics is None:
             continue
         hit5 = metrics["summary_hit_at_5"]
         hit10 = metrics["summary_hit_at_10"]
-        print(
-            f"  {label:<16} {metrics['cases']:>3}  "
-            f"{hit5['0_fts5_only']:>8.1%} {hit10['0_fts5_only']:>9.1%}  "
-            f"{hit5['1_vector_only']:>9.1%} {hit10['1_vector_only']:>10.1%}  "
-            f"{hit5['2_vector_keyword']:>8.1%} {hit10['2_vector_keyword']:>9.1%}  "
-            f"{hit5['3_vector_keyword_expand']:>9.1%} {hit10['3_vector_keyword_expand']:>10.1%}  "
-            f"{hit5['4_full_rewrite']:>10.1%} {hit10['4_full_rewrite']:>11.1%}"
-        )
-    print("=" * 140)
+        if show_confidence:
+            ci5 = metrics["summary_hit_at_5_ci"]
+            ci10 = metrics["summary_hit_at_10_ci"]
+            print(
+                f"  {label:<16} {metrics['cases']:>3}  "
+                f"{format_rate(hit5['0_fts5_only'], ci5['0_fts5_only']['margin']):>15} "
+                f"{format_rate(hit10['0_fts5_only'], ci10['0_fts5_only']['margin']):>15}  "
+                f"{format_rate(hit5['1_vector_only'], ci5['1_vector_only']['margin']):>15} "
+                f"{format_rate(hit10['1_vector_only'], ci10['1_vector_only']['margin']):>15}  "
+                f"{format_rate(hit5['2_vector_keyword'], ci5['2_vector_keyword']['margin']):>15} "
+                f"{format_rate(hit10['2_vector_keyword'], ci10['2_vector_keyword']['margin']):>15}  "
+                f"{format_rate(hit5['3_vector_keyword_expand'], ci5['3_vector_keyword_expand']['margin']):>15} "
+                f"{format_rate(hit10['3_vector_keyword_expand'], ci10['3_vector_keyword_expand']['margin']):>15}  "
+                f"{format_rate(hit5['4_full_rewrite'], ci5['4_full_rewrite']['margin']):>15} "
+                f"{format_rate(hit10['4_full_rewrite'], ci10['4_full_rewrite']['margin']):>15}"
+            )
+            if metrics["cases"] <= 6:
+                print(f"    ⚠ n={metrics['cases']} — interpret with caution")
+        else:
+            print(
+                f"  {label:<16} {metrics['cases']:>3}  "
+                f"{hit5['0_fts5_only']:>8.1%} {hit10['0_fts5_only']:>9.1%}  "
+                f"{hit5['1_vector_only']:>9.1%} {hit10['1_vector_only']:>10.1%}  "
+                f"{hit5['2_vector_keyword']:>8.1%} {hit10['2_vector_keyword']:>9.1%}  "
+                f"{hit5['3_vector_keyword_expand']:>9.1%} {hit10['3_vector_keyword_expand']:>10.1%}  "
+                f"{hit5['4_full_rewrite']:>10.1%} {hit10['4_full_rewrite']:>11.1%}"
+            )
+    print("=" * width)
     print()
 
 
@@ -292,8 +372,8 @@ def main() -> None:
         })
         h5  = [int(hits5[k][-1])  for k in config_keys]
         h10 = [int(hits10[k][-1]) for k in config_keys]
-        print(f"  @5  fts5={h5[0]}  dense={h5[1]}  +like={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}")
-        print(f"  @10 fts5={h10[0]}  dense={h10[1]}  +like={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}")
+        print(f"  @5  fts5={h5[0]}  dense={h5[1]}  +fts5={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}")
+        print(f"  @10 fts5={h10[0]}  dense={h10[1]}  +fts5={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}")
 
     n = evaluated_cases
     if n == 0:
@@ -333,6 +413,7 @@ def main() -> None:
         category_summary,
         [(key.replace("_", " "), key) for key in category_summary.keys()],
         "Category",
+        show_confidence=True,
     )
     print_bucket_table(
         "Retrieval ablations by difficulty",

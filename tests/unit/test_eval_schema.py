@@ -141,3 +141,31 @@ def test_harness_aggregate_results_tracks_abstention_metrics() -> None:
     assert summary["abstention_recall"] == 1.0
     assert summary["abstention_cases"] == 1
     assert summary["answerable_abstentions"] == 1
+
+
+def test_ablation_summary_includes_wilson_intervals() -> None:
+    run_ablations = load_module(ROOT / "eval" / "run_ablations.py", "eval_run_ablations_wilson")
+    config_keys = [
+        "0_fts5_only",
+        "1_vector_only",
+    ]
+    cases = [
+        {
+            "hit_at_5": {"0_fts5_only": True, "1_vector_only": False},
+            "hit_at_10": {"0_fts5_only": True, "1_vector_only": True},
+        },
+        {
+            "hit_at_5": {"0_fts5_only": False, "1_vector_only": False},
+            "hit_at_10": {"0_fts5_only": True, "1_vector_only": False},
+        },
+    ]
+
+    summary = run_ablations.summarize_subset(cases, config_keys)
+
+    assert summary["cases"] == 2
+    assert summary["summary_hit_at_5"]["0_fts5_only"] == 0.5
+    assert "summary_hit_at_5_ci" in summary
+    assert "summary_hit_at_10_ci" in summary
+    assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["lower"] >= 0.0
+    assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["upper"] <= 1.0
+    assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["margin"] > 0.0
