@@ -171,7 +171,11 @@ Rules:
 
         # Step 5: verify grounding
         hit_ids = {hit.node_id for hit in bundle.hits}
-        grounded = len(citations) > 0 and all(c.source_id in hit_ids for c in citations)
+        hit_source_ids = {self._resolve_source_id(hit.node_id) for hit in bundle.hits}
+        grounded = len(citations) > 0 and all(
+            citation.source_id in hit_ids or citation.source_id in hit_source_ids
+            for citation in citations
+        )
         trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
 
         return GeneratedAnswer(
@@ -214,10 +218,10 @@ Rules:
     ) -> list[Citation]:
         """Find [[src:...]] or [[chk:...]] references in the answer.
 
-        Chunk IDs (ending in :NNNN) are always resolved to their parent src:
-        node — regardless of whether the chunk itself is in the hit map.
-        The previous guard (hit is None) caused chunk citations to be stored
-        as-is when the chunk was in the hit map, breaking source_correct checks.
+        Chunk IDs (ending in :NNNN) are resolved to their parent src: node
+        whenever possible. If the source node is not part of the returned hit
+        bundle, fall back to the graph store so chunk-heavy bundles still
+        produce source-level citations.
         """
         found_ids = self._CITATION_PATTERN.findall(answer_text)
 
@@ -233,13 +237,20 @@ Rules:
             hit = hit_map.get(cited_id)
 
             # Always resolve chunk IDs to their parent source node.
-            # Try src: prefix regardless of what the LLM wrote.
             if self._CHUNK_SUFFIX.search(cited_id):
-                base = self._CHUNK_SUFFIX.sub("", cited_id)
-                parent_id = "src:" + base.split(":", 1)[1]
+                parent_id = self._resolve_source_id(cited_id)
                 parent_hit = hit_map.get(parent_id)
                 if parent_hit is not None:
                     hit = parent_hit
+                else:
+                    parent_node = self.retrieve_flow.graph_store.get_node(parent_id)
+                    if parent_node is not None:
+                        citations.append(Citation(
+                            source_id=parent_id,
+                            title=parent_node.title,
+                            excerpt=(parent_node.text or "")[:150],
+                        ))
+                        continue
 
             if hit:
                 citations.append(Citation(
@@ -337,6 +348,15 @@ Rules:
         if len(merged_tokens) < 4:
             return original_query
         return " ".join(merged_tokens)
+
+    @classmethod
+    def _resolve_source_id(cls, node_id: str) -> str:
+        if node_id.startswith("src:"):
+            return node_id
+        if cls._CHUNK_SUFFIX.search(node_id):
+            base = cls._CHUNK_SUFFIX.sub("", node_id)
+            return "src:" + base.split(":", 1)[1]
+        return node_id
 
     @classmethod
     def _extract_rewrite_tokens(cls, rewritten_query: str) -> list[str]:

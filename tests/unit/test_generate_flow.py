@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from rca.contracts.nodes import Node, NodeKind
 from rca.flows.generate_flow import GenerateFlow
 from rca.flows.retrieve_flow import RetrievalBundle, RetrievalHit
 from rca.llm.client import ChatResponse, LLMClient
@@ -37,6 +38,7 @@ class StubRetrieveFlow:
         self.score = score
         self.queries: list[str] = []
         self.query_types: list[QueryType | None] = []
+        self.graph_store = None
 
     def retrieve(self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None) -> RetrievalBundle:
         self.queries.append(query)
@@ -198,3 +200,52 @@ def test_generate_answer_keeps_rewrite_for_conceptual_queries() -> None:
     assert "robotic" in retrieve_flow.queries[0]
     assert "packing" in retrieve_flow.queries[0]
     assert retrieve_flow.query_types == [QueryType.conceptual]
+
+
+def test_generate_answer_resolves_chunk_citation_to_parent_source_without_source_hit() -> None:
+    class StubGraphStore:
+        def get_node(self, node_id: str) -> Node | None:
+            if node_id == "src:pdf/jampacker":
+                return Node(
+                    id=node_id,
+                    kind=NodeKind.paper,
+                    title="JamPacker",
+                    text="JamPacker source preview",
+                )
+            return None
+
+    class ChunkOnlyRetrieveFlow(StubRetrieveFlow):
+        def __init__(self) -> None:
+            super().__init__()
+            self.graph_store = StubGraphStore()
+
+        def retrieve(self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None) -> RetrievalBundle:
+            self.queries.append(query)
+            self.query_types.append(query_type)
+            return RetrievalBundle(
+                query=query,
+                hits=[
+                    RetrievalHit(
+                        node_id="chk:pdf/jampacker:0001",
+                        score=0.91,
+                        title="JamPacker chunk",
+                        excerpt="DBLF is described in this chunk.",
+                        metadata={"source_id": "src:pdf/jampacker"},
+                    )
+                ],
+                related_edges=[],
+                trace=trace,
+            )
+
+    flow = GenerateFlow(
+        retrieve_flow=ChunkOnlyRetrieveFlow(),
+        llm_client=StubLLMClient(
+            responses=["DBLF is a JamPacker heuristic. [[chk:pdf/jampacker:0001]]"]
+        ),
+    )
+
+    result = flow.generate_answer("What is DBLF in JamPacker?")
+
+    assert result.abstained is False
+    assert result.grounded is True
+    assert [citation.source_id for citation in result.citations] == ["src:pdf/jampacker"]

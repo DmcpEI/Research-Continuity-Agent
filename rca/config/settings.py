@@ -45,6 +45,10 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("RCA_LLM_API_KEY", "LLM_API_KEY"),
     )
     generation_model: str = "qwen2.5:14b"
+    enable_reranker: bool = True
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_top_k: int = 10
+    retrieval_fetch_limit: int = 20
 
     if _HAS_PYDANTIC_SETTINGS:
         model_config = SettingsConfigDict(
@@ -100,6 +104,10 @@ class Settings(BaseSettings):
             "RCA_LLM_API_KEY": "llm_api_key",
             "LLM_API_KEY": "llm_api_key",
             "RCA_GENERATION_MODEL": "generation_model",
+            "RCA_ENABLE_RERANKER": "enable_reranker",
+            "RCA_RERANKER_MODEL": "reranker_model",
+            "RCA_RERANKER_TOP_K": "reranker_top_k",
+            "RCA_RETRIEVAL_FETCH_LIMIT": "retrieval_fetch_limit",
         }
 
     @staticmethod

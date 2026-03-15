@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from types import SimpleNamespace
 
 from rca.contracts.nodes import Edge, EdgeKind, Node, NodeKind
 from rca.contracts.trace import QueryTrace
@@ -270,3 +271,49 @@ def test_salient_lexical_only_hits_can_still_enter_top_k() -> None:
 
     assert "chk:pdf/lexical-only-salient:0000" in top_ids
     assert "chk:pdf/lexical-only-generic:0000" not in top_ids
+
+
+def test_retrieve_uses_reranker_and_records_stage() -> None:
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            return [
+                VectorQueryResult(id="chk:pdf/a:0000", score=0.91, document="alpha", metadata={}),
+                VectorQueryResult(id="chk:pdf/b:0000", score=0.89, document="beta", metadata={}),
+                VectorQueryResult(id="chk:pdf/c:0000", score=0.87, document="gamma", metadata={}),
+            ]
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return []
+
+        def get_node(self, node_id: str) -> Node | None:
+            return Node(
+                id=node_id,
+                kind=NodeKind.chunk,
+                title=f"title for {node_id}",
+                text=f"text for {node_id}",
+                metadata={},
+            )
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            return []
+
+    class StubReranker:
+        def rerank(self, query: str, hits: list[RetrievalHit], top_k: int | None = None) -> list[RetrievalHit]:
+            ordered = sorted(hits, key=lambda hit: hit.node_id, reverse=True)
+            keep = len(ordered) if top_k is None else top_k
+            return ordered[:keep]
+
+    flow = object.__new__(RetrieveFlow)
+    flow.settings = SimpleNamespace(retrieval_fetch_limit=20, reranker_top_k=5)
+    flow.graph_store = StubGraphStore()
+    flow.vector_store = StubVectorStore()
+    flow._reranker = StubReranker()
+    trace = QueryTrace(query="demo query")
+
+    bundle = flow.retrieve("demo query", limit=2, trace=trace)
+
+    assert [hit.node_id for hit in bundle.hits] == ["chk:pdf/c:0000", "chk:pdf/b:0000"]
+    assert "cross_encoder_rerank" in [stage.name for stage in trace.stages]

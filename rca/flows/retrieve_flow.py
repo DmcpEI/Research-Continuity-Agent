@@ -12,6 +12,7 @@ from rca.config.settings import Settings, get_settings
 from rca.contracts.nodes import Edge, EdgeKind
 from rca.contracts.trace import HitProvenance, QueryTrace, StageTrace
 from rca.retrieval.query_classifier import QueryType
+from rca.retrieval.reranker import CrossEncoderReranker
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorQueryResult, VectorStore
 
@@ -54,6 +55,11 @@ class RetrieveFlow:
         self.settings = settings or get_settings()
         self.graph_store = graph_store or GraphStore(self.settings.graph_db_path)
         self.vector_store = vector_store or VectorStore(self.settings.vector_dir, self.settings.default_collection)
+        self._reranker: CrossEncoderReranker | None = (
+            CrossEncoderReranker(self.settings.reranker_model)
+            if self.settings.enable_reranker
+            else None
+        )
 
     def retrieve(
         self,
@@ -66,6 +72,13 @@ class RetrieveFlow:
         hit_stages: dict[str, str] = {}
         related_edges: list[Edge] = []
         query_tokens = self._tokenize(query)
+        reranker = getattr(self, "_reranker", None)
+        settings = getattr(self, "settings", None)
+        fetch_limit = limit
+        rerank_limit = limit
+        if reranker is not None:
+            fetch_limit = max(limit, getattr(settings, "retrieval_fetch_limit", limit))
+            rerank_limit = min(limit, getattr(settings, "reranker_top_k", limit))
 
         if query_type is QueryType.proper_noun:
             lexical_base = 0.65
@@ -78,7 +91,7 @@ class RetrieveFlow:
             vector_scale = 1.00
 
         vector_started = perf_counter() if trace is not None else None
-        vector_results = self.vector_store.query(query, limit=limit)
+        vector_results = self.vector_store.query(query, limit=fetch_limit)
         if trace is not None:
             self._append_stage(
                 trace,
@@ -90,7 +103,7 @@ class RetrieveFlow:
             self._append_warning(trace, self.vector_store.backend_warning)
 
         graph_started = perf_counter() if trace is not None else None
-        lexical_nodes = self.graph_store.search_nodes(query, limit=limit)
+        lexical_nodes = self.graph_store.search_nodes(query, limit=fetch_limit)
         if trace is not None:
             self._append_stage(
                 trace,
@@ -123,7 +136,7 @@ class RetrieveFlow:
             )
             hit_stages.setdefault(node.id, "lexical")
 
-        ordered_hits = sorted(hit_map.values(), key=lambda h: h.score, reverse=True)[:limit]
+        ordered_hits = sorted(hit_map.values(), key=lambda h: h.score, reverse=True)[:fetch_limit]
         if trace is not None:
             self._append_stage(
                 trace,
@@ -148,6 +161,28 @@ class RetrieveFlow:
         final_hits = ordered_hits + source_hits_new
         for hit in source_hits_new:
             hit_stages[hit.node_id] = "expansion"
+
+        rerank_started = perf_counter() if trace is not None else None
+        if reranker is not None:
+            try:
+                final_hits = reranker.rerank(query, final_hits, top_k=rerank_limit)
+            except Exception as exc:
+                final_hits = final_hits[:rerank_limit]
+                if trace is not None:
+                    self._append_warning(
+                        trace,
+                        f"cross-encoder reranker unavailable: {type(exc).__name__}: {exc}",
+                    )
+            if trace is not None:
+                self._append_stage(
+                    trace,
+                    name="cross_encoder_rerank",
+                    started_at=rerank_started,
+                    hit_count=len(final_hits),
+                    query=query,
+                )
+        else:
+            final_hits = final_hits[:limit]
 
         seen_edge_keys: set[tuple[str, str, str]] = set()
         for hit in final_hits:

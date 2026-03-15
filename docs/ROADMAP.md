@@ -37,7 +37,7 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 | Negative abstention recall | 1/5 (20.0%) |
 | Meaningful grounded rate | 52/60 = 86.7% |
 | Avg keyword hit rate | 0.181 |
-| Avg latency | 12.2 s |
+| Avg latency | 10.5 s |
 
 Retrieval ablations — hit@5 / hit@10 (n=60 answerable):
 
@@ -47,14 +47,14 @@ Retrieval ablations — hit@5 / hit@10 (n=60 answerable):
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
 | 2. vector + keyword (FTS5) | 76.7% | 91.7% |
 | 3. vector + keyword + expansion | 95.0% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 93.3% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 95.0% | 98.3% |
 
 ### Known failure modes
 - Citation selection drift on a small set of cases (`jampacker-003`, `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`, `vilain-001`)
 - Vector-only and keyword-only retrieval still under-rank a few questions that source expansion or rewrite recover
 - LLM generating plausible but wrong answers from off-topic chunks (keyword hit rate remains low)
 - Query rewriter drifts on queries containing specific named entities (scene names, system names)
-- Abstention remains under-calibrated after the FTS5 migration: answerable citation precision improved, but negative recall fell to `1/5`
+- Abstention remains under-calibrated even after reranking: answerable citation precision improved to `92.9%`, but the system still only rejects `3/5` negative questions
 
 ---
 
@@ -85,14 +85,14 @@ hit@5 / hit@10 across 60 answerable golden pairs (current):
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
 | 2. vector + keyword (FTS5) | 76.7% | 91.7% |
 | 3. vector + keyword + expansion | 95.0% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 93.3% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 95.0% | 98.3% |
 
 **Findings:**
 - FTS5/BM25 was strong enough in ablation that it replaced the earlier token-wise `LIKE` lexical stage on the production path.
 - A held-out coefficient sweep then tuned the reranker from `(title=0.12, text=0.04)` to `(title=0.12, text=0.05)`, lifting config 3 from `93.3%` to `95.0%` at hit@5.
 - The original `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the design history and provides a simple fallback baseline.
-- Query rewriting is still mixed on the expanded set and currently underperforms the raw FTS5 baseline.
-- The current retrieval story is now more balanced: the composed pipeline matches pure FTS5 at hit@5, but BM25-only still leads at hit@10.
+- Query rewriting is still mixed on the expanded set, but the final reranker now lets the full pipeline match the pure FTS5 baseline on both hit@5 and hit@10.
+- The current retrieval story is stronger than before: graph expansion remains the main lift over dense retrieval, and cross-encoder reranking closes the remaining gap to the BM25-only baseline.
 - Full results in `eval/results/ablations.json`.
 
 Remaining:
@@ -221,7 +221,7 @@ git checkout -b v2/migrate
 > Built a local-first research knowledge system that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations. Designed an evaluation harness with golden queries, retrieval ablations, and failure analysis for citation errors and hallucination modes.
 
 **With numbers (v1 current):**
-> Citation precision is 88.5% over 52 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 1/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 95.0% with graph expansion, and 93.3% with the full rewrite pipeline. The current result is that the tuned expansion pipeline now matches pure FTS5 at hit@5, while BM25-only still leads on hit@10.
+> Citation precision is 92.9% over 56 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 3/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 95.0% with graph expansion, and 95.0% with the full rewrite + rerank pipeline. The current result is that the reranked full pipeline now matches pure FTS5 on both hit@5 and hit@10.
 
 ---
 
@@ -256,7 +256,7 @@ These priorities were identified through external review of v1.1.0. They are ord
 
 🟢 Later roadmap
 
-- Reranking — highest retrieval leverage after observability is in place. Improves top-5 precision and reduces generic-token bleed better than coefficient tuning.
+- Reranking — shipped in the current pipeline as a cross-encoder final stage. Future work is now about improving calibration and whether section-aware or paper-aware reranking beats the current chunk-level setup.
 - Reciprocal rank fusion — rank-based late fusion as a cleaner alternative to score-scale-dependent merging.
 - Query-type-aware retrieval — lightweight routing: proper noun queries → stronger lexical/title bias; conceptual queries → stronger semantic retrieval.
 - Section-aware chunk weighting — weight abstract/title/conclusion chunks differently based on question type.
@@ -292,5 +292,5 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 🟢 Roadmap — after core gaps are closed:
 
 - Query-type-aware routing — rewrite already helps some proper-noun queries and hurts some paraphrase queries. Add a lightweight classifier or rule-based router and measure the delta.
-- Cross-encoder reranking — retrieve top-20, rerank, and take top-5. This is the most plausible next lever for improving contribution and cross-paper retrieval quality.
+- Cross-encoder reranking — shipped. The next question is whether chunk-level reranking should be supplemented with source-level grouping or section-aware weighting to reduce repeated-paper dominance in the final bundle.
 - Eval question independence at scale — grow to roughly 80–100 questions total, with at least 10 authored externally.

@@ -21,6 +21,7 @@ RetrieveFlow
     ├── like fallback  ← token-wise LIKE kept for reference/testing
     ├── exact-word lexical rerank + dedup → ranked RetrievalBundle
     └── source expansion ← chunk → parent src: nodes
+    └── cross-encoder rerank ← top-k reorder over merged candidates
     │
     ▼
 GenerateFlow
@@ -64,7 +65,8 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 3. **Lexical rerank** — exact word-token overlap over title and text removes partial-word false positives before merge
 4. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
 5. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
-6. **Edge collection** — gathers related edges for the returned nodes
+6. **Cross-encoder rerank** — reranks the merged candidate set with `cross-encoder/ms-marco-MiniLM-L-6-v2`, preserving the original retrieval score scale for downstream context selection
+7. **Edge collection** — gathers related edges for the returned nodes
 
 **Ablation results** (hit@5 / hit@10, n=60 answerable pairs):
 
@@ -73,16 +75,16 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 | fts5-only (BM25 baseline) | 95.0% | 98.3% |
 | vector-only (dense baseline) | 76.7% | 91.7% |
 | vector + keyword (FTS5) | 76.7% | 91.7% |
-| vector + keyword + expansion | 93.3% | 96.7% |
-| full + query rewrite | 91.7% | 96.7% |
+| vector + keyword + expansion | 95.0% | 96.7% |
+| full + query rewrite | 95.0% | 98.3% |
 
-The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. Even after that migration, the pure BM25 baseline still beats the composed retrieval pipeline on hit@5.
+The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. After adding the cross-encoder reranker, the full rewrite pipeline now matches the pure BM25 baseline on both hit@5 and hit@10, while the raw expansion pipeline still trails slightly at hit@10.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 
 Grounded answer generation with citation enforcement.
 
-1. **Rewrite query** — uses the LLM to derive a dense keyword query before retrieval
+1. **Classify + rewrite query** — a lightweight classifier can skip rewrite for proper-noun queries; conceptual and hybrid queries still derive a dense keyword query before retrieval
 2. **Retrieve** — calls `RetrieveFlow.retrieve()`
 3. **Assemble context** — formats retrieved hits into the prompt context block
 4. **Prompt** — system prompt enforces citation format `[[src:paper_name]]` or `[[chk:paper:NNNN]]`
@@ -92,7 +94,7 @@ Grounded answer generation with citation enforcement.
 8. **Abstention gate** — unsupported answers can be suppressed using hedge phrases plus retrieval confidence
 9. **Ground check** — `grounded=True` if at least one valid citation was resolved to a returned hit
 
-**QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the six pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, and `llm_generate`. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.
+**QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the seven pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, `cross_encoder_rerank`, and `llm_generate`. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.
 
 ### GraphStore (`rca/store/graph_store.py`)
 

@@ -53,7 +53,7 @@ It writes a run artifact to `eval/results/run_<timestamp>.json` and per-question
 ### Current Generation Results
 
 Live run artifact:
-- [run_20260315T160649Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260315T160649Z.json)
+- [run_20260315T194910Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260315T194910Z.json)
 
 Headline metrics:
 
@@ -62,13 +62,13 @@ Headline metrics:
 | Overall harness coverage | `65` questions |
 | Answerable questions | `60` |
 | Negative questions | `5` |
-| Answerable questions answered with citation | `52/60` |
-| Answerable abstentions or failures | `8/60` |
-| Citation precision (answerable, non-abstained) | `88.5%` over `52` cases |
-| Negative abstention recall | `1/5` (`20.0%`) |
-| Meaningful grounded rate | `52/60 = 86.7%` |
-| Average keyword hit rate | `0.181` |
-| Average latency | `12.2 s` |
+| Answerable questions answered with citation | `56/60` |
+| Answerable abstentions or failures | `4/60` |
+| Citation precision (answerable, non-abstained) | `92.9%` over `56` cases |
+| Negative abstention recall | `3/5` (`60.0%`) |
+| Meaningful grounded rate | `56/60 = 93.3%` |
+| Average keyword hit rate | `0.214` |
+| Average latency | `10.5 s` |
 
 Notes:
 - The harness summary field `overall_grounded_rate` is now lower than historical runs because abstentions correctly set `grounded=False`.
@@ -79,9 +79,9 @@ Notes:
 
 | Difficulty | Grounded | Citation precision | Abstention recall | Answerable abstentions | Keyword hit rate |
 |---|---|---|---|---:|---:|
-| Easy | `85.7%` | `100.0%` | `0.0%` | `1` | `0.269` |
-| Medium | `85.7%` | `90.9%` | `0.0%` | `4` | `0.121` |
-| Hard | `86.7%` | `83.3%` | `33.3%` | `3` | `0.216` |
+| Easy | `85.7%` | `100.0%` | `0.0%` | `1` | `0.312` |
+| Medium | `89.3%` | `100.0%` | `50.0%` | `2` | `0.179` |
+| Hard | `90.0%` | `84.6%` | `66.7%` | `1` | `0.225` |
 
 ---
 
@@ -104,13 +104,13 @@ Current aggregate retrieval results:
 | 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `91.7%` |
 | 3. vector + keyword + expansion | `95.0%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `93.3%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `95.0%` | `98.3%` |
 
 Interpretation:
-- FTS5/BM25 and the tuned expansion pipeline are now tied for the strongest hit@5 result on the expanded 65-question set
+- FTS5/BM25 remains the strongest single-method baseline, but the full reranked pipeline now matches it on both hit@5 and hit@10
 - config 2 shows that simply adding dense hits to the new FTS5 backbone does not help by itself
 - graph expansion is the single biggest downstream improvement over the dense baseline, lifting hit@5 from `76.7%` to `95.0%`
-- pure FTS5 remains the best hit@10 configuration at `98.3%`
+- the cross-encoder reranker is what closes the remaining gap between the composed pipeline and the pure BM25 baseline
 - query rewrite remains mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
 
 Per-category retrieval results now report 95% Wilson confidence intervals rather than raw percentages alone. This matters because several categories are still very small (`error_analysis n=2`, `paraphrase n=5`, `cross_paper n=6`), and point estimates on their own overstate certainty. Categories with `n <= 6` are flagged explicitly and should be interpreted with caution in the thesis writeup.
@@ -125,7 +125,7 @@ The retrieval baseline question is now answered explicitly rather than by archit
 | 1. vector-only (dense baseline) | `76.7%` | `91.7%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `91.7%` |
 | 3. vector + keyword + expansion | `95.0%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `93.3%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `95.0%` | `98.3%` |
 
 Examiner question: why did the system not use FTS5 earlier, and what changed?
 
@@ -143,10 +143,11 @@ So the current answer is:
 - the earlier implementation remains available as `search_nodes_like()` for reference and regression testing
 
 One important consequence remains:
-- after coefficient tuning, the composed pipeline now matches pure FTS5 on hit@5 (`95.0%`) but still trails it on hit@10 (`96.7%` vs `98.3%`)
-- FTS5-only therefore remains the cleanest single-method baseline and the best hit@10 configuration measured so far
+- FTS5-only is still the cleanest single-method baseline
+- after adding the cross-encoder reranker, the full pipeline now matches pure FTS5 on both hit@5 and hit@10 (`95.0%` / `98.3%`)
+- the raw expansion pipeline without reranking still trails on hit@10 (`96.7%`)
 
-This is worth stating plainly: pure FTS5 remains an unusually strong baseline on this corpus. After the lexical migration and the reranker sweep, the composed pipeline (`FTS5 + vector + expansion`) now reaches the same hit@5 as BM25-only (`95.0%`) while still trailing on hit@10. On a small, domain-specific corpus like this one, BM25 term statistics are strong enough that the semantic retrieval layer adds limited net value unless it is paired with a strong expansion/reranking stage. What *does* matter immediately is source expansion: config 3 gains `+18.3pp` over vector-only (`95.0%` vs `76.7%`), making graph expansion the single most impactful pipeline component after the lexical backbone itself.
+This is worth stating plainly: pure FTS5 remains an unusually strong baseline on this corpus. On a small, domain-specific corpus like this one, BM25 term statistics are strong enough that the semantic retrieval layer only adds net value when it is paired with graph expansion and a strong final reranker. That is exactly what the current pipeline now does: config 3 gains `+18.3pp` over vector-only (`95.0%` vs `76.7%`), and the full reranked pipeline closes the remaining gap to pure BM25 at hit@10.
 
 ---
 
@@ -213,16 +214,12 @@ What it does not catch:
 - answerable questions where the model correctly notices that a specific metric or detail is absent, even though the broader paper is still the right source
 
 Current abstention outcomes:
-- Negative abstention recall: `1/5`
-- Answerable abstentions: `8`
-  - `pic2-009`
+- Negative abstention recall: `3/5`
+- Answerable abstentions: `4`
+  - `jampacker-001`
   - `jampacker-002`
-  - `para-003`
-  - `cross-005`
-  - `densepack-002`
-  - `sayplan-001`
-  - `moma-001`
-  - `vilain-003`
+  - `cross-004`
+  - `densepack-001`
 
 Interpretation of the answerable abstentions:
 - some are likely genuine retrieval or generation misses
@@ -230,7 +227,7 @@ Interpretation of the answerable abstentions:
 - the harness treats all of them as answerable misses because the evaluation target is still a cited answer, not a hedge
 
 Current limitation:
-- after the FTS5 migration, four negative failures (`neg-002`, `neg-003`, `neg-004`, `neg-005`) still retrieve plausible enough context that the current abstention gate does not fire
+- after the reranker integration, two negative failures (`neg-001`, `neg-004`) still retrieve plausible enough context that the current abstention gate does not fire
 - score alone is therefore not a reliable separator between valid evidence and unsupported-but-plausible retrieval bundles, especially once lexical retrieval gets stronger
 - fixing this cleanly will require calibrated confidence scoring, a dedicated abstention classifier, or both
 

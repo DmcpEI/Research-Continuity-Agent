@@ -29,6 +29,7 @@ flowchart TD
         LEX["_lexical_score() reranking<br/>title 0.12 / text 0.05"]
         MERGE["Score merge by node_id<br/>max score wins"]
         EXPAND["Source expansion<br/>contains edges only"]
+        RERANK["Cross-encoder rerank<br/>ms-marco-MiniLM-L-6-v2"]
         GF["GenerateFlow"]
         CTX["Context assembly<br/>top-k hits"]
         LLM["LLM generation<br/>qwen2.5:14b via configured backend"]
@@ -39,7 +40,7 @@ flowchart TD
         UQ --> RW --> RF
         RF --> VQ --> MERGE
         RF --> FTS --> LEX --> MERGE
-        MERGE --> EXPAND --> GF
+        MERGE --> EXPAND --> RERANK --> GF
         GF --> CTX --> LLM --> ABS --> CITE --> OUT
     end
 
@@ -49,7 +50,7 @@ flowchart TD
     VS -. "serves semantic search" .-> RF
 ```
 
-The system composes FTS5/BM25 lexical search, dense vector retrieval, and source graph expansion into a single ranked bundle. A two-gate abstention mechanism detects when the corpus lacks sufficient evidence. All query stages are traced with per-stage latency and retrieval provenance.
+The system composes FTS5/BM25 lexical search, dense vector retrieval, source graph expansion, and a final cross-encoder rerank into a single ranked bundle. A two-gate abstention mechanism detects when the corpus lacks sufficient evidence. All query stages are traced with per-stage latency and retrieval provenance.
 
 ## Reproducing Results
 
@@ -61,7 +62,7 @@ uv run python eval/run_ablations.py
 uv run python eval/harness.py
 ```
 
-Current reference results on the checked-in 65-question corpus: hit@5 `95.0%` for config 3, citation precision `88.5%`, negative abstention recall `1/5`.
+Current reference results on the checked-in 65-question corpus: hit@5 `95.0%` for config 4, citation precision `92.9%`, negative abstention recall `3/5`.
 
 ---
 
@@ -100,12 +101,12 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
 
-**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search over SQLite FTS5/BM25. The earlier token-wise `LIKE` path is still available as `GraphStore.search_nodes_like()` for reference/testing, but it is no longer the production retrieval backbone because explicit evaluation showed BM25 was materially stronger. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID. `_expand_to_sources` promotes parent source nodes from chunk hits, and the final bundle contains ranked hits plus the associated graph edges.
+**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search over SQLite FTS5/BM25. The earlier token-wise `LIKE` path is still available as `GraphStore.search_nodes_like()` for reference/testing, but it is no longer the production retrieval backbone because explicit evaluation showed BM25 was materially stronger. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID, promotes parent source nodes from chunk hits via `_expand_to_sources`, and now applies a final cross-encoder rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`) over the merged candidate set before returning the top bundle.
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
-1. **Query rewriting** — the user's natural-language question is sent to the LLM to produce a dense 8–12 keyword technical search query, improving vector recall over conversational phrasing.
+1. **Query routing + rewriting** — a lightweight query classifier labels the question as `proper_noun`, `conceptual`, or `hybrid`. Proper-noun queries skip the LLM rewrite entirely; the other classes still produce a dense 8–12 keyword technical search query to improve vector recall over conversational phrasing.
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
-3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source when needed. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
+3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
 
 **LLM client.** `OllamaLLMClient` defaults to local Ollama (`/api/chat`, `/api/embeddings`) and now also supports OpenAI-compatible endpoints when `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` are configured. The default generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. `EchoLLMClient` is a deterministic stub for tests.
 
@@ -144,15 +145,15 @@ RCA is currently evaluated on **65 golden questions**: `60` answerable and `5` e
 
 ### Current generation results
 
-Live harness artifact: `eval/results/run_20260315T160649Z.json`
+Live harness artifact: `eval/results/run_20260315T194910Z.json`
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | 88.5% over 52 cases |
-| Negative abstention recall | 1/5 (20.0%) |
-| Meaningful grounded rate | 52/60 = 86.7% |
-| Avg keyword hit rate | 0.181 |
-| Avg latency | 12.2 s |
+| Citation precision (answerable, non-abstained) | 92.9% over 56 cases |
+| Negative abstention recall | 3/5 (60.0%) |
+| Meaningful grounded rate | 56/60 = 93.3% |
+| Avg keyword hit rate | 0.214 |
+| Avg latency | 10.5 s |
 
 The generation pipeline now includes explicit abstention detection. That makes the current grounding metric more honest than the older `100% grounded` runs, but it also exposes a real limitation: four unsupported questions still retrieve plausible enough context that score-based abstention does not trigger.
 
@@ -164,16 +165,16 @@ The generation pipeline now includes explicit abstention detection. That makes t
 | 1. vector-only (dense baseline) | 76.7% | 91.7% |
 | 2. vector + keyword (FTS5) | 76.7% | 91.7% |
 | 3. vector + keyword + expansion | 95.0% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 93.3% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 95.0% | 98.3% |
 
 ### What the numbers mean
 
 - **FTS5/BM25 is now the production lexical backbone**. The repo originally shipped with a transparent token-wise `LIKE` lexical stage, then added an explicit FTS5/BM25 baseline, and finally migrated production retrieval after BM25 consistently outperformed the older path.
-- **Pure FTS5-only remains an unusually strong baseline on this corpus.** After the coefficient sweep, the composed pipeline now matches BM25-only at hit@5 (`95.0%`) but still trails at hit@10 (`96.7%` vs `98.3%`).
+- **Pure FTS5-only remains the strongest single-method baseline on this corpus.** After adding the cross-encoder reranker, the full pipeline now matches BM25-only on both hit@5 and hit@10 (`95.0%` / `98.3%`).
 - **Dense retrieval is still useful as a baseline**, but on this corpus the questions are lexically anchored enough that BM25 performs much better.
-- **Source expansion is the main contributor after the lexical backbone itself.** Config 3 gains `+18.3pp` over vector-only at hit@5.
+- **Source expansion is the main contributor after the lexical backbone itself.** Config 3 gains `+18.3pp` over vector-only at hit@5, and the final reranker closes the remaining gap to the BM25-only baseline.
 - **Query rewrite remains mixed**. It helps some sparse technical queries, but still hurts several paraphrase and cross-paper questions.
-- **Generation improved on answerable citation precision after the lexical migration**, but abstention got worse. The stronger lexical backbone surfaces plausible context more often, which helps answerable questions but makes unsupported questions harder to reject with the current phrase-plus-score abstention heuristic.
+- **Generation improved materially after reranking plus chunk-to-source citation resolution.** The latest 65-question harness reaches `92.9%` citation precision and `3/5` negative abstention recall while also reducing average latency.
 
 ### Known failure modes
 
