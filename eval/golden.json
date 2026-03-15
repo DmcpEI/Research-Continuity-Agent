@@ -548,5 +548,221 @@
     "difficulty": "hard",
     "category": "synthesis",
     "notes": "Requires combining the dataset, evaluation, and corrective re-prompting sections."
+  },
+  {
+    "id": "review-005",
+    "question": "What item-shape coverage gap does the freight packing review identify beyond boxes?",
+    "expected_keywords": ["cylinders", "balls", "irregular", "arbitrary shapes", "boxes"],
+    "expected_source": "src:pdf/comprehensive_review_of_robotized_freight_packing",
+    "difficulty": "medium",
+    "category": "future_work"
+  },
+  {
+    "id": "review-006",
+    "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+    "expected_keywords": ["RGB-D", "depth", "Intel Real Sense", "Xtion Pro Live", "lasers"],
+    "expected_source": "src:pdf/comprehensive_review_of_robotized_freight_packing",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "jampacker-005",
+    "question": "What bin size and object-size groupings does JamPacker use in its large-box evaluation?",
+    "expected_keywords": ["220 cm×120 cm×80 cm", "large", "medium", "small", "varied dimensions"],
+    "expected_source": "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "difficulty": "medium",
+    "category": "evaluation"
+  },
+  {
+    "id": "stablebinpacking-005",
+    "question": "What makes a packing plan robot-packable in the stable bin packing paper, and why is that stricter than ordinary packing feasibility?",
+    "expected_keywords": ["noninterference", "containment", "stability", "kinematic", "grasp", "collision"],
+    "expected_source": "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "difficulty": "hard",
+    "category": "contribution"
+  },
+  {
+    "id": "sgvl-004",
+    "question": "What two data sources does SGVL train on jointly, and why are they combined?",
+    "expected_keywords": ["Visual Genome", "LAION", "scene graphs", "image-text pairs", "simultaneously train"],
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "sgvl-005",
+    "question": "Which pretrained VLM backbones does SGVL improve on across ARO and related compositional benchmarks?",
+    "expected_keywords": ["CLIP", "BLIP", "BLIP2", "ARO", "Winoground"],
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "difficulty": "hard",
+    "category": "results"
+  },
+  {
+    "id": "vlmsurvey-005",
+    "question": "How does the multimodal fusion survey classify different fusion strategies for combining vision and language representations?",
+    "expected_keywords": ["early fusion", "late fusion", "cross-attention", "concatenation", "alignment"],
+    "expected_source": "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "autobag-004",
+    "question": "What robot and sensing setup does AutoBag use in its physical experiments?",
+    "expected_keywords": ["ABB YuMi", "dual-arm", "Realsense", "RGBD", "UV LED"],
+    "expected_source": "src:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects",
+    "difficulty": "easy",
+    "category": "evaluation"
+  },
+  {
+    "id": "autobag-005",
+    "question": "What failure modes does the AutoBag paper report for bag opening and insertion?",
+    "expected_keywords": ["grasps two layers", "bag collapses", "opening closes", "slip", "single layer"],
+    "expected_source": "src:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects",
+    "difficulty": "hard",
+    "category": "error_analysis"
+  },
+  {
+    "id": "densepack-004",
+    "question": "What object sets does Dense Robotic Packing use in simulation and on-robot experiments?",
+    "expected_keywords": ["YCB", "APC 2015", "15 items", "94 real-world object meshes", "robot"],
+    "expected_source": "src:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects",
+    "difficulty": "medium",
+    "category": "evaluation"
+  },
+  {
+    "id": "sayplan-004",
+    "question": "What scene representation and validation mechanism does SayPlan use to check whether generated plans are feasible?",
+    "expected_keywords": ["3D scene graph", "3DSG", "scene graph simulator", "feedback", "iterative replanning"],
+    "expected_source": "src:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "moma-004",
+    "question": "How does MoMa-LLM initialize its scene graph at the start of execution?",
+    "expected_keywords": ["fully turning around", "in-place", "initialize", "start", "execution"],
+    "expected_source": "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "vilain-004",
+    "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+    "expected_keywords": ["PDDL", "Fast Downward", "error messages", "re-prompting", "Corrective Re-Prompting"],
+    "expected_source": "src:pdf/vision-language_interpreter_for_robot_task_planning",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "para-006",
+    "question": "What does SayPlan do when the LLM proposes a step that refers to a node not present in the visible scene graph?",
+    "expected_keywords": ["iterative replanning", "scene graph simulator", "feedback", "hallucinating nodes", "infeasible actions"],
+    "expected_source": "src:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning",
+    "difficulty": "medium",
+    "category": "paraphrase",
+    "notes": "Lexical mismatch: node not present paraphrases hallucinating nodes or out-of-graph references."
+  },
+  {
+    "id": "para-007",
+    "question": "How does MoMa-LLM update its world model as the robot explores and interacts with new objects?",
+    "expected_keywords": ["dynamic scene graphs", "update", "exploration", "interactive", "object-centric"],
+    "expected_source": "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "difficulty": "medium",
+    "category": "paraphrase",
+    "notes": "Lexical mismatch: world model update paraphrases dynamic scene graph maintenance."
+  },
+  {
+    "id": "para-008",
+    "question": "What training signal lets AutoBag learn bag-handle and rim perception without manual labels?",
+    "expected_keywords": ["UV fluorescent", "self-supervised", "UV markings", "handles", "rim"],
+    "expected_source": "src:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects",
+    "difficulty": "medium",
+    "category": "paraphrase",
+    "notes": "Lexical mismatch: training signal paraphrases UV-fluorescent self-supervision."
+  },
+  {
+    "id": "neg-006",
+    "question": "What is the average number of manipulation steps SayPlan requires per task on the HM3D benchmark?",
+    "expected_keywords": ["cannot answer", "not reported", "HM3D"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false
+  },
+  {
+    "id": "neg-007",
+    "question": "What wall-clock training time does SGVL require on a single A100 GPU?",
+    "expected_keywords": ["cannot answer", "not reported", "training time"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false
+  },
+  {
+    "id": "neg-008",
+    "question": "How does AutoBag's bag-opening success rate compare with SuctionGrasp on the Columbia grasp dataset?",
+    "expected_keywords": ["cannot answer", "not in corpus", "Columbia grasp"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false
+  },
+  {
+    "id": "neg-009",
+    "question": "What ablation does ViLaIn report for removing the corrective re-prompting component on the ProDG test split?",
+    "expected_keywords": ["cannot answer", "ablation", "not reported"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false
+  },
+  {
+    "id": "neg-010",
+    "question": "How many parameters does the VLM used in the grocery bagging pipeline have?",
+    "expected_keywords": ["cannot answer", "not reported", "parameters"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false
+  },
+  {
+    "id": "cross-007",
+    "question": "How do the fault recovery strategies in JamPacker and Dense Robotic Packing differ in how they detect and correct placement errors at execution time?",
+    "expected_keywords": ["FRM", "fault score", "offset", "conservative planning", "closed-loop packing", "placement errors"],
+    "expected_sources": [
+      "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+      "src:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects"
+    ],
+    "difficulty": "hard",
+    "category": "cross_paper"
+  },
+  {
+    "id": "cross-008",
+    "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+    "expected_keywords": ["YOLO", "canonical_name", "RGB", "UV markings", "self-supervised", "handles and rim"],
+    "expected_sources": [
+      "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+      "src:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects"
+    ],
+    "difficulty": "hard",
+    "category": "cross_paper"
+  },
+  {
+    "id": "synth-006",
+    "question": "How do the three evaluation dimensions in the grocery bagging benchmark — strict, packing, and no_weight — capture progressively looser notions of correctness?",
+    "expected_keywords": ["strict", "packing", "no_weight", "group", "packaging", "weight_class"],
+    "expected_source": "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation",
+    "difficulty": "hard",
+    "category": "synthesis",
+    "notes": "Requires combining the metric definitions with what each matching mode relaxes."
+  },
+  {
+    "id": "synth-007",
+    "question": "How do SGVL's hard negative generation and Adaptive SG tokens target different weaknesses of standard VLM pre-training?",
+    "expected_keywords": ["hard negative generation", "Adaptive SG tokens", "compositional scene understanding", "object attributes", "relations", "action states"],
+    "expected_source": "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "difficulty": "hard",
+    "category": "synthesis",
+    "notes": "Requires connecting hard negative generation to fine-grained discrimination and Adaptive SG tokens to explicit scene-graph prediction."
   }
 ]

@@ -181,8 +181,8 @@ def test_coefficient_sweep_splits_exist_and_cover_golden_set() -> None:
     dev_ids = set(dev["ids"])
     test_ids = set(test["ids"])
 
-    assert dev["count"] == 45
-    assert test["count"] == 20
+    assert dev["count"] == len(dev["ids"])
+    assert test["count"] == len(test["ids"])
     assert not (dev_ids & test_ids)
-    assert len(dev_ids | test_ids) == 65
     assert dev_ids | test_ids == golden_ids
+    assert dev["count"] + test["count"] == len(golden)

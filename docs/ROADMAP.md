@@ -102,6 +102,7 @@ Remaining:
 
 ### P2 — Expand evaluation
 - [ ] Grow golden set: 30 → 100+ pairs across more papers
+  Current validated set is 90 questions. Pending final step: add 10 externally authored questions once `OPENAI_API_KEY` is available.
 - [ ] Add failure taxonomy to `docs/EVAL.md`:
   - query classes that fail
   - chunking failures
