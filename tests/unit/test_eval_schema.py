@@ -83,3 +83,61 @@ def test_ablation_helpers_handle_negative_and_multi_source_cases() -> None:
     assert run_ablations.hit_at_k(hits, ["src:pdf/a"], k=5) is True
     assert run_ablations.hit_at_k(hits, ["src:pdf/a", "src:pdf/b"], k=5) is True
     assert run_ablations.hit_at_k(hits, ["src:pdf/a", "src:pdf/c"], k=5) is False
+
+
+def test_harness_aggregate_results_tracks_abstention_metrics() -> None:
+    harness = load_module(ROOT / "eval" / "harness.py", "eval_harness_abstention")
+    results = [
+        harness.EvaluationCaseResult(
+            id="ans-001",
+            question="Supported?",
+            difficulty="medium",
+            category="results",
+            answerable=True,
+            expected_source="src:pdf/a",
+            answer="Answer [[src:pdf/a]]",
+            grounded=True,
+            abstained=False,
+            citations=["src:pdf/a"],
+            source_correct=True,
+            keyword_hits=1.0,
+            latency_ms=10.0,
+        ),
+        harness.EvaluationCaseResult(
+            id="ans-002",
+            question="Missed?",
+            difficulty="hard",
+            category="method",
+            answerable=True,
+            expected_source="src:pdf/b",
+            answer="No relevant context found in your knowledge base.",
+            grounded=False,
+            abstained=True,
+            citations=[],
+            source_correct=False,
+            keyword_hits=0.0,
+            latency_ms=20.0,
+        ),
+        harness.EvaluationCaseResult(
+            id="neg-001",
+            question="Unsupported?",
+            difficulty="hard",
+            category="negative",
+            answerable=False,
+            answer="The provided context does not contain information.",
+            grounded=False,
+            abstained=True,
+            citations=[],
+            source_correct=True,
+            keyword_hits=1.0,
+            latency_ms=5.0,
+        ),
+    ]
+
+    summary = harness.aggregate_results(results)
+
+    assert summary["citation_precision"] == 1.0
+    assert summary["citation_precision_cases"] == 1
+    assert summary["abstention_recall"] == 1.0
+    assert summary["abstention_cases"] == 1
+    assert summary["answerable_abstentions"] == 1

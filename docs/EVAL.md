@@ -1,146 +1,201 @@
 # Evaluation
 
-RCA is evaluated against a golden Q&A set across two layers: retrieval quality (does the right paper surface?) and generation quality (does the answer contain correct, cited content?).
+RCA is evaluated at two layers:
+- retrieval quality: does the correct paper surface in the top-k bundle?
+- generation quality: does the final answer cite the correct source, use the retrieved evidence, and abstain when the corpus does not support the question?
+
+This document reflects the current 65-question evaluation set and the live abstention-enabled generation harness.
 
 ---
 
-## Golden set
+## Golden Set
 
-**30 Q&A pairs** across 6 source papers, covering 12 question categories and 3 difficulty levels.
+The active golden set is [eval/golden.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/golden.json).
 
-| Paper | Questions | Categories |
-|---|---|---|
-| Robotic Grocery Bagging (PIC2) | 10 | pipeline, schema, results, error analysis, evaluation |
-| Comprehensive Review of Robotized Freight Packing | 4 | contribution, findings, future work, method |
-| JamPacker | 4 | contribution, method, results |
-| Stable Bin Packing (Wang & Hauser) | 4 | contribution, method, results |
-| SGVL (Scene Graph VLMs) | 3 | contribution, method, results |
-| Multimodal Fusion Survey | 4 | scope, findings, challenges, future work |
-| Cross-paper | 1 | cross-paper reasoning |
+- Total questions: `65`
+- Answerable: `60`
+- Negative / unanswerable: `5`
+- Difficulties: `7 easy`, `28 medium`, `30 hard`
 
-Difficulty distribution: 6 easy / 15 medium / 9 hard.
+Coverage includes:
+- single-paper factual lookup
+- method and contribution questions
+- paraphrase / lexical mismatch cases
+- cross-paper comparison
+- multi-chunk synthesis
+- explicit negative / unsupported queries
 
-**Metric definitions:**
-- **Citation precision** — fraction of cases where `expected_source` (exact string match on source ID) appears in the set of source IDs returned with the answer. Not precision@k — a binary per-question check.
-- **Keyword hit rate** — fraction of `expected_keywords` found via case-insensitive substring match in the answer text.
-- **hit@k** — fraction of cases where `expected_source` appears among the source IDs resolved from the top-k retrieved chunks.
+Metric definitions:
+- `citation_precision`: fraction of answerable, non-abstained cases where every `expected_source` appears in the returned citation IDs
+- `abstention_recall`: fraction of negative questions where the system abstains correctly
+- `grounded_rate`: for the current harness, fraction of all cases where the model returned a cited answer; for thesis reporting, the meaningful definition is answerable questions answered with citation
+- `keyword_hit_rate`: fraction of `expected_keywords` matched by case-insensitive substring in the generated answer
+- `hit@k`: retrieval-only metric indicating whether the expected source appears in the top-k resolved retrieval hits
 
 ---
 
-## Generation harness
+## Generation Harness
 
 ```bash
 uv run python eval/harness.py
 ```
 
-Measures per golden pair:
-- `grounded` — whether the system flagged the answer as grounded
-- `source_correct` — whether `expected_source` appears in returned citation IDs
-- `keyword_hit_rate` — fraction of `expected_keywords` found (case-insensitive) in the answer
-- `latency_ms` — end-to-end time including retrieval and generation
+The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py) over all 65 questions and records:
+- `grounded`
+- `abstained`
+- `citations`
+- `source_correct`
+- `keyword_hits`
+- `latency_ms`
 
-Writes full results to `eval/results/run_<timestamp>.json`.
+It writes a run artifact to `eval/results/run_<timestamp>.json` and per-question traces to `eval/results/traces/<run_id>/`.
 
-### Results (2026-03-14, verified live run)
+### Current Generation Results
+
+Live run artifact:
+- [run_20260315T145602Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260315T145602Z.json)
+
+Headline metrics:
 
 | Metric | Value |
 |---|---|
-| Grounded rate | 100% |
-| **Citation precision** | **86.7%** |
-| Avg keyword hit rate | 0.189 |
-| Avg latency | 16.8 s |
+| Overall harness coverage | `65` questions |
+| Answerable questions | `60` |
+| Negative questions | `5` |
+| Answerable questions answered with citation | `49/60` |
+| Answerable abstentions or failures | `11/60` |
+| Citation precision (answerable, non-abstained) | `91.8%` over `49` cases |
+| Negative abstention recall | `2/5` (`40.0%`) |
+| Meaningful grounded rate | `49/60 = 81.7%` |
+| Average keyword hit rate | `0.167` |
+| Average latency | `12.5 s` |
 
-**By difficulty:**
+Notes:
+- The harness summary field `overall_grounded_rate` is now lower than historical runs because abstentions correctly set `grounded=False`.
+- For thesis reporting, `49/60 = 81.7%` is the more useful grounded-rate definition: answerable questions where the model produced a cited answer.
 
-| Difficulty | Grounded | Citation precision | Keyword hit rate |
-|---|---|---|---|
-| Easy (n=6) | 100% | 100.0% | 0.531 |
-| Medium (n=15) | 100% | 80.0% | 0.080 |
-| Hard (n=9) | 100% | 88.9% | 0.143 |
+### Difficulty Breakdown
 
-### Progression
-
-| Run | Change | Citation precision |
-|---|---|---|
-| Baseline | — | 26.7% |
-| After P0 fix | Source-ID resolution bug fixed (1 line) | 73.3% |
-| After golden fix | Typo in expected_source for sgvl papers | 83.3% |
-| After retrieval hardening | Query rewrite cleanup + lexical/source scoring fixes | 86.7% |
-| After exact-word rerank guardrails | Removed partial-word false positives in title/text rescoring | 86.7% (stable) |
+| Difficulty | Grounded | Citation precision | Abstention recall | Answerable abstentions | Keyword hit rate |
+|---|---|---|---|---:|---:|
+| Easy | `100.0%` | `100.0%` | `0.0%` | `0` | `0.340` |
+| Medium | `78.6%` | `95.0%` | `0.0%` | `6` | `0.082` |
+| Hard | `76.7%` | `86.4%` | `66.7%` | `5` | `0.205` |
 
 ---
 
-## Retrieval ablations
+## Retrieval Ablations
 
 ```bash
 uv run python eval/run_ablations.py
 ```
 
-Tests 4 retrieval configurations on all 30 golden pairs. Measures hit@5 and hit@10 — whether `expected_source` appears among the top-k retrieved chunk source IDs.
+The ablation runner evaluates retrieval only on the `60` answerable questions and skips the `5` negatives.
 
-### Results
+Latest retrieval artifact:
+- [ablations.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/ablations.json)
+
+Current aggregate retrieval results:
 
 | Configuration | hit@5 | hit@10 |
-|---|---|---|
-| 1. vector-only | 80.0% | 96.7% |
-| 2. vector + keyword | 80.0% | 96.7% |
-| 3. vector + keyword + expansion | 96.7% | 100.0% |
-| 4. full pipeline (+ query rewrite) | 100.0% | 100.0% |
+|---|---:|---:|
+| 1. vector-only | `76.7%` | `91.7%` |
+| 2. vector + keyword | `76.7%` | `91.7%` |
+| 3. vector + keyword + expansion | `86.7%` | `91.7%` |
+| 4. full pipeline (+ rewrite) | `80.0%` | `90.0%` |
 
-### Interpretation
-
-**96.7% hit@10 on plain vector** — the corpus is still well-indexed, but one case remains a true semantic miss without help from graph-aware retrieval.
-
-**Source expansion plus exact-word lexical reranking now matter** — after removing partial-word false positives in title/text rescoring, graph-backed retrieval lifts hit@5 from 80.0% to 96.7% while preserving 100.0% hit@10.
-
-**Query rewriting still adds the last increment** — after cleanup and salient-term retention, full rewrite closes the last remaining hit@5 miss and reaches 100.0% / 100.0%.
+Interpretation:
+- vector retrieval remains a strong baseline
+- graph expansion is still the best raw retrieval setting on the expanded 65-question set
+- query rewrite is mixed: it helps some sparse technical questions but still hurts paraphrase and some structured-planning queries
 
 ---
 
-## Failure analysis
+## Abstention Analysis
 
-### Class 1 — Source-ID resolution bug (fixed)
+The current generation pipeline uses a two-gate abstention mechanism in [generate_flow.py](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py):
 
-**Root cause:** In `generate_flow.py`, `_extract_citations` only attempted parent resolution when `hit is None`. When the LLM cited a chunk ID that was already in `hit_map`, the resolution was skipped and the raw chunk ID (`chk:pdf/paper:0042`) was stored as `Citation.source_id` instead of the parent source ID (`src:pdf/paper`). The harness comparison then always failed.
+1. `phrase gate`: detect explicit hedging language in the raw LLM response, such as `does not contain information`, `cannot answer`, or `not provided in`
+2. `confidence gate`: if the response contains a citation marker anyway, only convert it into an abstention when the retrieval bundle is weak, using `max(hit.score) < 0.50`
 
-**Fix:** Remove the `hit is None` guard — parent resolution now runs unconditionally for any ID with a numeric suffix. Since `_expand_to_sources` always adds parent `src:` nodes to the retrieval bundle, the parent is reliably found.
+Operationally:
+- if the model hedges and gives no citation, the system abstains
+- if the model hedges, cites anyway, and retrieval confidence is low, the system strips the guessed citation and abstains
+- otherwise the response is treated as a normal cited answer
 
-**Impact:** 26.7% → 73.3% citation precision from a single-line change.
+What this catches well:
+- explicit unsupported-query responses with no evidence citation
+- low-confidence guessed citations that look like “closest source” behavior rather than grounded answers
 
-### Class 2 — Golden set typo (fixed)
+What it does not catch:
+- negative questions where retrieval scores are still high enough to look plausible
+- answerable questions where the model correctly notices that a specific metric or detail is absent, even though the broader paper is still the right source
 
-**Root cause:** The `expected_source` for all three sgvl questions used `vision_language` (underscore) while the actual stored source ID uses `vision-language` (hyphen). All three were false negatives in the eval — the right chunks were being retrieved and cited, but the string comparison always failed.
+Current abstention outcomes:
+- Negative abstention recall: `2/5`
+- False positives on answerable questions: `2`
+  - `vlmsurvey-001`
+  - `autobag-003`
 
-**Fix:** Corrected the three entries in `eval/golden.json`.
+Interpretation of the two false positives:
+- these are not random hallucinations by the detector
+- in both cases the LLM identified that the requested detail was not supported by the retrieved context and emitted a clean abstention with no citation marker
+- the harness counts them as answerable misses because the golden set expects the broader paper to still support a valid answer
 
-**Impact:** 73.3% → 83.3% citation precision.
+Current limitation:
+- the three negative failures (`neg-002`, `neg-004`, `neg-005`) have top retrieval scores in the `0.69–0.73` range, which overlaps with ordinary successful retrievals
+- score alone is therefore not a reliable separator between valid evidence and unsupported-but-plausible retrieval bundles
+- fixing this cleanly will require calibrated confidence scoring, a dedicated abstention classifier, or both
 
-### Class 3 — Retrieval ranking bug (fixed)
-
-**Root cause:** `RetrieveFlow._lexical_score` temporarily used raw substring membership for title and text while GraphStore candidate generation used SQL `LIKE` over tokenized query terms. That let partial-word matches such as `mode` → `models` and `jampack` → `jampacker` inflate distractor papers and reorder the top of the bundle.
-
-**Fix:** Title and text rescoring now use exact word-token membership after splitting on non-alphanumeric characters.
-
-**Impact:** The graph-backed raw retrieval path rose from 90.0% → 96.7% hit@5, and the full rewritten pipeline now reaches 100.0% hit@5 / hit@10.
-
-### Class 4 — Citation selection miss (active, 4 cases)
-
-**Affected cases:** `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`.
-
-In these cases the correct paper is retrieved strongly enough for grounding, but generation still cites a different source. Retrieval is no longer the main bottleneck here; citation selection is.
-
-### Class 5 — Answer quality miss (active)
-
-Several questions are `source_correct=True` but `keyword_hits=0.0` — the right paper is retrieved and cited, but the answer paraphrases without including the exact technical terms tracked by `expected_keywords`.
+This is the practical ceiling of the current phrase-plus-score heuristic. It is good enough to expose unsupported answers honestly, but not yet strong enough to serve as a final confidence model.
 
 ---
 
-## Known limitations
+## Failure Analysis
+
+### Fixed retrieval/generation issues
+
+1. Source-ID resolution bug
+   - chunk citations were previously stored as `chk:` IDs instead of being resolved back to parent `src:` IDs
+   - fixed in `_extract_citations()` in [generate_flow.py](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py)
+
+2. Golden-set source typo
+   - SGVL expected source IDs used the wrong hyphen/underscore form
+   - fixed in [golden.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/golden.json)
+
+3. Partial-word lexical rescoring bug
+   - lexical reranking was incorrectly crediting distractors on substring matches such as `mode` vs `models`
+   - fixed in [retrieve_flow.py](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/retrieve_flow.py) by switching to exact word-token overlap
+
+4. Expansion correctness bug
+   - `_expand_to_sources()` used to follow any incoming edge
+   - it now filters to `EdgeKind.contains` only
+
+### Active failure classes
+
+- rewrite-induced retrieval drift on paraphrase and cross-paper questions
+- answerable questions where the LLM hedges about a missing detail instead of giving the broader supported answer
+- unsupported questions whose retrieved context looks plausible enough that score-based abstention does not trigger
+
+---
+
+## Known Limitations
 
 | Limitation | Status |
 |---|---|
-| 30 golden pairs is a small evaluation set | Planned expansion to 100+ |
-| Keyword matching is case-insensitive substring — not semantic | Acceptable for technical terms, misses paraphrases |
-| A few questions still need graph expansion or rewrite to reach top-5 | Improved, but vector-only remains weaker on `jampacker-001`, `stablebinpacking-002`, and `sgvl-003` |
-| Query rewriter degrades performance on precise proper-noun queries | Needs conditional rewriting logic |
-| Generation latency ~17s | Acceptable for local Ollama; target <10s with top-5 retrieval |
+| Abstention is heuristic, not calibrated | Active |
+| Three negative cases are indistinguishable from valid hits by score alone | Active |
+| Query rewrite still hurts some paraphrase and cross-paper questions | Active |
+| Keyword hit rate is lexical, not semantic | Acceptable but limited |
+| Category counts are still small in several buckets | Active |
+| No explicit lexical-only FTS/BM25 baseline yet | Planned |
+
+---
+
+## Next Evaluation Steps
+
+- add calibrated confidence scoring or a dedicated abstention classifier
+- run the generation harness again after any abstention-model change, not just retrieval ablations
+- add lexical-only baseline comparisons
+- report confidence intervals or small-sample caveats for tiny categories
+- continue expanding the question set with externally written prompts

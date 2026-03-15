@@ -24,6 +24,7 @@ class GeneratedAnswer(BaseModel):
     answer: str
     citations: list[Citation] = Field(default_factory=list)
     grounded: bool = False
+    abstained: bool = False
     trace: QueryTrace | None = None
 
 
@@ -33,12 +34,22 @@ class GenerateFlow:
     SYSTEM_PROMPT = """You are a research assistant with access to a personal knowledge base.
 Your job is to answer questions using ONLY the context provided below.
 Rules:
-- Every factual claim MUST be followed immediately by [[source_id]] where source_id is the EXACT ID shown in square brackets at the start of the relevant context block
-- An answer with no [[...]] citations will be rejected — citations are mandatory, not optional
+- If the context contains enough information to answer, every factual claim MUST be followed immediately by [[source_id]] where source_id is the EXACT ID shown in square brackets at the start of the relevant context block
 - Use the full ID as written, e.g. [[src:pdf/paper_name]] or [[chk:pdf/paper_name:0012]]
-- If the context does not contain enough information, say so and still cite the closest source
+- If the context does not contain enough information, say so clearly and do not include any [[...]] citations
 - Never invent facts, authors, or results not present in the context
 - Be concise and precise — this is a research tool, not a chatbot"""
+    _ABSTENTION_SIGNALS = (
+        "does not contain information",
+        "no information",
+        "cannot find",
+        "not mentioned in",
+        "no relevant information",
+        "cannot answer",
+        "not provided in",
+    )
+    _CITATION_PATTERN = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
+    _ABSTENTION_SCORE_THRESHOLD = 0.50
 
     def __init__(
         self,
@@ -78,6 +89,7 @@ Rules:
                 query=query,
                 answer="No relevant context found in your knowledge base.",
                 grounded=False,
+                abstained=True,
                 trace=trace,
             )
 
@@ -101,6 +113,7 @@ Rules:
                 query=query,
                 answer="No relevant context found in your knowledge base.",
                 grounded=False,
+                abstained=True,
                 trace=trace,
             )
 
@@ -122,6 +135,19 @@ Rules:
 
         # Step 4: extract citations from response
         answer_text = response.text
+        abstained_text = self._abstained_response(answer_text, bundle)
+        if abstained_text is not None:
+            self._append_warning(trace, "llm abstained")
+            trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
+            return GeneratedAnswer(
+                query=query,
+                answer=abstained_text,
+                citations=[],
+                grounded=False,
+                abstained=True,
+                trace=trace,
+            )
+
         citations = self._extract_citations(answer_text, bundle)
 
         # Step 4b: fallback — if LLM produced no citations, inject top source hit
@@ -140,6 +166,7 @@ Rules:
             answer=answer_text,
             citations=citations,
             grounded=grounded,
+            abstained=False,
             trace=trace,
         )
 
@@ -179,8 +206,7 @@ Rules:
         The previous guard (hit is None) caused chunk citations to be stored
         as-is when the chunk was in the hit map, breaking source_correct checks.
         """
-        pattern = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
-        found_ids = pattern.findall(answer_text)
+        found_ids = self._CITATION_PATTERN.findall(answer_text)
 
         hit_map = {hit.node_id: hit for hit in bundle.hits}
         citations = []
@@ -210,6 +236,32 @@ Rules:
                 ))
 
         return citations
+
+    @classmethod
+    def _contains_abstention_signal(cls, answer_text: str) -> bool:
+        normalized = answer_text.casefold()
+        return any(signal in normalized for signal in cls._ABSTENTION_SIGNALS)
+
+    @classmethod
+    def _abstained_response(
+        cls,
+        answer_text: str,
+        bundle: RetrievalBundle,
+    ) -> str | None:
+        has_hedge = cls._contains_abstention_signal(answer_text)
+        has_citation = bool(cls._CITATION_PATTERN.search(answer_text))
+        max_retrieval_score = max((hit.score for hit in bundle.hits), default=0.0)
+
+        if has_hedge and not has_citation:
+            return cls._strip_citation_markers(answer_text)
+        if has_hedge and has_citation and max_retrieval_score < cls._ABSTENTION_SCORE_THRESHOLD:
+            return cls._strip_citation_markers(answer_text)
+        return None
+
+    @classmethod
+    def _strip_citation_markers(cls, answer_text: str) -> str:
+        cleaned = cls._CITATION_PATTERN.sub("", answer_text)
+        return cleaned.strip()
 
     def _rewrite_query(self, query: str, trace: QueryTrace | None = None) -> str:
         """Use the LLM to extract clean semantic search keywords."""

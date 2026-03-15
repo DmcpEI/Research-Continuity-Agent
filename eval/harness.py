@@ -48,6 +48,7 @@ class EvaluationCaseResult(BaseModel):
     expected_keywords: list[str] = Field(default_factory=list)
     answer: str
     grounded: bool
+    abstained: bool = False
     citations: list[str] = Field(default_factory=list)
     source_correct: bool
     keyword_hits: float
@@ -94,9 +95,11 @@ def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseR
         matched_keywords, missing_keywords = keyword_matches(generated.answer, pair.expected_keywords)
         keyword_hits = calculate_keyword_hit_rate(matched_keywords, pair.expected_keywords)
         if not pair.answerable:
-            source_correct = (not generated.grounded) and not citation_source_ids
+            source_correct = generated.abstained
         elif expected_sources:
-            source_correct = all(source in citation_source_ids for source in expected_sources)
+            source_correct = (not generated.abstained) and all(
+                source in citation_source_ids for source in expected_sources
+            )
         else:
             source_correct = False
 
@@ -112,6 +115,7 @@ def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseR
                 expected_keywords=pair.expected_keywords,
                 answer=generated.answer,
                 grounded=generated.grounded,
+                abstained=generated.abstained,
                 citations=citation_source_ids,
                 source_correct=source_correct,
                 keyword_hits=keyword_hits,
@@ -135,6 +139,7 @@ def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseR
                 expected_keywords=pair.expected_keywords,
                 answer="",
                 grounded=False,
+                abstained=False,
                 citations=[],
                 source_correct=False,
                 keyword_hits=0.0,
@@ -166,11 +171,19 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
         return {
             "overall_grounded_rate": 0.0,
             "citation_precision": 0.0,
+            "citation_precision_cases": 0,
+            "abstention_recall": 0.0,
+            "abstention_cases": 0,
+            "answerable_abstentions": 0,
             "average_keyword_hit_rate": 0.0,
             "average_latency_ms": 0.0,
             "by_difficulty": {},
             "top_failures": [],
         }
+
+    answerable = [result for result in results if result.answerable]
+    negatives = [result for result in results if not result.answerable]
+    scored_answerable = [result for result in answerable if not result.abstained]
 
     by_difficulty: dict[str, dict[str, Any]] = {}
     for difficulty in ("easy", "medium", "hard"):
@@ -182,7 +195,17 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
     top_failures = sorted(results, key=lambda result: result.keyword_hits)[:5]
     return {
         "overall_grounded_rate": sum(result.grounded for result in results) / total,
-        "citation_precision": sum(result.source_correct for result in results) / total,
+        "citation_precision": (
+            sum(result.source_correct for result in scored_answerable) / len(scored_answerable)
+            if scored_answerable else 0.0
+        ),
+        "citation_precision_cases": len(scored_answerable),
+        "abstention_recall": (
+            sum(result.abstained for result in negatives) / len(negatives)
+            if negatives else 0.0
+        ),
+        "abstention_cases": len(negatives),
+        "answerable_abstentions": sum(result.abstained for result in answerable),
         "average_keyword_hit_rate": sum(result.keyword_hits for result in results) / total,
         "average_latency_ms": sum(result.latency_ms for result in results) / total,
         "by_difficulty": by_difficulty,
@@ -192,6 +215,7 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
                 "difficulty": result.difficulty,
                 "keyword_hits": result.keyword_hits,
                 "grounded": result.grounded,
+                "abstained": result.abstained,
                 "source_correct": result.source_correct,
                 "error": result.error,
             }
@@ -202,10 +226,21 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
 
 def summarize_subset(results: list[EvaluationCaseResult]) -> dict[str, Any]:
     total = len(results)
+    answerable = [result for result in results if result.answerable]
+    negatives = [result for result in results if not result.answerable]
+    scored_answerable = [result for result in answerable if not result.abstained]
     return {
         "count": total,
         "grounded_rate": sum(result.grounded for result in results) / total,
-        "citation_precision": sum(result.source_correct for result in results) / total,
+        "citation_precision": (
+            sum(result.source_correct for result in scored_answerable) / len(scored_answerable)
+            if scored_answerable else 0.0
+        ),
+        "abstention_recall": (
+            sum(result.abstained for result in negatives) / len(negatives)
+            if negatives else 0.0
+        ),
+        "answerable_abstentions": sum(result.abstained for result in answerable),
         "average_keyword_hit_rate": sum(result.keyword_hits for result in results) / total,
         "average_latency_ms": sum(result.latency_ms for result in results) / total,
     }
@@ -214,7 +249,17 @@ def summarize_subset(results: list[EvaluationCaseResult]) -> dict[str, Any]:
 def print_summary(summary: dict[str, Any], total_cases: int) -> None:
     print(f"Cases: {total_cases}")
     print(f"Overall grounded rate: {summary['overall_grounded_rate']:.1%}")
-    print(f"Citation precision: {summary['citation_precision']:.1%}")
+    print(
+        "Citation precision (answerable, non-abstained only): "
+        f"{summary['citation_precision']:.1%} "
+        f"over {summary['citation_precision_cases']} cases"
+    )
+    print(
+        "Abstention recall (negative questions): "
+        f"{summary['abstention_recall']:.1%} "
+        f"over {summary['abstention_cases']} cases"
+    )
+    print(f"Answerable abstentions: {summary['answerable_abstentions']}")
     print(f"Average keyword hit rate: {summary['average_keyword_hit_rate']:.3f}")
     print(f"Average latency: {summary['average_latency_ms']:.1f} ms")
     print("")
@@ -226,6 +271,8 @@ def print_summary(summary: dict[str, Any], total_cases: int) -> None:
         print(
             f"- {difficulty}: grounded={metrics['grounded_rate']:.1%}, "
             f"citation_precision={metrics['citation_precision']:.1%}, "
+            f"abstention_recall={metrics['abstention_recall']:.1%}, "
+            f"answerable_abstentions={metrics['answerable_abstentions']}, "
             f"keyword_hit_rate={metrics['average_keyword_hit_rate']:.3f}, "
             f"latency={metrics['average_latency_ms']:.1f} ms"
         )
@@ -237,6 +284,7 @@ def print_summary(summary: dict[str, Any], total_cases: int) -> None:
             f"- {failure['id']} ({failure['difficulty']}): "
             f"keyword_hits={failure['keyword_hits']:.3f}, "
             f"grounded={failure['grounded']}, "
+            f"abstained={failure['abstained']}, "
             f"source_correct={failure['source_correct']}{error_suffix}"
         )
 
