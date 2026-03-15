@@ -11,6 +11,7 @@ from rca.config.settings import Settings, get_settings
 from rca.contracts.trace import QueryTrace, StageTrace
 from rca.flows.retrieve_flow import RetrieveFlow, RetrievalBundle
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
+from rca.retrieval.query_classifier import QueryType, classify_query
 
 
 class Citation(BaseModel):
@@ -75,13 +76,24 @@ Rules:
     def generate_answer(self, query: str, limit: int = 5, trace: QueryTrace | None = None) -> GeneratedAnswer:
         trace = trace or QueryTrace(query=query)
         trace.model = getattr(self.llm, "model", self.llm.__class__.__name__)
+        query_type = classify_query(query)
+        trace.query_type = query_type.value
 
         # Step 1: retrieve grounded context
-        rewritten = self._rewrite_query(query, trace=trace)
-        if rewritten != query:
-            trace.rewritten_query = rewritten
+        if query_type is QueryType.proper_noun:
+            rewritten = query
+            self._append_warning(trace, "rewrite skipped: proper_noun query")
+        else:
+            rewritten = self._rewrite_query(query, trace=trace)
+            if rewritten != query:
+                trace.rewritten_query = rewritten
 
-        bundle = self.retrieve_flow.retrieve(rewritten, limit=limit, trace=trace)
+        bundle = self.retrieve_flow.retrieve(
+            rewritten,
+            limit=limit,
+            trace=trace,
+            query_type=query_type,
+        )
 
         if not bundle.hits:
             self._append_warning(trace, "empty retrieval")
@@ -102,7 +114,7 @@ Rules:
         # Step 2b: fallback — if rewritten query yielded no usable context, retry with raw query
         if not context.strip() and rewritten != query:
             self._append_warning(trace, "rewritten retrieval produced empty context; retrying raw query")
-            bundle = self.retrieve_flow.retrieve(query, limit=limit, trace=trace)
+            bundle = self.retrieve_flow.retrieve(query, limit=limit, trace=trace, query_type=query_type)
             context_hits = self._select_context_hits(bundle)
             context = self._build_context(context_hits)
             trace.context_node_ids = [hit.node_id for hit in context_hits]

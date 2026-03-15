@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from rca.flows.generate_flow import GenerateFlow
 from rca.flows.retrieve_flow import RetrievalBundle, RetrievalHit
 from rca.llm.client import ChatResponse, LLMClient
+from rca.retrieval.query_classifier import QueryType
 
 
 class StubLLMClient(LLMClient):
@@ -32,8 +35,12 @@ class StubLLMClient(LLMClient):
 class StubRetrieveFlow:
     def __init__(self, score: float = 0.92) -> None:
         self.score = score
+        self.queries: list[str] = []
+        self.query_types: list[QueryType | None] = []
 
-    def retrieve(self, query: str, limit: int = 10, trace=None) -> RetrievalBundle:
+    def retrieve(self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None) -> RetrievalBundle:
+        self.queries.append(query)
+        self.query_types.append(query_type)
         return RetrievalBundle(
             query=query,
             hits=[
@@ -53,11 +60,12 @@ class StubRetrieveFlow:
 def test_generate_answer_attaches_query_trace() -> None:
     flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=StubLLMClient())
 
-    result = flow.generate_answer("What are the two main components of JamPacker?")
+    result = flow.generate_answer("what approaches exist for robotic bin packing?")
 
     assert result.abstained is False
     assert result.trace is not None
     assert result.trace.model == "stub-model"
+    assert result.trace.query_type == "conceptual"
     assert result.trace.rewritten_query is not None
     assert result.trace.context_node_ids == ["src:pdf/jampacker"]
     assert [stage.name for stage in result.trace.stages] == ["llm_rewrite", "llm_generate"]
@@ -142,3 +150,51 @@ def test_generate_answer_appends_citation_for_supported_answer_without_model_cit
     assert result.grounded is True
     assert [citation.source_id for citation in result.citations] == ["src:pdf/jampacker"]
     assert result.answer.endswith("[[src:pdf/jampacker]]")
+
+
+def test_generate_answer_skips_rewrite_for_proper_noun_queries(monkeypatch: pytest.MonkeyPatch) -> None:
+    retrieve_flow = StubRetrieveFlow()
+    flow = GenerateFlow(
+        retrieve_flow=retrieve_flow,
+        llm_client=StubLLMClient(
+            responses=["DBLF is the heuristic used by JamPacker. [[src:pdf/jampacker]]"]
+        ),
+    )
+
+    def fail_rewrite(query: str, trace=None) -> str:
+        raise AssertionError("proper_noun queries should skip rewrite")
+
+    monkeypatch.setattr(flow, "_rewrite_query", fail_rewrite)
+
+    result = flow.generate_answer("What is DBLF in JamPacker?")
+
+    assert result.trace is not None
+    assert result.trace.query_type == "proper_noun"
+    assert [stage.name for stage in result.trace.stages] == ["llm_generate"]
+    assert retrieve_flow.queries == ["What is DBLF in JamPacker?"]
+    assert retrieve_flow.query_types == [QueryType.proper_noun]
+    assert "rewrite skipped: proper_noun query" in result.trace.warnings
+
+
+def test_generate_answer_keeps_rewrite_for_conceptual_queries() -> None:
+    retrieve_flow = StubRetrieveFlow()
+    flow = GenerateFlow(
+        retrieve_flow=retrieve_flow,
+        llm_client=StubLLMClient(
+            responses=[
+                "robotic bin packing methods heuristics planning placement stability",
+                "Robotic bin packing combines planning and placement heuristics. [[src:pdf/jampacker]]",
+            ]
+        ),
+    )
+
+    result = flow.generate_answer("what approaches exist for robotic bin packing?")
+
+    assert result.trace is not None
+    assert result.trace.query_type == "conceptual"
+    assert "llm_rewrite" in [stage.name for stage in result.trace.stages]
+    assert retrieve_flow.queries == [result.trace.rewritten_query]
+    assert retrieve_flow.queries[0] != "what approaches exist for robotic bin packing?"
+    assert "robotic" in retrieve_flow.queries[0]
+    assert "packing" in retrieve_flow.queries[0]
+    assert retrieve_flow.query_types == [QueryType.conceptual]

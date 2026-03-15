@@ -28,6 +28,7 @@ class HitProvenance(BaseModel):
 class QueryTrace(BaseModel):
     query: str
     rewritten_query: str | None = None
+    query_type: str = ""
     timestamp: str = Field(default_factory=_iso_utc_now)
     stages: list[StageTrace] = Field(default_factory=list)
     provenance: list[HitProvenance] = Field(default_factory=list)

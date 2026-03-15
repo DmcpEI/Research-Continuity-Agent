@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from rca.config.settings import Settings, get_settings
 from rca.contracts.nodes import Edge, EdgeKind
 from rca.contracts.trace import HitProvenance, QueryTrace, StageTrace
+from rca.retrieval.query_classifier import QueryType
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorQueryResult, VectorStore
 
@@ -54,11 +55,27 @@ class RetrieveFlow:
         self.graph_store = graph_store or GraphStore(self.settings.graph_db_path)
         self.vector_store = vector_store or VectorStore(self.settings.vector_dir, self.settings.default_collection)
 
-    def retrieve(self, query: str, limit: int = 10, trace: QueryTrace | None = None) -> RetrievalBundle:
+    def retrieve(
+        self,
+        query: str,
+        limit: int = 10,
+        trace: QueryTrace | None = None,
+        query_type: QueryType | None = None,
+    ) -> RetrievalBundle:
         hit_map: dict[str, RetrievalHit] = {}
         hit_stages: dict[str, str] = {}
         related_edges: list[Edge] = []
         query_tokens = self._tokenize(query)
+
+        if query_type is QueryType.proper_noun:
+            lexical_base = 0.65
+            vector_scale = 0.70
+        elif query_type is QueryType.conceptual:
+            lexical_base = 0.30
+            vector_scale = 1.00
+        else:
+            lexical_base = LEXICAL_BASE_SCORE
+            vector_scale = 1.00
 
         vector_started = perf_counter() if trace is not None else None
         vector_results = self.vector_store.query(query, limit=limit)
@@ -85,11 +102,16 @@ class RetrieveFlow:
 
         merge_started = perf_counter() if trace is not None else None
         for result in vector_results:
-            self._merge_vector_hit(hit_map, result)
+            self._merge_vector_hit(hit_map, result, score_scale=vector_scale)
             hit_stages.setdefault(result.id, "vector")
 
         for node in lexical_nodes:
-            lexical_score = self._lexical_score(query_tokens, node.title, node.text or "")
+            lexical_score = self._lexical_score(
+                query_tokens,
+                node.title,
+                node.text or "",
+                base=lexical_base,
+            )
             current = hit_map.get(node.id)
             score = current.score if current is not None else lexical_score
             hit_map[node.id] = RetrievalHit(
@@ -149,17 +171,23 @@ class RetrieveFlow:
 
         return RetrievalBundle(query=query, hits=final_hits, related_edges=related_edges, trace=trace)
 
-    def _merge_vector_hit(self, hit_map: dict[str, RetrievalHit], result: VectorQueryResult) -> None:
+    def _merge_vector_hit(
+        self,
+        hit_map: dict[str, RetrievalHit],
+        result: VectorQueryResult,
+        score_scale: float = 1.0,
+    ) -> None:
         node = self.graph_store.get_node(result.id)
         title = node.title if node else result.metadata.get("title", result.id)
         metadata = node.metadata if node else result.metadata
         excerpt = result.document[:240]
+        score = result.score * score_scale
 
         current = hit_map.get(result.id)
-        if current is None or result.score > current.score:
+        if current is None or score > current.score:
             hit_map[result.id] = RetrievalHit(
                 node_id=result.id,
-                score=result.score,
+                score=score,
                 title=title,
                 excerpt=excerpt,
                 metadata=metadata,
@@ -197,7 +225,13 @@ class RetrieveFlow:
             if len(token) >= 3 and token not in STOPWORDS
         }
 
-    def _lexical_score(self, query_tokens: set[str], title: str, text: str) -> float:
+    def _lexical_score(
+        self,
+        query_tokens: set[str],
+        title: str,
+        text: str,
+        base: float = LEXICAL_BASE_SCORE,
+    ) -> float:
         if not query_tokens:
             return 0.5
 
@@ -211,7 +245,7 @@ class RetrieveFlow:
 
         return min(
             0.95,
-            LEXICAL_BASE_SCORE
+            base
             + (LEXICAL_TITLE_WEIGHT * title_overlap)
             + (LEXICAL_TEXT_WEIGHT * text_overlap),
         )

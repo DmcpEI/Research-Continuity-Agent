@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import shutil
 import tempfile
 from pathlib import Path
@@ -419,6 +420,96 @@ hr {{ border-color: {border}; margin: 1rem 0; }}
 }}
 .empty-state-icon {{ font-size: 2.5rem; margin-bottom: 0.5rem; }}
 .empty-state-text {{ font-size: 0.9rem; line-height: 1.6; }}
+
+/* ── Query Trace panel ── */
+.trace-grid {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+}}
+.trace-section-label {{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: {text_muted};
+    margin-bottom: 0.4rem;
+}}
+.trace-row {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid {border};
+    font-size: 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+}}
+.trace-row:last-child {{ border-bottom: none; }}
+.trace-stage-name {{
+    color: {accent2};
+    flex: 0 0 auto;
+    min-width: 120px;
+}}
+.trace-ms {{
+    color: {accent};
+    flex: 0 0 auto;
+    min-width: 60px;
+    text-align: right;
+}}
+.trace-hits {{
+    color: {text_muted};
+    flex: 1;
+}}
+.trace-prov-rank {{
+    color: {text_muted};
+    flex: 0 0 22px;
+    text-align: right;
+}}
+.trace-prov-id {{
+    color: {accent};
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}}
+.trace-prov-score {{
+    color: {accent2};
+    flex: 0 0 44px;
+    text-align: right;
+}}
+.trace-prov-stage {{
+    color: {text_muted};
+    flex: 0 0 70px;
+    text-align: right;
+    font-size: 0.65rem;
+}}
+.trace-meta-row {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.4rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+}}
+.trace-meta-chip {{
+    background: {tag_bg};
+    border: 1px solid {border};
+    border-radius: 6px;
+    padding: 0.15rem 0.5rem;
+    color: {text_muted};
+}}
+.trace-meta-chip b {{ color: {text}; }}
+.trace-warning {{
+    background: #f7b73111;
+    border: 1px solid #f7b73133;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: #f7b731;
+    margin-top: 0.3rem;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -460,6 +551,96 @@ def format_answer_with_citations(answer_text):
         short = sid.split("/")[-1][:30] + ("…" if len(sid.split("/")[-1]) > 30 else "")
         return f'<code title="{sid}">📎 {short}</code>'
     return pattern.sub(replace, answer_text)
+
+
+def format_trace_note(note: object, limit: int = 40) -> tuple[str, str]:
+    """Return a safe inline label plus full hover text for trace notes."""
+    full_note = html.escape(str(note))
+    if len(full_note) <= limit:
+        return full_note, full_note
+    return full_note[: limit - 1] + "…", full_note
+
+
+def render_trace(trace: dict) -> None:
+    """Render a QueryTrace dict inside a Streamlit expander."""
+    stages = trace.get("stages", [])
+    provenance = trace.get("provenance", [])
+    warnings = trace.get("warnings", [])
+    total_ms = trace.get("total_latency_ms", 0.0)
+    prompt_tok = trace.get("prompt_tokens", 0)
+    completion_tok = trace.get("completion_tokens", 0)
+    model = html.escape(str(trace.get("model", "—")))
+    query_type = html.escape(str(trace.get("query_type") or "—"))
+    rewritten = trace.get("rewritten_query")
+
+    with st.expander("🔍 Query trace", expanded=False):
+        meta_chips = (
+            f'<div class="trace-meta-row">'
+            f'<span class="trace-meta-chip"><b>model</b> {model}</span>'
+            f'<span class="trace-meta-chip"><b>type</b> {query_type}</span>'
+            f'<span class="trace-meta-chip"><b>latency</b> {total_ms:.0f} ms</span>'
+            f'<span class="trace-meta-chip"><b>prompt</b> {prompt_tok} tok</span>'
+            f'<span class="trace-meta-chip"><b>completion</b> {completion_tok} tok</span>'
+            f"</div>"
+        )
+        st.markdown(meta_chips, unsafe_allow_html=True)
+
+        if rewritten:
+            st.markdown(
+                f'<div class="trace-meta-row">'
+                f'<span class="trace-meta-chip"><b>rewritten query</b> {html.escape(str(rewritten))}</span>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        for warning in warnings:
+            st.markdown(
+                f'<div class="trace-warning">⚠ {html.escape(str(warning))}</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_stages, col_prov = st.columns(2)
+
+        with col_stages:
+            st.markdown('<div class="trace-section-label">Pipeline stages</div>', unsafe_allow_html=True)
+            if stages:
+                rows: list[str] = []
+                for stage in stages:
+                    note_text = ""
+                    title_attr = ""
+                    if stage.get("notes"):
+                        short_note, full_note = format_trace_note(stage["notes"])
+                        note_text = f" · {short_note}"
+                        title_attr = f' title="{full_note}"'
+                    rows.append(
+                        f'<div class="trace-row">'
+                        f'<span class="trace-stage-name">{html.escape(str(stage["name"]))}</span>'
+                        f'<span class="trace-ms">{float(stage["duration_ms"]):.0f} ms</span>'
+                        f'<span class="trace-hits"{title_attr}>{int(stage["hit_count"])} hits{note_text}</span>'
+                        f"</div>"
+                    )
+                rows_html = "".join(rows)
+                st.markdown(rows_html, unsafe_allow_html=True)
+            else:
+                st.caption("no stage data")
+
+        with col_prov:
+            st.markdown('<div class="trace-section-label">Hit provenance</div>', unsafe_allow_html=True)
+            if provenance:
+                rows_html = "".join(
+                    f'<div class="trace-row">'
+                    f'<span class="trace-prov-rank">#{int(item["rank"])}</span>'
+                    f'<span class="trace-prov-id" title="{html.escape(str(item["node_id"]))}">'
+                    f'{html.escape(str(item["node_id"]).split("/")[-1][:28])}</span>'
+                    f'<span class="trace-prov-score">{float(item["score"]):.3f}</span>'
+                    f'<span class="trace-prov-stage">{html.escape(str(item["stage"]))}</span>'
+                    f"</div>"
+                    for item in provenance
+                )
+                st.markdown(rows_html, unsafe_allow_html=True)
+            else:
+                st.caption("no provenance data")
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -568,6 +749,8 @@ if st.session_state.mode == "chat":
                     f'{citations_html}</div>',
                     unsafe_allow_html=True,
                 )
+                if msg.get("trace"):
+                    render_trace(msg["trace"])
 
     st.markdown("<br>", unsafe_allow_html=True)
     with st.form(key="chat_form", clear_on_submit=True):
@@ -596,6 +779,7 @@ if st.session_state.mode == "chat":
                         {"source_id": c.source_id, "title": c.title, "excerpt": c.excerpt}
                         for c in result.citations
                     ],
+                    "trace": result.trace.model_dump() if result.trace else None,
                 })
             except Exception as e:
                 st.session_state.messages.append({
