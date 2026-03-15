@@ -6,6 +6,7 @@ import hashlib
 import json
 from abc import ABC, abstractmethod
 from typing import Any
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
@@ -53,7 +54,7 @@ def _stable_embedding(text: str, dimensions: int) -> list[float]:
     return vector
 
 class OllamaLLMClient(LLMClient):
-    """Local generation via Ollama — free, private, no API key needed."""
+    """Default Ollama client with optional OpenAI-compatible API support."""
 
     def __init__(
         self,
@@ -61,26 +62,54 @@ class OllamaLLMClient(LLMClient):
         model: str,
         options: dict[str, Any] | None = None,
         embedding_model: str | None = None,
+        api_key: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.embedding_model = embedding_model or get_settings().embedding_model
+        self.api_key = api_key or "ollama"
         self.options = {"temperature": 0}
         if options:
             self.options.update(options)
 
     def chat(self, messages: list[ChatMessage]) -> ChatResponse:
-        payload = {
-            "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "stream": False,
-            "options": self.options,
-        }
-        result = self._post_json("/api/chat", payload, timeout=120)
-        text = result["message"]["content"]
+        if self._api_style == "openai":
+            payload = {
+                "model": self.model,
+                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "temperature": self.options.get("temperature", 0),
+                "stream": False,
+            }
+            result = self._post_json(self._openai_path("chat/completions"), payload, timeout=120)
+            text = self._extract_openai_text(result)
+        else:
+            payload = {
+                "model": self.model,
+                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "stream": False,
+                "options": self.options,
+            }
+            result = self._post_json("/api/chat", payload, timeout=120)
+            text = result["message"]["content"]
         return ChatResponse(text=text, raw=result)
 
     def embed(self, texts: list[str], dimensions: int = 768) -> list[list[float]]:
+        if self._api_style == "openai":
+            payload = {"model": self.embedding_model, "input": texts}
+            if dimensions:
+                payload["dimensions"] = dimensions
+            result = self._post_json(self._openai_path("embeddings"), payload, timeout=120)
+            data = result.get("data")
+            if not isinstance(data, list):
+                raise RuntimeError("OpenAI-compatible embedding response did not include a 'data' list.")
+            vectors: list[list[float]] = []
+            for item in data:
+                embedding = item.get("embedding") if isinstance(item, dict) else None
+                if not isinstance(embedding, list):
+                    raise RuntimeError("OpenAI-compatible embedding item did not include an 'embedding' vector.")
+                vectors.append([float(value) for value in embedding])
+            return vectors
+
         del dimensions  # Ollama controls embedding dimensionality based on the selected model.
         vectors: list[list[float]] = []
         for text in texts:
@@ -95,14 +124,50 @@ class OllamaLLMClient(LLMClient):
             vectors.append([float(value) for value in embedding])
         return vectors
 
+    @property
+    def _api_style(self) -> str:
+        parsed = urlparse(self.base_url)
+        if parsed.path.rstrip("/").endswith("/v1"):
+            return "openai"
+        if self.api_key and self.api_key != "ollama":
+            return "openai"
+        return "ollama"
+
+    def _openai_path(self, suffix: str) -> str:
+        parsed = urlparse(self.base_url)
+        if parsed.path.rstrip("/").endswith("/v1"):
+            return f"/{suffix}"
+        return f"/v1/{suffix}"
+
+    @staticmethod
+    def _extract_openai_text(result: dict[str, Any]) -> str:
+        choices = result.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise RuntimeError("OpenAI-compatible chat response did not include any choices.")
+        message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+        content = message.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text" and isinstance(item.get("text"), str):
+                    parts.append(item["text"])
+            if parts:
+                return "\n".join(parts)
+        raise RuntimeError("OpenAI-compatible chat response did not include text content.")
+
     def _post_json(self, path: str, payload: dict[str, Any], timeout: int) -> dict[str, Any]:
         import urllib.request
 
         data = json.dumps(payload).encode()
+        headers = {"Content-Type": "application/json"}
+        if self.api_key and self.api_key != "ollama":
+            headers["Authorization"] = f"Bearer {self.api_key}"
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read())

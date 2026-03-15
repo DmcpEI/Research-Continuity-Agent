@@ -4,7 +4,7 @@ from functools import lru_cache
 import os
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 768
     embedding_model: str = "nomic-embed-text"
     embedding_base_url: str = "http://localhost:11434"  # Ollama default
+    llm_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("RCA_LLM_BASE_URL", "LLM_BASE_URL"),
+    )
+    llm_api_key: str = Field(
+        default="ollama",
+        validation_alias=AliasChoices("RCA_LLM_API_KEY", "LLM_API_KEY"),
+    )
     generation_model: str = "qwen2.5:14b"
 
     if _HAS_PYDANTIC_SETTINGS:
@@ -85,6 +93,13 @@ class Settings(BaseSettings):
             "RCA_CHUNK_SIZE": "chunk_size",
             "RCA_CHUNK_OVERLAP": "chunk_overlap",
             "RCA_EMBEDDING_DIMENSIONS": "embedding_dimensions",
+            "RCA_EMBEDDING_MODEL": "embedding_model",
+            "RCA_EMBEDDING_BASE_URL": "embedding_base_url",
+            "RCA_LLM_BASE_URL": "llm_base_url",
+            "LLM_BASE_URL": "llm_base_url",
+            "RCA_LLM_API_KEY": "llm_api_key",
+            "LLM_API_KEY": "llm_api_key",
+            "RCA_GENERATION_MODEL": "generation_model",
         }
 
     @staticmethod

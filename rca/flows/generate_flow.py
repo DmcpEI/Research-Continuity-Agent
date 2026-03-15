@@ -65,8 +65,9 @@ Rules:
         elif self.settings.generation_model:
             from rca.llm.client import OllamaLLMClient
             self.llm = OllamaLLMClient(
-                base_url=self.settings.embedding_base_url,
+                base_url=self.settings.llm_base_url,
                 model=self.settings.generation_model,
+                api_key=self.settings.llm_api_key,
             )
         else:
             self.llm = EchoLLMClient()

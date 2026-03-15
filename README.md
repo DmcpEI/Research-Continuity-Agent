@@ -31,7 +31,7 @@ flowchart TD
         EXPAND["Source expansion<br/>contains edges only"]
         GF["GenerateFlow"]
         CTX["Context assembly<br/>top-k hits"]
-        LLM["LLM generation<br/>qwen2.5:14b via Ollama"]
+        LLM["LLM generation<br/>qwen2.5:14b via configured backend"]
         ABS["Abstention detection<br/>two-gate"]
         CITE["Citation extraction"]
         OUT["GeneratedAnswer<br/>text + citations + QueryTrace"]
@@ -107,7 +107,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
 3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source when needed. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
 
-**LLM client.** `OllamaLLMClient` calls the Ollama `/api/chat` endpoint locally — no external API key needed. The generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. `EchoLLMClient` is a deterministic stub for tests.
+**LLM client.** `OllamaLLMClient` defaults to local Ollama (`/api/chat`, `/api/embeddings`) and now also supports OpenAI-compatible endpoints when `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` are configured. The default generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. `EchoLLMClient` is a deterministic stub for tests.
 
 **Contracts layer.** `rca/contracts/` defines the identifier rules, node/edge models, and other shared DTOs that every other layer imports. No layer other than `store` performs persistence; no persistence layer makes model calls.
 
@@ -251,9 +251,13 @@ Key environment variables:
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
 | `RCA_GENERATION_MODEL` | `qwen2.5:14b` | Ollama model used for answer generation and query rewriting |
 | `RCA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model used for vector embeddings |
+| `RCA_LLM_BASE_URL` | `http://localhost:11434` | Base URL for the generation/chat API; defaults to local Ollama, but can point to any OpenAI-compatible endpoint |
+| `RCA_LLM_API_KEY` | `ollama` | API key for the configured LLM endpoint; ignored by default local Ollama |
 | `ANONYMIZED_TELEMETRY` | `False` | Disable ChromaDB telemetry |
 
 Runtime directories under `.rca/` are created automatically on first use.
+
+To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` in your `.env` file. Unprefixed `LLM_BASE_URL` and `LLM_API_KEY` are also accepted for convenience.
 
 > **Always use `uv run python`.** Never bare `python` — the system Python lacks ChromaDB and silently falls back to the JSON backend, returning 0 documents.
 

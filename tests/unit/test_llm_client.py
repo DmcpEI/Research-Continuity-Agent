@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import urllib.request
 
-from rca.llm.client import OllamaLLMClient
+from rca.llm.client import ChatMessage, OllamaLLMClient
 
 
 def test_ollama_llm_client_embed_uses_embeddings_endpoint(monkeypatch) -> None:
@@ -51,3 +51,57 @@ def test_ollama_llm_client_embed_uses_embeddings_endpoint(monkeypatch) -> None:
         {"model": "nomic-embed-text", "prompt": "alpha"},
         {"model": "nomic-embed-text", "prompt": "beta"},
     ]
+
+
+def test_llm_client_uses_configured_openai_compatible_base_url(monkeypatch) -> None:
+    requests: list[dict[str, object]] = []
+
+    class FakeResponse:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = payload
+
+        def read(self) -> bytes:
+            return json.dumps(self.payload).encode("utf-8")
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    def fake_urlopen(request: urllib.request.Request, timeout: int = 120):
+        requests.append(
+            {
+                "url": request.full_url,
+                "headers": dict(request.header_items()),
+                "payload": json.loads(request.data.decode("utf-8")),
+                "timeout": timeout,
+            }
+        )
+        return FakeResponse(
+            {
+                "choices": [
+                    {"message": {"content": "Configured backend response"}}
+                ]
+            }
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    client = OllamaLLMClient(
+        base_url="https://api.example.test/v1",
+        model="gpt-test",
+        api_key="secret-token",
+    )
+
+    response = client.chat([ChatMessage(role="user", content="Hello")])
+
+    assert response.text == "Configured backend response"
+    assert requests[0]["url"] == "https://api.example.test/v1/chat/completions"
+    assert requests[0]["headers"]["Authorization"] == "Bearer secret-token"
+    assert requests[0]["payload"] == {
+        "model": "gpt-test",
+        "messages": [{"role": "user", "content": "Hello"}],
+        "temperature": 0,
+        "stream": False,
+    }
