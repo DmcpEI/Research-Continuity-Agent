@@ -32,8 +32,10 @@ GenerateFlow
     └── grounding check → GenerateResult(answer, citations, grounded)
     │
     ▼
-Orchestrator  (stateless per query, LangGraph-compatible)
+Direct flow orchestration  (stateless per query)
 ```
+
+Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`. A LangGraph-based agent workflow is on the roadmap.
 
 ---
 

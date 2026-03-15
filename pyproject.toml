@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "research-continuity-agent"
-version = "0.1.0"
+version = "1.1.1"
 description = "Retrieval-first scaffolding for a research continuity agent."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,14 +35,10 @@ vector = [
 pdf = [
   "pypdf>=5.0,<6.0"
 ]
-orchestration = [
-  "langgraph>=0.2,<1.0"
-]
 
 [project.scripts]
 rca-ingest = "cli.rca_ingest:main"
 rca-query = "cli.rca_query:main"
-rca-digest = "cli.rca_digest:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["rca", "cli"]

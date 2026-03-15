@@ -40,8 +40,10 @@ GenerateFlow
     └── citation enforcement        (prompt-level + fallback injection)
     │
     ▼
-Orchestrator  (LangGraph-ready, stateless per query)
+Direct flow orchestration  (RetrieveFlow + GenerateFlow, stateless per query)
 ```
+
+Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`. A LangGraph-based agent workflow is on the roadmap.
 
 **Why two stores?**
 
@@ -98,7 +100,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 | Vector DB | ChromaDB | Persistent, zero-infrastructure prototype |
 | Graph/metadata | SQLite | Zero-dependency, portable, easy to audit |
 | UI | Streamlit | Prototype interface — FastAPI migration planned |
-| Orchestration | Custom flows + LangGraph-ready | Modular, testable, evolvable |
+| Orchestration | Direct flow composition | `RetrieveFlow` and `GenerateFlow` are called directly today; an agent workflow is future work |
 
 ---
 
@@ -307,7 +309,7 @@ uv run python eval/run_ablations.py
 │   └── config.toml             # Theme configuration (base: dark)
 ├── rca/                        # Main package
 │   ├── config/                 # Settings (pydantic-settings, RCA_ env prefix) and tool policies
-│   ├── contracts/              # Shared data models: node/edge types, ID rules, citations, artifacts
+│   ├── contracts/              # Shared data models: node/edge types, ID rules, citations, traces
 │   ├── store/                  # Persistence only: GraphStore (SQLite), VectorStore (ChromaDB), EventLog
 │   │   └── migrations/         # SQL schema applied on GraphStore init
 │   ├── extractors/             # Turn files into text payloads: PDF, Markdown, Git, Experiment
@@ -316,7 +318,7 @@ uv run python eval/run_ablations.py
 │   │   ├── retrieve_flow.py    # Vector + lexical search, graph expansion, scored bundles
 │   │   └── generate_flow.py    # Query rewriting → retrieval → grounded LLM answer
 │   ├── llm/                    # LLM client interface: OllamaLLMClient, EchoLLMClient
-│   ├── orchestrator/           # LangGraph state machine and routing (skeletal)
+│   ├── orchestrator/           # Routing helpers and typed state models
 │   ├── telemetry/              # Tracing and metrics instrumentation (skeletal)
 │   └── mcp_servers/
 │       ├── filesystem/         # MCP server: sandboxed file access and ripgrep search
@@ -324,7 +326,7 @@ uv run python eval/run_ablations.py
 │       ├── arxiv/              # Reserved — not implemented
 │       ├── zotero/             # Reserved — not implemented
 │       └── git/                # Reserved — not implemented
-├── cli/                        # Entry points: rca-ingest, rca-query, rca-digest
+├── cli/                        # Entry points: rca-ingest, rca-query
 ├── eval/                       # Golden question set, evaluation harness, and run results
 ├── tests/
 │   ├── unit/                   # Contract and store unit tests

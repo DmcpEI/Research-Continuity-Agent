@@ -209,7 +209,7 @@ git checkout -b v2/migrate
 ### How to describe it
 
 **Bad:**
-> Built a RAG system with ChromaDB, SQLite, Ollama, Streamlit, LangGraph, MCP.
+> Built a RAG system with ChromaDB, SQLite, Ollama, Streamlit, MCP.
 
 **Good:**
 > Built a local-first research knowledge system that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations. Designed an evaluation harness with golden queries, retrieval ablations, and failure analysis for citation errors and hallucination modes.
@@ -229,4 +229,61 @@ git checkout -b v2/migrate
 | SQLite graph | Structured traversal, provenance, zero external dependency |
 | Skip note extractor | User doesn't take structured notes; Notion logs are mentor-facing, not knowledge |
 | Skip SageMaker | No model training; Ollama covers inference entirely |
-| LangGraph-ready (not LangGraph) | Premature to commit; modular flows already support it when needed |
+| Direct flow orchestration | Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`; a LangGraph-based agent workflow stays on the roadmap until it earns its complexity |
+
+---
+
+## Strategic Priorities (from v1.1.0 review)
+
+These priorities were identified through external review of v1.1.0. They are ordered by thesis credibility impact, not implementation complexity.
+
+🔴 High priority
+
+- Eval set expansion — current 30-question golden set is too small for thesis credibility. Target: 60–100 questions, stratified into buckets: factual lookup, proper noun/paper title lookup, paraphrased terminology, contribution/method questions, comparison, synthesis across chunks, negative/unanswerable queries, citation-sensitive questions, hard lexical mismatch cases. Report results per bucket, not just aggregate.
+- Unanswerable query handling — system currently always answers. Need basic abstention/grounding check and negative queries in golden set. A research agent that confidently answers with insufficient evidence is a thesis credibility risk.
+
+🟡 Medium priority
+
+- Coefficient tuning justification — future changes to scoring coefficients (e.g. title weight) must include a small sweep (e.g. 0.15, 0.18, 0.20, 0.25) rather than manual eyeballing, so the chosen value is defensible to a thesis examiner.
+- Index/state versioning — eval output should record what ingest schema version, chunking version, embedding model, and graph build version produced the current store. Prevents ambiguity like "did this metric come from current code against stale graph state?"
+- Chroma fallback visibility in eval — a warning log is not enough. Eval runs should detect and flag if retrieval ran on JSON fallback instead of Chroma, since metrics are not comparable across backends.
+
+🟢 Later roadmap
+
+- Reranking — highest retrieval leverage after observability is in place. Improves top-5 precision and reduces generic-token bleed better than coefficient tuning.
+- Reciprocal rank fusion — rank-based late fusion as a cleaner alternative to score-scale-dependent merging.
+- Query-type-aware retrieval — lightweight routing: proper noun queries → stronger lexical/title bias; conceptual queries → stronger semantic retrieval.
+- Section-aware chunk weighting — weight abstract/title/conclusion chunks differently based on question type.
+
+⚠️ Orchestration wording to keep honest
+
+- Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`. A LangGraph-based agent workflow is on the roadmap, not part of the current implementation.
+
+---
+
+## Expert Review — Action Items (post v1.1.0)
+
+Action items from independent expert review of v1.1.0. Ordered by impact on thesis credibility and portfolio value. Items marked 🔴 should be resolved before thesis submission or adding this project to a CV.
+
+🔴 Critical — before thesis defence / CV:
+
+- Abstention / grounding detection — the system currently defaults to answering whenever retrieval returns context, and `GenerateFlow` can inject a fallback citation when the model emits none. The current `100% grounded` figure therefore overstates evidence sufficiency. Add a retrieval-confidence check (for example, mean top-3 score) and return "insufficient evidence" with `grounded=False` below threshold. Tune on the 5 negative questions and report abstention precision / recall.
+- Expand generation evaluation to the full 65-question set — `eval/golden.json` and retrieval ablations now cover 65 questions, but the last reported generation metrics in docs/results are still from the older 30-question run. Regenerate answer-level metrics on the full set so retrieval and generation sections are directly comparable.
+- Add explicit baselines to evaluation — current hybrid hit@5 numbers on the expanded set lack a pure lexical baseline. Keep vector-only config 1 as an explicit baseline and add a lexical-only baseline (ideally FTS5/BM25 if implemented, otherwise a clearly documented current lexical baseline). Report all baselines and hybrid configs in one table.
+- FTS5 investigation — the current lexical layer in `GraphStore.search_nodes()` is token-wise SQL `LIKE`, which is the most obvious retrieval-design question an examiner will ask about. Either implement FTS5 and compare it empirically, or document a concrete rationale for staying with `LIKE` and what FTS5 would and would not change.
+- Keep the repository lean — placeholder-only files and dead helpers should be deleted or clearly deprecated. Every retained file should have a clear current role in the ingest, retrieval, generation, eval, or deployment path.
+- Keep orchestration claims honest — orchestration is handled directly via `RetrieveFlow` and `GenerateFlow` today. A LangGraph-based agent workflow remains a roadmap option, not shipped functionality.
+
+🟡 Important — before thesis submission:
+
+- Coefficient sweep — lexical weights are still hand-tuned. Run a grid over title weight and text weight, evaluate on a held-out split, and show the selected values are near-optimal rather than ad hoc.
+- README architecture diagram + one-command eval — add a compact system diagram and ensure `uv run python eval/run_ablations.py` reproduces the reported numbers from a clean state.
+- Question independence — have at least 10 golden questions written by someone else (labmate, advisor, reviewer) to reduce self-bias in the eval set.
+- API backend config option — add an OpenAI-compatible base-URL / model configuration path in `rca/llm/client.py` so local-first is clearly a deliberate deployment choice, not a hard product limitation.
+- Confidence intervals on per-category metrics — several categories have very small `n`, so per-category hit rates should either include confidence intervals or be explicitly caveated as small-sample results.
+
+🟢 Roadmap — after core gaps are closed:
+
+- Query-type-aware routing — rewrite already helps some proper-noun queries and hurts some paraphrase queries. Add a lightweight classifier or rule-based router and measure the delta.
+- Cross-encoder reranking — retrieve top-20, rerank, and take top-5. This is the most plausible next lever for improving contribution and cross-paper retrieval quality.
+- Eval question independence at scale — grow to roughly 80–100 questions total, with at least 10 authored externally.
