@@ -143,6 +143,8 @@ One important consequence remains:
 - the composed pipeline does **not** currently outperform all single-method baselines
 - FTS5-only is still the best retrieval configuration measured so far on hit@5 and hit@10
 
+This is worth stating plainly: FTS5-only remains the strongest single retrieval configuration on this corpus (`95.0%` hit@5). The composed pipeline (`FTS5 + vector + expansion`) reaches `93.3%`, which is `1.7` points behind. On a small, domain-specific corpus like this one, BM25 term statistics are strong enough that the semantic retrieval layer does not yet add net value over the lexical baseline. At larger corpus scale or broader domain coverage, the semantic layer is still expected to contribute more significantly. What *does* matter immediately is source expansion: config 3 gains `+16.6pp` over vector-only (`93.3%` vs `76.7%`), making graph expansion the single most impactful pipeline component after the lexical backbone itself.
+
 ---
 
 ## Abstention Analysis
