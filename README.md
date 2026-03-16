@@ -55,14 +55,14 @@ The system composes FTS5/BM25 lexical search, dense vector retrieval, source gra
 ## Reproducing Results
 
 ```bash
-# Run retrieval ablations (65 questions, 5 configs including baselines)
+# Run retrieval ablations on the current golden set
 uv run python eval/run_ablations.py
 
-# Run generation harness (citation precision, abstention recall)
+# Run generation harness on the same golden set
 uv run python eval/harness.py
 ```
 
-Current reference results on the checked-in 65-question corpus: hit@5 `95.0%` for config 4, citation precision `92.9%`, negative abstention recall `3/5`.
+The checked-in golden set currently contains `100` questions: `90` answerable and `10` explicit negative / unanswerable queries. Refresh `eval/results/` locally after any corpus or backend change.
 
 ---
 
@@ -141,50 +141,46 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Evaluation
 
-RCA is currently evaluated on **65 golden questions**: `60` answerable and `5` explicit negative / unanswerable queries.
+RCA is currently evaluated on **100 golden questions**: `90` answerable and `10` explicit negative / unanswerable queries.
 
-### Current generation results
+The checked-in eval assets now include:
+- `eval/golden.json` with the full 100-question corpus
+- `eval/splits/dev.json` and `eval/splits/test.json` with a stratified `69 / 31` split
+- `eval/harness.py` for answer-level evaluation over all `100` questions
+- `eval/run_ablations.py` for retrieval-only evaluation over the `90` answerable questions
+- `eval/run_coefficient_sweep.py` for held-out lexical-reranker tuning on the current split
 
-Live harness artifact: `eval/results/run_20260315T194910Z.json`
+Latest local artifacts:
+- `eval/results/run_20260316T191249Z.json`
+- `eval/results/ablations.json`
+
+Current generation results on the 100-question corpus:
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | 92.9% over 56 cases |
-| Negative abstention recall | 3/5 (60.0%) |
-| Meaningful grounded rate | 56/60 = 93.3% |
-| Avg keyword hit rate | 0.214 |
-| Avg latency | 10.5 s |
+| Citation precision (answerable, non-abstained) | `91.0%` over `89` cases |
+| Negative abstention recall | `2/10` (`20.0%`) |
+| Answerable abstentions | `1` |
+| Average keyword hit rate | `0.265` |
+| Average latency | `11.8 s` |
 
-The generation pipeline now includes explicit abstention detection. That makes the current grounding metric more honest than the older `100% grounded` runs, but it also exposes a real limitation: four unsupported questions still retrieve plausible enough context that score-based abstention does not trigger.
-
-### Retrieval baselines — hit@5 / hit@10 (n=60 answerable)
+Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
 | Configuration | hit@5 | hit@10 |
 |---|---:|---:|
-| 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
-| 1. vector-only (dense baseline) | 76.7% | 91.7% |
-| 2. vector + keyword (FTS5) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 95.0% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 95.0% | 98.3% |
+| 0. fts5-only (BM25 baseline) | `95.6%` | `98.9%` |
+| 1. vector-only (dense baseline) | `76.7%` | `88.9%` |
+| 2. vector + keyword (FTS5) | `76.7%` | `88.9%` |
+| 3. vector + keyword + expansion | `94.4%` | `96.7%` |
+| 4. full pipeline (+ query rewrite) | `87.8%` | `96.7%` |
 
-### What the numbers mean
+The most important current evaluation takeaways are:
+- FTS5/BM25 remains the strongest single-method retrieval baseline on this corpus.
+- Source expansion is still the biggest lift over dense retrieval alone.
+- Query rewriting is still mixed and now clearly hurts hit@5 on the full 100-question set.
+- Abstention is still heuristic and remains one of the main thesis-facing limitations.
 
-- **FTS5/BM25 is now the production lexical backbone**. The repo originally shipped with a transparent token-wise `LIKE` lexical stage, then added an explicit FTS5/BM25 baseline, and finally migrated production retrieval after BM25 consistently outperformed the older path.
-- **Pure FTS5-only remains the strongest single-method baseline on this corpus.** After adding the cross-encoder reranker, the full pipeline now matches BM25-only on both hit@5 and hit@10 (`95.0%` / `98.3%`).
-- **Dense retrieval is still useful as a baseline**, but on this corpus the questions are lexically anchored enough that BM25 performs much better.
-- **Source expansion is the main contributor after the lexical backbone itself.** Config 3 gains `+18.3pp` over vector-only at hit@5, and the final reranker closes the remaining gap to the BM25-only baseline.
-- **Query rewrite remains mixed**. It helps some sparse technical queries, but still hurts several paraphrase and cross-paper questions.
-- **Generation improved materially after reranking plus chunk-to-source citation resolution.** The latest 65-question harness reaches `92.9%` citation precision and `3/5` negative abstention recall while also reducing average latency.
-
-### Known failure modes
-
-| Failure class | Description |
-|---|---|
-| Citation selection drift | Correct source is retrieved but the LLM cites a distractor or answers around the wrong detail |
-| Abstention calibration gap | Three negative questions still look plausible enough by score that abstention does not trigger |
-| Detail-level abstention on answerable questions | The model sometimes correctly notices a missing metric/detail instead of giving the broader paper-level answer |
-| Query rewrite drift | Rewriter can still replace specific system/scene names with generic terms |
-| LLM paraphrase | Answer cites correctly but misses specific numerical/keyword content |
+Live metrics depend on the local Ollama/Chroma environment, so the right way to refresh results is to rerun the eval scripts on the target machine rather than trusting stale checked-in numbers after a corpus change. The detailed evaluation notes live in `docs/EVAL.md`.
 
 ---
 
@@ -202,10 +198,10 @@ The generation pipeline now includes explicit abstention detection. That makes t
 - [x] **Fix citation precision** — source-ID resolution bug
 - [x] **Retrieval baselines and ablations** — FTS5/BM25, dense-only, LIKE, graph expansion, rewrite
 - [x] **Retrieval ranking hardening** — exact-word title/text rescoring to remove partial-word false positives
-- [x] **Expand golden set** — 30 → 65 stratified questions
+- [x] **Expand golden set** — 30 → 100 grounded questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
-- [ ] **Expand golden set further** — 65 → 80–100+ pairs
+- [ ] **Add a human-authored external eval subset** — reduce self-bias for thesis reporting
 - [ ] arxiv MCP server
 - [ ] Zotero MCP server
 - [ ] Weekly digest generator

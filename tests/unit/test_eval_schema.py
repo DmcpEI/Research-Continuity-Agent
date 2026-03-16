@@ -171,6 +171,21 @@ def test_ablation_summary_includes_wilson_intervals() -> None:
     assert summary["summary_hit_at_5_ci"]["0_fts5_only"]["margin"] > 0.0
 
 
+def test_coefficient_sweep_helpers_scale_split_size_and_accept_base_override() -> None:
+    sweep = load_module(ROOT / "eval" / "run_coefficient_sweep.py", "eval_run_coefficient_sweep")
+    flow = sweep.WeightedRetrieveFlow.__new__(sweep.WeightedRetrieveFlow)
+    flow.title_weight = 0.12
+    flow.text_weight = 0.05
+    flow.base_score = 0.45
+
+    score = flow._lexical_score({"scene", "graph"}, "scene graph planner", "graph planner", base=0.65)
+
+    assert sweep.scaled_test_size(65) == 20
+    assert sweep.scaled_test_size(90) == 28
+    assert sweep.scaled_test_size(100) == 31
+    assert score > 0.65
+
+
 def test_coefficient_sweep_splits_exist_and_cover_golden_set() -> None:
     golden = json.loads((ROOT / "eval" / "golden.json").read_text(encoding="utf-8"))
     golden_ids = {pair["id"] for pair in golden}

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from rca.config.settings import get_settings
-from rca.flows.retrieve_flow import TITLE_WORD_PATTERN, RetrieveFlow
+from rca.flows.retrieve_flow import LEXICAL_BASE_SCORE, TITLE_WORD_PATTERN, RetrieveFlow
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
 
@@ -18,7 +18,7 @@ TITLE_WEIGHTS = [0.08, 0.12, 0.16, 0.20, 0.24]
 TEXT_WEIGHTS = [0.01, 0.02, 0.03, 0.04, 0.05]
 BASE_SCORE = 0.45
 SEED = 42
-TEST_SIZE = 20
+TEST_RATIO = 20 / 65
 FETCH_K = 10
 BASELINE_WEIGHTS = (0.12, 0.04)
 
@@ -52,6 +52,10 @@ def load_golden_pairs(path: Path) -> list[dict[str, Any]]:
     if isinstance(payload, dict):
         return payload.get("pairs", [])
     return payload
+
+
+def scaled_test_size(total_pairs: int) -> int:
+    return max(1, round(total_pairs * TEST_RATIO))
 
 
 def stratified_split_ids(pairs: list[dict[str, Any]], test_size: int, seed: int) -> tuple[list[str], list[str]]:
@@ -120,7 +124,13 @@ class WeightedRetrieveFlow(RetrieveFlow):
         self.text_weight = text_weight
         self.base_score = base_score
 
-    def _lexical_score(self, query_tokens: set[str], title: str, text: str) -> float:
+    def _lexical_score(
+        self,
+        query_tokens: set[str],
+        title: str,
+        text: str,
+        base: float = LEXICAL_BASE_SCORE,
+    ) -> float:
         if not query_tokens:
             return 0.5
 
@@ -132,7 +142,8 @@ class WeightedRetrieveFlow(RetrieveFlow):
         if title_overlap == 0 and text_overlap == 0:
             return 0.0
 
-        return min(0.95, self.base_score + (self.title_weight * title_overlap) + (self.text_weight * text_overlap))
+        effective_base = self.base_score if base == LEXICAL_BASE_SCORE else base
+        return min(0.95, effective_base + (self.title_weight * title_overlap) + (self.text_weight * text_overlap))
 
 
 def evaluate_subset(
@@ -231,7 +242,8 @@ def main() -> None:
     pairs = load_golden_pairs(golden_path)
     pairs_by_id = {pair["id"]: pair for pair in pairs}
 
-    dev_ids, test_ids = stratified_split_ids(pairs, test_size=TEST_SIZE, seed=SEED)
+    test_size = scaled_test_size(len(pairs))
+    dev_ids, test_ids = stratified_split_ids(pairs, test_size=test_size, seed=SEED)
     write_split(splits_dir / "dev.json", dev_ids, seed=SEED, split="dev")
     write_split(splits_dir / "test.json", test_ids, seed=SEED, split="test")
 

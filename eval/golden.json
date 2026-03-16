@@ -764,5 +764,86 @@
     "difficulty": "hard",
     "category": "synthesis",
     "notes": "Requires connecting hard negative generation to fine-grained discrimination and Adaptive SG tokens to explicit scene-graph prediction."
+  },
+  {
+    "id": "bagall-001",
+    "question": "What are the two learned policies in Bag All You Need, and what stage of heterogeneous bagging does each one handle?",
+    "expected_keywords": ["rearrangement policy", "place multiple rigid objects", "fold deformable objects", "lifting policy", "grasp points", "bi-manual bag lifting"],
+    "expected_source": "src:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "slip-001",
+    "question": "What assumptions does SLIP avoid compared with prior bag-opening methods, and what hardware does it use instead?",
+    "expected_keywords": ["specialized sensing", "end effectors", "visual observations", "ordinary parallel jaw grippers"],
+    "expected_source": "src:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception",
+    "difficulty": "medium",
+    "category": "contribution"
+  },
+  {
+    "id": "moo-001",
+    "question": "In Manipulation of Open-World Objects (MOO), what information does the pre-trained vision-language model extract, and what inputs condition the robot policy?",
+    "expected_keywords": ["object-identifying information", "language command", "image", "current image", "instruction", "extracted object information"],
+    "expected_source": "src:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "moo-002",
+    "question": "How do the MOO authors define an unseen object more strictly than prior work?",
+    "expected_keywords": ["not seen in the robot's training demonstration data", "not at any point for any task", "zero-shot object generalization", "unseen combinations"],
+    "expected_source": "src:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models",
+    "difficulty": "hard",
+    "category": "evaluation",
+    "notes": "Anchored to the evaluation section's stricter unseen-object definition rather than the abstract alone."
+  },
+  {
+    "id": "osgp-001",
+    "question": "How is a natural-language task converted into a planning objective in Optimal Scene Graph Planning with LLM Guidance?",
+    "expected_keywords": ["scene graph", "large language model", "linear temporal logic", "LTL automaton", "hierarchical planning domain"],
+    "expected_source": "src:pdf/optimal_scene_graph_planning_with_large_language_model_guidance",
+    "difficulty": "hard",
+    "category": "method"
+  },
+  {
+    "id": "osgp-002",
+    "question": "How does Optimal Scene Graph Planning keep optimality guarantees even though the LLM heuristic can be inadmissible?",
+    "expected_keywords": ["provably consistent", "LTL heuristic", "supplements", "inadmissible LLM guidance", "multi-heuristic planning", "optimality"],
+    "expected_source": "src:pdf/optimal_scene_graph_planning_with_large_language_model_guidance",
+    "difficulty": "hard",
+    "category": "contribution"
+  },
+  {
+    "id": "roboflamingo-001",
+    "question": "What architectural decomposition lets RoboFlamingo adapt pre-trained VLMs to robot manipulation?",
+    "expected_keywords": ["single-step vision-language comprehension", "explicit policy head", "imitation learning", "language-conditioned manipulation datasets", "open-loop control"],
+    "expected_source": "src:pdf/vision-language_foundation_models_as_effective_robot_imitators",
+    "difficulty": "medium",
+    "category": "method"
+  },
+  {
+    "id": "robotlm-001",
+    "question": "Which benchmark does the GPT-2 robot language model target for long-horizon tasks, and what planning direction do the authors say it supports?",
+    "expected_keywords": ["ALFRED", "long-horizon task planning", "classical planning", "neuro-symbolic planning"],
+    "expected_source": "src:pdf/learning_to_reason_over_scene_graphs_a_case_study_of_finetuning_gpt-2_into_a_robot_language_model_for_grounded_task_planning",
+    "difficulty": "hard",
+    "category": "findings"
+  },
+  {
+    "id": "retail-001",
+    "question": "What combination of perception, reasoning, and planning does the AI-powered retail shelf system use to manage cluttered shelves?",
+    "expected_keywords": ["advanced perception models", "knowledge-based reasoning", "multi-layered planning framework", "object recognition", "strategic placement"],
+    "expected_source": "src:pdf/ai-powered_robotic_systems_for_intelligent_retail",
+    "difficulty": "medium",
+    "category": "contribution"
+  },
+  {
+    "id": "restock-001",
+    "question": "What three retail tasks does the restock and straightening system integrate into one autonomous mobile manipulator?",
+    "expected_keywords": ["restock", "disposal", "straightening", "autonomous mobile manipulator"],
+    "expected_source": "src:pdf/restockandstraighteningsystemforretailautomationusingcompliantandmobilemanipulation",
+    "difficulty": "medium",
+    "category": "contribution"
   }
 ]

@@ -13,7 +13,7 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 
 ---
 
-## Current state (v1.2.0 — 2026-03-15)
+## Current state (v1.2.1 — 2026-03-16)
 
 ### What works
 - [x] Project scaffold (uv, pydantic settings, stable ID system)
@@ -26,35 +26,35 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 - [x] Query rewriter — LLM rewrites natural language to dense keywords before retrieval
 - [x] Citation resolution — chunk IDs resolved to source IDs
 - [x] Streamlit UI — chat + workspace (ingest, knowledge map, store)
-- [x] Integration tests (pytest, 0.90s)
-- [x] Evaluation harness with 65 golden Q&A pairs
+- [x] Integration tests (pytest, 50 passing)
+- [x] Evaluation harness with 100 golden Q&A pairs
 
 ### Measured performance
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | 88.5% over 52 cases |
-| Negative abstention recall | 1/5 (20.0%) |
-| Meaningful grounded rate | 52/60 = 86.7% |
-| Avg keyword hit rate | 0.181 |
-| Avg latency | 10.5 s |
+| Citation precision (answerable, non-abstained) | 91.0% over 89 cases |
+| Negative abstention recall | 2/10 (20.0%) |
+| Overall grounded rate | 97.0% |
+| Avg keyword hit rate | 0.265 |
+| Avg latency | 11.8 s |
 
-Retrieval ablations — hit@5 / hit@10 (n=60 answerable):
+Retrieval ablations — hit@5 / hit@10 (n=90 answerable):
 
 | Configuration | hit@5 | hit@10 |
 |---|---|---|
-| 0. fts5-only (BM25 baseline) | 95.0% | 98.3% |
-| 1. vector-only (dense baseline) | 76.7% | 91.7% |
-| 2. vector + keyword (FTS5) | 76.7% | 91.7% |
-| 3. vector + keyword + expansion | 95.0% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 95.0% | 98.3% |
+| 0. fts5-only (BM25 baseline) | 95.6% | 98.9% |
+| 1. vector-only (dense baseline) | 76.7% | 88.9% |
+| 2. vector + keyword (FTS5) | 76.7% | 88.9% |
+| 3. vector + keyword + expansion | 94.4% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 87.8% | 96.7% |
 
 ### Known failure modes
 - Citation selection drift on a small set of cases (`jampacker-003`, `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`, `vilain-001`)
-- Vector-only and keyword-only retrieval still under-rank a few questions that source expansion or rewrite recover
+- Vector-only retrieval still under-rank a few questions that source expansion recovers
 - LLM generating plausible but wrong answers from off-topic chunks (keyword hit rate remains low)
 - Query rewriter drifts on queries containing specific named entities (scene names, system names)
-- Abstention remains under-calibrated even after reranking: answerable citation precision improved to `92.9%`, but the system still only rejects `3/5` negative questions
+- Abstention remains under-calibrated even after reranking: answerable citation precision improved, but the system still only rejects `2/10` negative questions
 
 ---
 
@@ -77,7 +77,7 @@ Priority order:
 
 ### P1 — Retrieval baselines and lexical migration ✅ completed 2026-03-15
 
-hit@5 / hit@10 across 60 answerable golden pairs (current):
+hit@5 / hit@10 across 60 answerable golden pairs (historical 65-question snapshot):
 
 | Configuration | hit@5 | hit@10 |
 |---|---|---|
@@ -101,8 +101,8 @@ Remaining:
 - [ ] Measure: embedding model sensitivity (nomic vs alternatives)
 
 ### P2 — Expand evaluation
-- [ ] Grow golden set: 30 → 100+ pairs across more papers
-  Current validated set is 90 questions. Pending final step: add 10 externally authored questions once `OPENAI_API_KEY` is available.
+- [x] Grow golden set: 30 → 100 pairs across more papers
+  Current validated set is 100 questions. This expansion did not require `OPENAI_API_KEY`; API access is optional and separate from eval-set design.
 - [ ] Add failure taxonomy to `docs/EVAL.md`:
   - query classes that fail
   - chunking failures
@@ -221,8 +221,8 @@ git checkout -b v2/migrate
 **Good:**
 > Built a local-first research knowledge system that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations. Designed an evaluation harness with golden queries, retrieval ablations, and failure analysis for citation errors and hallucination modes.
 
-**With numbers (v1 current):**
-> Citation precision is 92.9% over 56 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 3/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 95.0% with graph expansion, and 95.0% with the full rewrite + rerank pipeline. The current result is that the reranked full pipeline now matches pure FTS5 on both hit@5 and hit@10.
+**With numbers (historical 65-question snapshot):**
+> Citation precision is 92.9% over 56 answerable, non-abstained cases on the 65-question harness, with negative abstention recall at 3/5. Retrieval baselines (n=60 answerable): hit@5 95.0% FTS5/BM25, 76.7% dense-only, 76.7% vector + FTS5, 95.0% with graph expansion, and 95.0% with the full rewrite + rerank pipeline. The current codebase now uses a 100-question corpus, so these numbers should be treated as a dated benchmark snapshot.
 
 ---
 
@@ -274,8 +274,8 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 
 🔴 Critical — before thesis defence / CV:
 
-- [x] Abstention / grounding detection — a two-gate abstention check now exists, but it is still under-calibrated. Current results are `1/5` negative recall with `8` answerable abstentions on the 65-question run. The next step is calibrated confidence scoring or a dedicated abstention classifier.
-- [x] Expand generation evaluation to the full 65-question set — answer-level metrics now use the same 65-question corpus as retrieval ablations.
+- [x] Abstention / grounding detection — a two-gate abstention check now exists, but it is still under-calibrated. The original v1.1.0 review snapshot was `1/5` negative recall with `8` answerable abstentions on the 65-question run; the next step is still calibrated confidence scoring or a dedicated abstention classifier.
+- [x] Expand generation evaluation to the full 65-question set — this milestone is complete historically, and the corpus has since grown further to 100 questions.
 - [x] Explicit baselines added to evaluation — config 0 is now an FTS5/BM25 lexical baseline and config 1 is labeled explicitly as the dense baseline. All five retrieval configs are reported in one table.
 - [x] FTS5 investigation completed — FTS5/BM25 measured better than the earlier `LIKE` path and has now replaced it on the production lexical path.
 - [x] Coefficient sweep completed — held-out validation justified raising `text_weight` from `0.04` to `0.05` while keeping `title_weight` at `0.12`.
@@ -286,7 +286,7 @@ Action items from independent expert review of v1.1.0. Ordered by impact on thes
 
 - [x] Coefficient sweep — completed with a held-out split. The current lexical reranker moved from `(title=0.12, text=0.04)` to `(title=0.12, text=0.05)` after a `+5.3pp` held-out hit@5 gain.
 - [x] README architecture diagram + one-command eval — the README now includes a Mermaid system diagram plus explicit `uv run python eval/run_ablations.py` and `uv run python eval/harness.py` reproduction commands.
-- Question independence — have at least 10 golden questions written by someone else (labmate, advisor, reviewer) to reduce self-bias in the eval set.
+- Question independence — still preferable to have at least 10 golden questions written by a human external reviewer (labmate, advisor, reviewer) to reduce self-bias. This is separate from whether an API key is available.
 - [x] API backend config option — `rca/llm/client.py` now supports configurable `RCA_LLM_BASE_URL` / `RCA_LLM_API_KEY` for OpenAI-compatible endpoints while keeping the default Ollama path unchanged.
 - [x] Confidence intervals on per-category metrics — per-category ablation output now reports 95% Wilson confidence intervals and flags small-sample categories with explicit caution.
 
