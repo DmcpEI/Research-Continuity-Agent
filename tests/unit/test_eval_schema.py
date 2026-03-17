@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+from rca.contracts.trace import HitProvenance, QueryTrace
+from rca.flows.generate_flow import Citation, GeneratedAnswer
 from rca.flows.retrieve_flow import RetrievalHit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -140,6 +142,44 @@ def test_harness_aggregate_results_tracks_abstention_metrics() -> None:
     assert summary["abstention_recall"] == 1.0
     assert summary["abstention_cases"] == 1
     assert summary["answerable_abstentions"] == 1
+
+
+def test_harness_evaluate_pair_records_trace_retrieval_features() -> None:
+    harness = load_module(ROOT / "eval" / "harness.py", "eval_harness_trace_features")
+
+    class StubFlow:
+        def generate_answer(self, question: str) -> GeneratedAnswer:
+            trace = QueryTrace(
+                query=question,
+                provenance=[
+                    HitProvenance(node_id="src:pdf/a", score=0.91, stage="lexical", rank=1),
+                    HitProvenance(node_id="chk:pdf/a:0001", score=0.88, stage="vector", rank=2),
+                    HitProvenance(node_id="src:pdf/b", score=0.79, stage="lexical", rank=3),
+                ],
+            )
+            return GeneratedAnswer(
+                query=question,
+                answer="Answer [[src:pdf/a]]",
+                citations=[Citation(source_id="src:pdf/a", title="A", excerpt="")],
+                grounded=True,
+                abstained=False,
+                trace=trace,
+            )
+
+    pair = harness.GoldenPair(
+        id="ans-001",
+        question="Supported?",
+        expected_source="src:pdf/a",
+        difficulty="medium",
+        category="results",
+        answerable=True,
+    )
+
+    result, trace_payload = harness.evaluate_pair(StubFlow(), pair)
+
+    assert result.max_retrieval_score == 0.91
+    assert result.unique_sources_top5 == 2
+    assert trace_payload is not None
 
 
 def test_ablation_summary_includes_wilson_intervals() -> None:

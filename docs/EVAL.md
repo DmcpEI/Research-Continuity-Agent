@@ -46,6 +46,8 @@ The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Univer
 - `citations`
 - `source_correct`
 - `keyword_hits`
+- `max_retrieval_score`
+- `unique_sources_top5`
 - `latency_ms`
 
 It writes a run artifact to `eval/results/run_<timestamp>.json` and per-question traces to `eval/results/traces/<run_id>/`.
@@ -56,7 +58,7 @@ Important caveat:
 - after changing the corpus, the right source of truth is a fresh local rerun, not an older checked-in artifact
 
 Current local run:
-- [run_20260316T200915Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260316T200915Z.json)
+- [run_20260317T173540Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260317T173540Z.json)
 
 Headline metrics:
 
@@ -69,7 +71,7 @@ Headline metrics:
 | Negative abstention recall | `2/10` (`20.0%`) |
 | Answerable abstentions | `1` |
 | Average keyword hit rate | `0.259` |
-| Average latency | `11.3 s` |
+| Average latency | `11.0 s` |
 
 ---
 
@@ -123,6 +125,14 @@ As with the other eval scripts, rerun locally when the corpus or retrieval backe
 Note:
 - the coefficient-sweep script itself was fixed to track the current retriever signature and current corpus size
 - if the sweep is run in a sandboxed environment that forces JSON fallback, do not treat those numbers as comparable to the live Chroma/Ollama runs above
+
+---
+
+## Known Limitations
+
+- Negative abstention recall is currently `2/10` on the local `qwen2.5:14b` generation model.
+- Prompt-only abstention tuning on this model has not produced a stable middle ground: the default prompt under-abstains, while stricter prompt variants over-abstain heavily on answerable questions.
+- Improving abstention likely requires either a stronger generation model or a retrieval-gate/classifier approach trained and validated on a larger negative set.
 
 ---
 

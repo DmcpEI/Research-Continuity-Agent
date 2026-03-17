@@ -52,6 +52,8 @@ class EvaluationCaseResult(BaseModel):
     citations: list[str] = Field(default_factory=list)
     source_correct: bool
     keyword_hits: float
+    max_retrieval_score: float = 0.0
+    unique_sources_top5: int = 0
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     latency_ms: float
@@ -100,6 +102,7 @@ def evaluate_pair(
             generated.answer, pair.expected_keywords
         )
         keyword_hits = calculate_keyword_hit_rate(matched_keywords, pair.expected_keywords)
+        max_retrieval_score, unique_sources_top5 = trace_retrieval_features(generated.trace)
         if not pair.answerable:
             source_correct = generated.abstained
         elif expected_sources:
@@ -125,6 +128,8 @@ def evaluate_pair(
                 citations=citation_source_ids,
                 source_correct=source_correct,
                 keyword_hits=keyword_hits,
+                max_retrieval_score=max_retrieval_score,
+                unique_sources_top5=unique_sources_top5,
                 matched_keywords=matched_keywords,
                 missing_keywords=missing_keywords,
                 latency_ms=latency_ms,
@@ -149,6 +154,8 @@ def evaluate_pair(
                 citations=[],
                 source_correct=False,
                 keyword_hits=0.0,
+                max_retrieval_score=0.0,
+                unique_sources_top5=0,
                 matched_keywords=[],
                 missing_keywords=pair.expected_keywords,
                 latency_ms=latency_ms,
@@ -169,6 +176,21 @@ def calculate_keyword_hit_rate(matched_keywords: list[str], expected_keywords: l
     if not expected_keywords:
         return 1.0
     return len(matched_keywords) / len(expected_keywords)
+
+
+def trace_retrieval_features(trace: Any | None) -> tuple[float, int]:
+    if trace is None:
+        return 0.0, 0
+
+    provenance = getattr(trace, "provenance", None) or []
+    if not provenance:
+        return 0.0, 0
+
+    top_hits = provenance[:5]
+    return (
+        max(item.score for item in top_hits),
+        len({GenerateFlow._resolve_source_id(item.node_id) for item in top_hits}),
+    )
 
 
 def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
