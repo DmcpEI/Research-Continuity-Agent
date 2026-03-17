@@ -151,18 +151,18 @@ The checked-in eval assets now include:
 - `eval/run_coefficient_sweep.py` for held-out lexical-reranker tuning on the current split
 
 Latest local artifacts:
-- `eval/results/run_20260316T191249Z.json`
+- `eval/results/run_20260316T200915Z.json`
 - `eval/results/ablations.json`
 
 Current generation results on the 100-question corpus:
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | `91.0%` over `89` cases |
+| Citation precision (answerable, non-abstained) | `92.1%` over `89` cases |
 | Negative abstention recall | `2/10` (`20.0%`) |
 | Answerable abstentions | `1` |
-| Average keyword hit rate | `0.265` |
-| Average latency | `11.8 s` |
+| Average keyword hit rate | `0.259` |
+| Average latency | `11.3 s` |
 
 Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
@@ -172,12 +172,12 @@ Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 | 1. vector-only (dense baseline) | `76.7%` | `88.9%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `88.9%` |
 | 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ query rewrite) | `87.8%` | `96.7%` |
+| 4. full pipeline (+ query rewrite) | `96.7%` | `98.9%` |
 
 The most important current evaluation takeaways are:
 - FTS5/BM25 remains the strongest single-method retrieval baseline on this corpus.
 - Source expansion is still the biggest lift over dense retrieval alone.
-- Query rewriting is still mixed and now clearly hurts hit@5 on the full 100-question set.
+- Query rewriting now helps when treated as a small append-only retrieval expansion rather than a full query replacement.
 - Abstention is still heuristic and remains one of the main thesis-facing limitations.
 
 Live metrics depend on the local Ollama/Chroma environment, so the right way to refresh results is to rerun the eval scripts on the target machine rather than trusting stale checked-in numbers after a corpus change. The detailed evaluation notes live in `docs/EVAL.md`.

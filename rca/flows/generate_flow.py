@@ -51,6 +51,12 @@ Rules:
     )
     _CITATION_PATTERN = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
     _ABSTENTION_SCORE_THRESHOLD = 0.50
+    _REWRITE_PROMPT_TEMPLATE = (
+        "Return 1 to 3 short additional search keywords or phrases that would improve retrieval "
+        "for this research question. Keep exact method names or acronyms only if helpful. "
+        "Do not invent terms. Do not concatenate words. Output only keywords, separated by spaces.\n\n"
+        "Question: {question}\n\nKeywords:"
+    )
 
     def __init__(
         self,
@@ -288,18 +294,13 @@ Rules:
         return cleaned.strip()
 
     def _rewrite_query(self, query: str, trace: QueryTrace | None = None) -> str:
-        """Use the LLM to extract clean semantic search keywords."""
+        """Use the LLM to suggest a few additional retrieval terms."""
         started_at = perf_counter() if trace is not None else None
         try:
             messages = [
                 ChatMessage(
                     role="user",
-                    content=(
-                        "Convert this research question into a dense technical search query of 8-12 keywords. "
-                        "Include domain-specific terms, method names, and technical concepts. "
-                        "No explanation, no punctuation, no full sentences. Just keywords.\n\n"
-                        f"Question: {query}\n\nKeywords:"
-                    ),
+                    content=self.build_rewrite_prompt(query),
                 )
             ]
             response = self.llm.chat(messages)
@@ -329,25 +330,30 @@ Rules:
 
     @classmethod
     def sanitize_rewritten_query(cls, original_query: str, rewritten_query: str) -> str:
-        """Keep dense keywords while preserving salient proper nouns from the original query."""
+        """Append a small number of safe retrieval terms to the original query."""
 
         llm_tokens = cls._extract_rewrite_tokens(rewritten_query)
-        original_tokens = cls._extract_salient_original_tokens(original_query)
+        if not llm_tokens:
+            return original_query
 
-        merged_tokens: list[str] = []
-        seen: set[str] = set()
-        for token in original_tokens + llm_tokens:
+        extra_tokens: list[str] = []
+        for token in llm_tokens:
             normalized = token.casefold()
-            if normalized in seen or normalized in cls._REWRITE_STOPWORDS:
+            if normalized in cls._REWRITE_STOPWORDS:
                 continue
-            seen.add(normalized)
-            merged_tokens.append(token)
-            if len(merged_tokens) >= 12:
+            if cls._is_suspicious_rewrite_token(token):
+                return original_query
+            extra_tokens.append(token)
+            if len(extra_tokens) >= 8:
                 break
 
-        if len(merged_tokens) < 4:
+        if not extra_tokens:
             return original_query
-        return " ".join(merged_tokens)
+        return f"{original_query} {' '.join(extra_tokens)}"
+
+    @classmethod
+    def build_rewrite_prompt(cls, query: str) -> str:
+        return cls._REWRITE_PROMPT_TEMPLATE.format(question=query)
 
     @classmethod
     def _resolve_source_id(cls, node_id: str) -> str:
@@ -363,21 +369,9 @@ Rules:
         return cls._REWRITE_TOKEN.findall(rewritten_query)
 
     @classmethod
-    def _extract_salient_original_tokens(cls, original_query: str) -> list[str]:
-        salient_tokens: list[str] = []
-        for token in cls._REWRITE_TOKEN.findall(original_query):
-            normalized = token.casefold()
-            if normalized in cls._REWRITE_STOPWORDS:
-                continue
-            if (
-                any(char.isdigit() for char in token)
-                or any(char in token for char in "+-_")
-                or token.isupper()
-                or any(char.isupper() for char in token[1:])
-                or len(token) >= 8
-            ):
-                salient_tokens.append(token)
-        return salient_tokens
+    def _is_suspicious_rewrite_token(cls, token: str) -> bool:
+        uppercase_after_first = sum(1 for char in token[1:] if char.isupper())
+        return len(token) > 24 or uppercase_after_first > 4
 
     @staticmethod
     def _accumulate_usage(trace: QueryTrace, raw: dict) -> None:

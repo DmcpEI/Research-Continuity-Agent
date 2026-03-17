@@ -56,7 +56,7 @@ Important caveat:
 - after changing the corpus, the right source of truth is a fresh local rerun, not an older checked-in artifact
 
 Current local run:
-- [run_20260316T191249Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260316T191249Z.json)
+- [run_20260316T200915Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260316T200915Z.json)
 
 Headline metrics:
 
@@ -65,11 +65,11 @@ Headline metrics:
 | Overall harness coverage | `100` questions |
 | Answerable questions | `90` |
 | Negative questions | `10` |
-| Citation precision (answerable, non-abstained) | `91.0%` over `89` cases |
+| Citation precision (answerable, non-abstained) | `92.1%` over `89` cases |
 | Negative abstention recall | `2/10` (`20.0%`) |
 | Answerable abstentions | `1` |
-| Average keyword hit rate | `0.265` |
-| Average latency | `11.8 s` |
+| Average keyword hit rate | `0.259` |
+| Average latency | `11.3 s` |
 
 ---
 
@@ -94,13 +94,13 @@ Aggregate retrieval results:
 | 1. vector-only (dense baseline) | `76.7%` | `88.9%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `88.9%` |
 | 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `87.8%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `96.7%` | `98.9%` |
 
 Interpretation guidance:
 - FTS5/BM25 is the production lexical backbone and should be treated as the main sparse baseline
 - dense retrieval remains useful, but on this corpus the lexical signal is often very strong
 - source expansion and the cross-encoder reranker are the main reasons the composed pipeline improves on simpler hybrids
-- query rewrite remains mixed and should be reported honestly as such; on the current 100-question set it lowers hit@5 relative to the expansion-only variant
+- query rewrite is now implemented as a small append-only expansion; on the current 100-question set it improves hit@5 and matches the FTS5 baseline at hit@10
 
 ---
 

@@ -202,6 +202,28 @@ def test_generate_answer_keeps_rewrite_for_conceptual_queries() -> None:
     assert retrieve_flow.query_types == [QueryType.conceptual]
 
 
+def test_sanitize_rewritten_query_appends_additional_terms_to_original() -> None:
+    original = "Why does the MoMa-LLM paper introduce AUC-E in addition to success and SPL?"
+
+    rewritten = GenerateFlow.sanitize_rewritten_query(
+        original,
+        "MoMa-LLM AUC-E evaluation metrics",
+    )
+
+    assert rewritten == f"{original} MoMa-LLM AUC-E evaluation metrics"
+
+
+def test_sanitize_rewritten_query_rejects_suspicious_tokens() -> None:
+    original = "What two data sources does SGVL train on jointly, and why are they combined?"
+
+    rewritten = GenerateFlow.sanitize_rewritten_query(
+        original,
+        "SGVL combined rationalespNetGraphVLTensoRFsNeRFmulti-modalintegrationheterogeneousdatafusionmachinelearningcross-domaingeneralization",
+    )
+
+    assert rewritten == original
+
+
 def test_generate_answer_resolves_chunk_citation_to_parent_source_without_source_hit() -> None:
     class StubGraphStore:
         def get_node(self, node_id: str) -> Node | None:

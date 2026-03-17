@@ -219,12 +219,7 @@ def rewrite_query(llm: OllamaLLMClient, question: str) -> str:
         messages = [
             ChatMessage(
                 role="user",
-                content=(
-                    "Convert this research question into a dense technical search query of 8-12 keywords. "
-                    "Include domain-specific terms, method names, and technical concepts. "
-                    "No explanation, no punctuation, no full sentences. Just keywords.\n\n"
-                    f"Question: {question}\n\nKeywords:"
-                ),
+                content=GenerateFlow.build_rewrite_prompt(question),
             )
         ]
         response = llm.chat(messages)

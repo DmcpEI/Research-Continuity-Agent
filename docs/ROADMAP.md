@@ -26,18 +26,18 @@ Target audience: **agent/orchestration/AI systems roles** in DACH robotics and M
 - [x] Query rewriter — LLM rewrites natural language to dense keywords before retrieval
 - [x] Citation resolution — chunk IDs resolved to source IDs
 - [x] Streamlit UI — chat + workspace (ingest, knowledge map, store)
-- [x] Integration tests (pytest, 50 passing)
+- [x] Integration tests (pytest, 52 passing)
 - [x] Evaluation harness with 100 golden Q&A pairs
 
 ### Measured performance
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | 91.0% over 89 cases |
+| Citation precision (answerable, non-abstained) | 92.1% over 89 cases |
 | Negative abstention recall | 2/10 (20.0%) |
 | Overall grounded rate | 97.0% |
-| Avg keyword hit rate | 0.265 |
-| Avg latency | 11.8 s |
+| Avg keyword hit rate | 0.259 |
+| Avg latency | 11.3 s |
 
 Retrieval ablations — hit@5 / hit@10 (n=90 answerable):
 
@@ -47,13 +47,13 @@ Retrieval ablations — hit@5 / hit@10 (n=90 answerable):
 | 1. vector-only (dense baseline) | 76.7% | 88.9% |
 | 2. vector + keyword (FTS5) | 76.7% | 88.9% |
 | 3. vector + keyword + expansion | 94.4% | 96.7% |
-| 4. full pipeline (+ query rewrite) | 87.8% | 96.7% |
+| 4. full pipeline (+ query rewrite) | 96.7% | 98.9% |
 
 ### Known failure modes
 - Citation selection drift on a small set of cases (`jampacker-003`, `pic2-010`, `review-002`, `review-003`, `stablebinpacking-002`, `vilain-001`)
 - Vector-only retrieval still under-rank a few questions that source expansion recovers
 - LLM generating plausible but wrong answers from off-topic chunks (keyword hit rate remains low)
-- Query rewriter drifts on queries containing specific named entities (scene names, system names)
+- Cross-paper comparison questions remain the hardest retrieval slice even after rewrite improvements
 - Abstention remains under-calibrated even after reranking: answerable citation precision improved, but the system still only rejects `2/10` negative questions
 
 ---
