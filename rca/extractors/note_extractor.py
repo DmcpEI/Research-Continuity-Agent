@@ -45,7 +45,9 @@ class NoteExtractor:
             match = HEADING_PATTERN.match(line.strip())
             if match:
                 if current_lines:
-                    sections.append({"heading": current_heading, "text": "\n".join(current_lines).strip()})
+                    sections.append(
+                        {"heading": current_heading, "text": "\n".join(current_lines).strip()}
+                    )
                     current_lines = []
                 current_heading = match.group(2).strip()
                 continue

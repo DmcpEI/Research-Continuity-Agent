@@ -58,7 +58,9 @@ def scaled_test_size(total_pairs: int) -> int:
     return max(1, round(total_pairs * TEST_RATIO))
 
 
-def stratified_split_ids(pairs: list[dict[str, Any]], test_size: int, seed: int) -> tuple[list[str], list[str]]:
+def stratified_split_ids(
+    pairs: list[dict[str, Any]], test_size: int, seed: int
+) -> tuple[list[str], list[str]]:
     by_category: dict[str, list[str]] = defaultdict(list)
     for pair in pairs:
         by_category[pair["category"]].append(pair["id"])
@@ -68,13 +70,19 @@ def stratified_split_ids(pairs: list[dict[str, Any]], test_size: int, seed: int)
         rng.shuffle(ids)
 
     category_counts = {category: len(ids) for category, ids in by_category.items()}
-    quotas = {category: count * test_size / len(pairs) for category, count in category_counts.items()}
+    quotas = {
+        category: count * test_size / len(pairs) for category, count in category_counts.items()
+    }
     test_counts = {category: math.floor(quota) for category, quota in quotas.items()}
 
     remaining = test_size - sum(test_counts.values())
     order = sorted(
         by_category.keys(),
-        key=lambda category: (quotas[category] - test_counts[category], category_counts[category], category),
+        key=lambda category: (
+            quotas[category] - test_counts[category],
+            category_counts[category],
+            category,
+        ),
         reverse=True,
     )
     for category in order:
@@ -143,7 +151,12 @@ class WeightedRetrieveFlow(RetrieveFlow):
             return 0.0
 
         effective_base = self.base_score if base == LEXICAL_BASE_SCORE else base
-        return min(0.95, effective_base + (self.title_weight * title_overlap) + (self.text_weight * text_overlap))
+        return min(
+            0.95,
+            effective_base
+            + (self.title_weight * title_overlap)
+            + (self.text_weight * text_overlap),
+        )
 
 
 def evaluate_subset(
@@ -204,7 +217,9 @@ def evaluate_subset(
     }
 
 
-def format_grid_table(results: dict[tuple[float, float], dict[str, Any]], best: tuple[float, float]) -> str:
+def format_grid_table(
+    results: dict[tuple[float, float], dict[str, Any]], best: tuple[float, float]
+) -> str:
     lines = []
     header = ["title\\text", *[f"{value:.2f}" for value in TEXT_WEIGHTS]]
     lines.append(" | ".join(header))
@@ -224,9 +239,13 @@ def format_grid_table(results: dict[tuple[float, float], dict[str, Any]], best: 
     return "\n".join(lines)
 
 
-def select_frontier(results: dict[tuple[float, float], dict[str, Any]]) -> list[tuple[float, float]]:
+def select_frontier(
+    results: dict[tuple[float, float], dict[str, Any]],
+) -> list[tuple[float, float]]:
     best_hit5 = max(metrics["hit_at_5"] for metrics in results.values())
-    best_hit10 = max(metrics["hit_at_10"] for metrics in results.values() if metrics["hit_at_5"] == best_hit5)
+    best_hit10 = max(
+        metrics["hit_at_10"] for metrics in results.values() if metrics["hit_at_5"] == best_hit5
+    )
     return [
         key
         for key, metrics in results.items()
@@ -350,7 +369,10 @@ def main() -> None:
         ],
         "selected_weights": {"title_weight": selected_key[0], "text_weight": selected_key[1]},
         "dev_split": {"questions": len(dev_ids), "retrieval_cases": current_dev["retrieval_cases"]},
-        "test_split": {"questions": len(test_ids), "retrieval_cases": current_test["retrieval_cases"]},
+        "test_split": {
+            "questions": len(test_ids),
+            "retrieval_cases": current_test["retrieval_cases"],
+        },
         "dev_grid": {
             f"title={title_weight:.2f}|text={text_weight:.2f}": metrics
             for (title_weight, text_weight), metrics in sweep_results.items()

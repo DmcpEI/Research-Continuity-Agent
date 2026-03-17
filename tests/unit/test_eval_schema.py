@@ -7,7 +7,6 @@ from pathlib import Path
 
 from rca.flows.retrieve_flow import RetrievalHit
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -178,7 +177,9 @@ def test_coefficient_sweep_helpers_scale_split_size_and_accept_base_override() -
     flow.text_weight = 0.05
     flow.base_score = 0.45
 
-    score = flow._lexical_score({"scene", "graph"}, "scene graph planner", "graph planner", base=0.65)
+    score = flow._lexical_score(
+        {"scene", "graph"}, "scene graph planner", "graph planner", base=0.65
+    )
 
     assert sweep.scaled_test_size(65) == 20
     assert sweep.scaled_test_size(90) == 28

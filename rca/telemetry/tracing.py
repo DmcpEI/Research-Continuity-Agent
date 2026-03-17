@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 
 class ToolCallEvent(BaseModel):
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     run_id: str
     tool_name: str
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -34,7 +34,9 @@ class Tracer:
     def new_run_id() -> str:
         return uuid4().hex
 
-    def log_tool_call(self, run_id: str, tool_name: str, payload: dict[str, Any] | None = None) -> None:
+    def log_tool_call(
+        self, run_id: str, tool_name: str, payload: dict[str, Any] | None = None
+    ) -> None:
         event = ToolCallEvent(run_id=run_id, tool_name=tool_name, payload=payload or {})
         with self.log_path.open("a", encoding="utf-8") as handle:
             handle.write(event.model_dump_json())

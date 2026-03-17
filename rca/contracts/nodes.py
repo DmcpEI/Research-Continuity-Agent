@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from rca.contracts.ids import NodeID
 
 
-class NodeKind(str, Enum):
+class NodeKind(StrEnum):
     source = "source"
     chunk = "chunk"
     note = "note"
@@ -20,7 +20,7 @@ class NodeKind(str, Enum):
     digest = "digest"
 
 
-class EdgeKind(str, Enum):
+class EdgeKind(StrEnum):
     contains = "contains"
     derived_from = "derived_from"
     references = "references"
@@ -37,7 +37,7 @@ class Node(BaseModel):
     title: str
     text: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Edge(BaseModel):
@@ -48,4 +48,4 @@ class Edge(BaseModel):
     kind: EdgeKind
     weight: float = 1.0
     metadata: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

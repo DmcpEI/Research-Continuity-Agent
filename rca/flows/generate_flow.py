@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from rca.config.settings import Settings, get_settings
 from rca.contracts.trace import QueryTrace, StageTrace
-from rca.flows.retrieve_flow import RetrieveFlow, RetrievalBundle
+from rca.flows.retrieve_flow import RetrievalBundle, RetrieveFlow
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
 from rca.retrieval.query_classifier import QueryType, classify_query
 
@@ -71,6 +71,7 @@ Rules:
             self.llm = llm_client
         elif self.settings.generation_model:
             from rca.llm.client import OllamaLLMClient
+
             self.llm = OllamaLLMClient(
                 base_url=self.settings.llm_base_url,
                 model=self.settings.generation_model,
@@ -79,7 +80,9 @@ Rules:
         else:
             self.llm = EchoLLMClient()
 
-    def generate_answer(self, query: str, limit: int = 5, trace: QueryTrace | None = None) -> GeneratedAnswer:
+    def generate_answer(
+        self, query: str, limit: int = 5, trace: QueryTrace | None = None
+    ) -> GeneratedAnswer:
         trace = trace or QueryTrace(query=query)
         trace.model = getattr(self.llm, "model", self.llm.__class__.__name__)
         query_type = classify_query(query)
@@ -119,8 +122,12 @@ Rules:
 
         # Step 2b: fallback — if rewritten query yielded no usable context, retry with raw query
         if not context.strip() and rewritten != query:
-            self._append_warning(trace, "rewritten retrieval produced empty context; retrying raw query")
-            bundle = self.retrieve_flow.retrieve(query, limit=limit, trace=trace, query_type=query_type)
+            self._append_warning(
+                trace, "rewritten retrieval produced empty context; retrying raw query"
+            )
+            bundle = self.retrieve_flow.retrieve(
+                query, limit=limit, trace=trace, query_type=query_type
+            )
             context_hits = self._select_context_hits(bundle)
             context = self._build_context(context_hits)
             trace.context_node_ids = [hit.node_id for hit in context_hits]
@@ -173,7 +180,9 @@ Rules:
         if not citations:
             top = next((h for h in bundle.hits if h.node_id.startswith("src:")), bundle.hits[0])
             answer_text = answer_text + f"\n\n[[{top.node_id}]]"
-            citations = [Citation(source_id=top.node_id, title=top.title, excerpt=top.excerpt[:150])]
+            citations = [
+                Citation(source_id=top.node_id, title=top.title, excerpt=top.excerpt[:150])
+            ]
 
         # Step 5: verify grounding
         hit_ids = {hit.node_id for hit in bundle.hits}
@@ -204,24 +213,39 @@ Rules:
 
     @staticmethod
     def _select_context_hits(bundle: RetrievalBundle) -> list:
-        return [
-            hit
-            for hit in bundle.hits
-            if hit.node_id.startswith("src:") or hit.score > 0.55
-        ]
+        return [hit for hit in bundle.hits if hit.node_id.startswith("src:") or hit.score > 0.55]
 
     # Matches the numeric chunk suffix, e.g. ":0009" at the end of an ID
     _CHUNK_SUFFIX = re.compile(r":\d+$")
     _REWRITE_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+_.-]*")
     _REWRITE_STOPWORDS = {
-        "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
-        "how", "in", "is", "it", "of", "on", "or", "s", "the", "to", "what",
-        "which", "with",
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "does",
+        "for",
+        "from",
+        "how",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "s",
+        "the",
+        "to",
+        "what",
+        "which",
+        "with",
     }
 
-    def _extract_citations(
-        self, answer_text: str, bundle: RetrievalBundle
-    ) -> list[Citation]:
+    def _extract_citations(self, answer_text: str, bundle: RetrievalBundle) -> list[Citation]:
         """Find [[src:...]] or [[chk:...]] references in the answer.
 
         Chunk IDs (ending in :NNNN) are resolved to their parent src: node
@@ -251,19 +275,23 @@ Rules:
                 else:
                     parent_node = self.retrieve_flow.graph_store.get_node(parent_id)
                     if parent_node is not None:
-                        citations.append(Citation(
-                            source_id=parent_id,
-                            title=parent_node.title,
-                            excerpt=(parent_node.text or "")[:150],
-                        ))
+                        citations.append(
+                            Citation(
+                                source_id=parent_id,
+                                title=parent_node.title,
+                                excerpt=(parent_node.text or "")[:150],
+                            )
+                        )
                         continue
 
             if hit:
-                citations.append(Citation(
-                    source_id=hit.node_id,
-                    title=hit.title,
-                    excerpt=hit.excerpt[:150],
-                ))
+                citations.append(
+                    Citation(
+                        source_id=hit.node_id,
+                        title=hit.title,
+                        excerpt=hit.excerpt[:150],
+                    )
+                )
 
         return citations
 

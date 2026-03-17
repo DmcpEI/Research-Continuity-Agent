@@ -172,11 +172,21 @@ def test_lexical_only_hits_do_not_push_strong_vector_hits_out_of_top_k() -> None
 
         def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
             return [
-                VectorQueryResult(id="chk:pdf/wrong-a:0000", score=0.66, document="wrong a", metadata={}),
-                VectorQueryResult(id="chk:pdf/wrong-b:0000", score=0.64, document="wrong b", metadata={}),
-                VectorQueryResult(id="chk:pdf/wrong-c:0000", score=0.63, document="wrong c", metadata={}),
-                VectorQueryResult(id="chk:pdf/wrong-d:0000", score=0.62, document="wrong d", metadata={}),
-                VectorQueryResult(id="chk:pdf/correct:0000", score=0.61, document="correct", metadata={}),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-a:0000", score=0.66, document="wrong a", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-b:0000", score=0.64, document="wrong b", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-c:0000", score=0.63, document="wrong c", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-d:0000", score=0.62, document="wrong d", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/correct:0000", score=0.61, document="correct", metadata={}
+                ),
             ]
 
     class StubGraphStore:
@@ -223,10 +233,18 @@ def test_salient_lexical_only_hits_can_still_enter_top_k() -> None:
 
         def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
             return [
-                VectorQueryResult(id="chk:pdf/wrong-a:0000", score=0.66, document="wrong a", metadata={}),
-                VectorQueryResult(id="chk:pdf/wrong-b:0000", score=0.64, document="wrong b", metadata={}),
-                VectorQueryResult(id="chk:pdf/wrong-c:0000", score=0.63, document="wrong c", metadata={}),
-                VectorQueryResult(id="chk:pdf/wrong-d:0000", score=0.62, document="wrong d", metadata={}),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-a:0000", score=0.66, document="wrong a", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-b:0000", score=0.64, document="wrong b", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-c:0000", score=0.63, document="wrong c", metadata={}
+                ),
+                VectorQueryResult(
+                    id="chk:pdf/wrong-d:0000", score=0.62, document="wrong d", metadata={}
+                ),
             ]
 
     class StubGraphStore:
@@ -301,7 +319,9 @@ def test_retrieve_uses_reranker_and_records_stage() -> None:
             return []
 
     class StubReranker:
-        def rerank(self, query: str, hits: list[RetrievalHit], top_k: int | None = None) -> list[RetrievalHit]:
+        def rerank(
+            self, query: str, hits: list[RetrievalHit], top_k: int | None = None
+        ) -> list[RetrievalHit]:
             ordered = sorted(hits, key=lambda hit: hit.node_id, reverse=True)
             keep = len(ordered) if top_k is None else top_k
             return ordered[:keep]

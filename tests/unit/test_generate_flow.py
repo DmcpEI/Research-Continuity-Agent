@@ -40,7 +40,9 @@ class StubRetrieveFlow:
         self.query_types: list[QueryType | None] = []
         self.graph_store = None
 
-    def retrieve(self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None) -> RetrievalBundle:
+    def retrieve(
+        self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None
+    ) -> RetrievalBundle:
         self.queries.append(query)
         self.query_types.append(query_type)
         return RetrievalBundle(
@@ -154,7 +156,9 @@ def test_generate_answer_appends_citation_for_supported_answer_without_model_cit
     assert result.answer.endswith("[[src:pdf/jampacker]]")
 
 
-def test_generate_answer_skips_rewrite_for_proper_noun_queries(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_answer_skips_rewrite_for_proper_noun_queries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     retrieve_flow = StubRetrieveFlow()
     flow = GenerateFlow(
         retrieve_flow=retrieve_flow,
@@ -241,7 +245,9 @@ def test_generate_answer_resolves_chunk_citation_to_parent_source_without_source
             super().__init__()
             self.graph_store = StubGraphStore()
 
-        def retrieve(self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None) -> RetrievalBundle:
+        def retrieve(
+            self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None
+        ) -> RetrievalBundle:
             self.queries.append(query)
             self.query_types.append(query_type)
             return RetrievalBundle(

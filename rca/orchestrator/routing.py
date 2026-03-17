@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 try:
     import yaml
@@ -12,7 +12,7 @@ except ImportError:
 from rca.config.settings import Settings, get_settings
 
 
-class Intent(str, Enum):
+class Intent(StrEnum):
     ingest = "ingest"
     retrieve = "retrieve"
     generate = "generate"

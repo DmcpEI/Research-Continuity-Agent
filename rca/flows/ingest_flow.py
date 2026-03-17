@@ -44,7 +44,9 @@ class IngestFlow:
         self.settings = settings or get_settings()
         self.settings.ensure_runtime_directories()
         self.graph_store = graph_store or GraphStore(self.settings.graph_db_path)
-        self.vector_store = vector_store or VectorStore(self.settings.vector_dir, self.settings.default_collection)
+        self.vector_store = vector_store or VectorStore(
+            self.settings.vector_dir, self.settings.default_collection
+        )
         self.event_log = event_log or EventLog(self.settings.event_log_path)
         self.note_extractor = note_extractor or NoteExtractor()
         self.pdf_extractor = pdf_extractor or PDFExtractor()
@@ -54,7 +56,10 @@ class IngestFlow:
     def ingest_path(self, path: str | Path) -> IngestResult:
         source_path = Path(path)
         payload = self._extract(source_path)
-        source_id = make_source_id(payload["metadata"]["kind"], source_path.stem if source_path.is_file() else source_path.name)
+        source_id = make_source_id(
+            payload["metadata"]["kind"],
+            source_path.stem if source_path.is_file() else source_path.name,
+        )
         source_kind = self._source_kind(payload["metadata"]["kind"])
         source_preview = self._source_text_preview(payload["content"])
 
@@ -81,7 +86,11 @@ class IngestFlow:
                 kind=NodeKind.chunk,
                 title=f"{payload['title']} #{index + 1}",
                 text=chunk_text,
-                metadata={"source_id": source_id, "chunk_index": index, "kind": payload["metadata"]["kind"]},
+                metadata={
+                    "source_id": source_id,
+                    "chunk_index": index,
+                    "kind": payload["metadata"]["kind"],
+                },
             )
             self.graph_store.upsert_node(chunk_node)
             self.graph_store.upsert_edge(

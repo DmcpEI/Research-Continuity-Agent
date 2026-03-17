@@ -11,8 +11,28 @@ from rca.contracts.nodes import Edge, Node
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9][a-z0-9+_.-]*")
 STOPWORDS = {
-    "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
-    "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "does",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "what",
+    "which",
     "with",
 }
 
@@ -22,7 +42,11 @@ class GraphStore:
 
     def __init__(self, db_path: str | Path, schema_path: str | Path | None = None) -> None:
         self.db_path = Path(db_path)
-        self.schema_path = Path(schema_path) if schema_path else Path(__file__).with_name("migrations") / "schema.sql"
+        self.schema_path = (
+            Path(schema_path)
+            if schema_path
+            else Path(__file__).with_name("migrations") / "schema.sql"
+        )
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.create_schema()
 

@@ -19,7 +19,10 @@ def test_ingest_flow_indexes_markdown_note(tmp_path) -> None:
         tool_policy_path=Path("rca/config/tool_policies.yaml"),
     )
     note_path = tmp_path / "demo-note.md"
-    note_path.write_text("# Demo Note\n\nThis repo tracks research continuity across experiments.\n", encoding="utf-8")
+    note_path.write_text(
+        "# Demo Note\n\nThis repo tracks research continuity across experiments.\n",
+        encoding="utf-8",
+    )
 
     ingest_flow = IngestFlow(settings=settings)
     result = ingest_flow.ingest_path(note_path)
@@ -48,7 +51,9 @@ def test_ingest_flow_truncates_source_text_but_keeps_full_chunk_text(tmp_path) -
         experiment_db_path=runtime_dir / "experiments.sqlite3",
         tool_policy_path=Path("rca/config/tool_policies.yaml"),
     )
-    repeated_line = "Research continuity requires durable long-form source retention for chunking.\n"
+    repeated_line = (
+        "Research continuity requires durable long-form source retention for chunking.\n"
+    )
     long_body = "# Long Note\n\n" + (repeated_line * 80)
     note_path = tmp_path / "long-note.md"
     note_path.write_text(long_body, encoding="utf-8")

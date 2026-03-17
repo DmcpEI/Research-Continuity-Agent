@@ -28,7 +28,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.3,<9.0"
+  "pytest>=8.3,<9.0",
+  "ruff>=0.4",
 ]
 vector = [
   "chromadb>=0.5,<0.7"
@@ -50,3 +51,21 @@ testpaths = [
   "rca/mcp_servers/filesystem/tests",
   "rca/mcp_servers/experiments/tests"
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "UP",
+]
+ignore = [
+  "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F811"]

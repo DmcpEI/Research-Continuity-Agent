@@ -31,30 +31,31 @@ dark = st.session_state.dark_mode
 
 # ── Colour palette ─────────────────────────────────────────────────────────────
 if dark:
-    bg         = "#0f1117"
-    surface    = "#1a1d27"
-    surface2   = "#22263a"
-    border     = "#2e3350"
-    accent     = "#7c6af7"
-    accent2    = "#4ecdc4"
-    text       = "#e8eaf0"
+    bg = "#0f1117"
+    surface = "#1a1d27"
+    surface2 = "#22263a"
+    border = "#2e3350"
+    accent = "#7c6af7"
+    accent2 = "#4ecdc4"
+    text = "#e8eaf0"
     text_muted = "#8b92b0"
-    success    = "#4ecdc4"
-    tag_bg     = "#2a2d45"
+    success = "#4ecdc4"
+    tag_bg = "#2a2d45"
 else:
-    bg         = "#f5f6fa"
-    surface    = "#ffffff"
-    surface2   = "#eef0f8"
-    border     = "#d4d8f0"
-    accent     = "#5b4de0"
-    accent2    = "#00a896"
-    text       = "#1a1d2e"
+    bg = "#f5f6fa"
+    surface = "#ffffff"
+    surface2 = "#eef0f8"
+    border = "#d4d8f0"
+    accent = "#5b4de0"
+    accent2 = "#00a896"
+    text = "#1a1d2e"
     text_muted = "#6b718f"
-    success    = "#00a896"
-    tag_bg     = "#e8eaf8"
+    success = "#00a896"
+    tag_bg = "#e8eaf8"
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
-st.markdown(f"""
+st.markdown(
+    f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
 
@@ -511,16 +512,19 @@ hr {{ border-color: {border}; margin: 1rem 0; }}
     margin-top: 0.3rem;
 }}
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # ── Cached resources ───────────────────────────────────────────────────────────
 @st.cache_resource
 def get_flows():
+    from rca.config.settings import get_settings
     from rca.flows.generate_flow import GenerateFlow
     from rca.flows.ingest_flow import IngestFlow
     from rca.store.graph_store import GraphStore
-    from rca.config.settings import get_settings
+
     settings = get_settings()
     return {
         "generate": GenerateFlow(),
@@ -532,6 +536,7 @@ def get_flows():
 
 def get_store_stats(flows):
     import sqlite3
+
     db_path = flows["settings"].graph_db_path
     try:
         conn = sqlite3.connect(db_path)
@@ -545,11 +550,14 @@ def get_store_stats(flows):
 
 def format_answer_with_citations(answer_text):
     import re
+
     pattern = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
+
     def replace(m):
         sid = m.group(1)
         short = sid.split("/")[-1][:30] + ("…" if len(sid.split("/")[-1]) > 30 else "")
         return f'<code title="{sid}">📎 {short}</code>'
+
     return pattern.sub(replace, answer_text)
 
 
@@ -603,7 +611,9 @@ def render_trace(trace: dict) -> None:
         col_stages, col_prov = st.columns(2)
 
         with col_stages:
-            st.markdown('<div class="trace-section-label">Pipeline stages</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="trace-section-label">Pipeline stages</div>', unsafe_allow_html=True
+            )
             if stages:
                 rows: list[str] = []
                 for stage in stages:
@@ -626,13 +636,15 @@ def render_trace(trace: dict) -> None:
                 st.caption("no stage data")
 
         with col_prov:
-            st.markdown('<div class="trace-section-label">Hit provenance</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="trace-section-label">Hit provenance</div>', unsafe_allow_html=True
+            )
             if provenance:
                 rows_html = "".join(
                     f'<div class="trace-row">'
                     f'<span class="trace-prov-rank">#{int(item["rank"])}</span>'
                     f'<span class="trace-prov-id" title="{html.escape(str(item["node_id"]))}">'
-                    f'{html.escape(str(item["node_id"]).split("/")[-1][:28])}</span>'
+                    f"{html.escape(str(item['node_id']).split('/')[-1][:28])}</span>"
                     f'<span class="trace-prov-score">{float(item["score"]):.3f}</span>'
                     f'<span class="trace-prov-stage">{html.escape(str(item["stage"]))}</span>'
                     f"</div>"
@@ -646,7 +658,9 @@ def render_trace(trace: dict) -> None:
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="rca-header">🧠 RCA</div>', unsafe_allow_html=True)
-    st.markdown('<div class="rca-subheader">research continuity agent</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="rca-subheader">research continuity agent</div>', unsafe_allow_html=True
+    )
     st.markdown("---")
 
     st.markdown('<div class="mode-label">Theme</div>', unsafe_allow_html=True)
@@ -687,7 +701,7 @@ with st.sidebar:
             f'<div class="stat-row">'
             f'<div class="stat-metric"><div class="stat-value">{stats.get("paper", 0)}</div><div class="stat-label">papers</div></div>'
             f'<div class="stat-metric"><div class="stat-value">{stats.get("chunk", 0)}</div><div class="stat-label">chunks</div></div>'
-            f'</div>',
+            f"</div>",
             unsafe_allow_html=True,
         )
     except Exception as e:
@@ -712,9 +726,9 @@ if st.session_state.mode == "chat":
             '<div class="empty-state">'
             '<div class="empty-state-icon">🔬</div>'
             '<div class="empty-state-text">Your research knowledge base is ready.<br>'
-            'Ask anything about your ingested papers.<br><br>'
+            "Ask anything about your ingested papers.<br><br>"
             '<em>Try: "What approaches exist for robotic bin packing?"</em>'
-            '</div></div>',
+            "</div></div>",
             unsafe_allow_html=True,
         )
     else:
@@ -735,18 +749,18 @@ if st.session_state.mode == "chat":
                         f'<div class="citation-title">{c["title"][:60]}{"…" if len(c["title"]) > 60 else ""}</div>'
                         f'<div class="citation-id">{c["source_id"]}</div>'
                         f'<div class="citation-excerpt">{c["excerpt"][:180]}…</div>'
-                        f'</div>'
+                        f"</div>"
                         for c in msg["citations"]
                     )
                     citations_html = (
                         f'<div class="citation-section">'
                         f'<div class="citation-label">📎 Sources ({len(msg["citations"])})</div>'
-                        f'{cards}</div>'
+                        f"{cards}</div>"
                     )
                 st.markdown(
                     f'<div class="msg-agent">{badge}'
                     f'<div style="margin-top:0.4rem">{answer_html}</div>'
-                    f'{citations_html}</div>',
+                    f"{citations_html}</div>",
                     unsafe_allow_html=True,
                 )
                 if msg.get("trace"):
@@ -771,23 +785,27 @@ if st.session_state.mode == "chat":
             try:
                 flows = get_flows()
                 result = flows["generate"].generate_answer(query)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": result.answer,
-                    "grounded": result.grounded,
-                    "citations": [
-                        {"source_id": c.source_id, "title": c.title, "excerpt": c.excerpt}
-                        for c in result.citations
-                    ],
-                    "trace": result.trace.model_dump() if result.trace else None,
-                })
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": result.answer,
+                        "grounded": result.grounded,
+                        "citations": [
+                            {"source_id": c.source_id, "title": c.title, "excerpt": c.excerpt}
+                            for c in result.citations
+                        ],
+                        "trace": result.trace.model_dump() if result.trace else None,
+                    }
+                )
             except Exception as e:
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": f"Error: {e}",
-                    "grounded": False,
-                    "citations": [],
-                })
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": f"Error: {e}",
+                        "grounded": False,
+                        "citations": [],
+                    }
+                )
         st.session_state.generating = False
         st.rerun()
 
@@ -828,8 +846,8 @@ else:
                             result = flows["ingest"].ingest_path(tmp_path)
                             st.markdown(
                                 f'<div class="ingest-success">✓ {uploaded.name}<br>'
-                                f'→ {result.source_id}<br>'
-                                f'→ {len(result.chunk_ids)} chunks · {result.node_count} nodes</div>',
+                                f"→ {result.source_id}<br>"
+                                f"→ {len(result.chunk_ids)} chunks · {result.node_count} nodes</div>",
                                 unsafe_allow_html=True,
                             )
                             get_flows.clear()
@@ -858,9 +876,9 @@ else:
                         tmp_path.write_bytes(uf.getvalue())
                         try:
                             result = flows["ingest"].ingest_path(tmp_path)
-                            results_html += f'<div class="ingest-success">✓ [{i+1}/{len(uploaded_files)}] {uf.name} → {len(result.chunk_ids)} chunks</div>'
+                            results_html += f'<div class="ingest-success">✓ [{i + 1}/{len(uploaded_files)}] {uf.name} → {len(result.chunk_ids)} chunks</div>'
                         except Exception as e:
-                            results_html += f'<div class="ingest-error">✗ [{i+1}/{len(uploaded_files)}] {uf.name}: {e}</div>'
+                            results_html += f'<div class="ingest-error">✗ [{i + 1}/{len(uploaded_files)}] {uf.name}: {e}</div>'
                         progress.progress((i + 1) / len(uploaded_files))
                     st.markdown(results_html, unsafe_allow_html=True)
                     get_flows.clear()
@@ -872,8 +890,9 @@ else:
         st.markdown("#### Knowledge graph — papers and their connections")
         try:
             import sqlite3
-            import plotly.graph_objects as go
+
             import networkx as nx
+            import plotly.graph_objects as go
 
             flows = get_flows()
             db_path = flows["settings"].graph_db_path
@@ -893,8 +912,8 @@ else:
                 )
             else:
                 G = nx.Graph()
-                node_ids    = {row["id"] for row in nodes_rows}
-                node_kinds  = {row["id"]: row["kind"]  for row in nodes_rows}
+                node_ids = {row["id"] for row in nodes_rows}
+                node_kinds = {row["id"]: row["kind"] for row in nodes_rows}
                 node_titles = {row["id"]: row["title"] for row in nodes_rows}
                 for row in nodes_rows:
                     G.add_node(row["id"])
@@ -909,30 +928,39 @@ else:
 
                 edge_x, edge_y = [], []
                 for u, v in G.edges():
-                    x0, y0 = pos[u]; x1, y1 = pos[v]
-                    edge_x += [x0, x1, None]; edge_y += [y0, y1, None]
+                    x0, y0 = pos[u]
+                    x1, y1 = pos[v]
+                    edge_x += [x0, x1, None]
+                    edge_y += [y0, y1, None]
 
                 edge_trace = go.Scatter(
-                    x=edge_x, y=edge_y, mode="lines",
-                    line=dict(width=0.8, color=border), hoverinfo="none",
+                    x=edge_x,
+                    y=edge_y,
+                    mode="lines",
+                    line=dict(width=0.8, color=border),
+                    hoverinfo="none",
                 )
-                node_x      = [pos[n][0] for n in G.nodes()]
-                node_y      = [pos[n][1] for n in G.nodes()]
-                node_colors = [kind_colors.get(node_kinds.get(n, "paper"), accent) for n in G.nodes()]
+                node_x = [pos[n][0] for n in G.nodes()]
+                node_y = [pos[n][1] for n in G.nodes()]
+                node_colors = [
+                    kind_colors.get(node_kinds.get(n, "paper"), accent) for n in G.nodes()
+                ]
                 node_labels = [
                     node_titles.get(n, n)[:35] + ("…" if len(node_titles.get(n, n)) > 35 else "")
                     for n in G.nodes()
                 ]
-                node_hover  = [
+                node_hover = [
                     f"<b>{node_titles.get(n, n)[:60]}</b><br>"
                     f"<span style='color:gray'>{node_kinds.get(n, '?')}</span><br>"
                     f"<code>{n}</code>"
                     for n in G.nodes()
                 ]
                 node_trace = go.Scatter(
-                    x=node_x, y=node_y,
+                    x=node_x,
+                    y=node_y,
                     mode="markers+text",
-                    hoverinfo="text", hovertext=node_hover,
+                    hoverinfo="text",
+                    hovertext=node_hover,
                     text=node_labels,
                     textposition="top center",
                     textfont=dict(size=8, color=text_muted),
@@ -941,16 +969,21 @@ else:
                 fig = go.Figure(
                     data=[edge_trace, node_trace],
                     layout=go.Layout(
-                        showlegend=False, hovermode="closest",
-                        paper_bgcolor=bg, plot_bgcolor=bg,
-                        margin=dict(l=20, r=20, t=20, b=20), height=520,
+                        showlegend=False,
+                        hovermode="closest",
+                        paper_bgcolor=bg,
+                        plot_bgcolor=bg,
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        height=520,
                         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         font=dict(color=text),
                     ),
                 )
                 st.plotly_chart(fig, use_container_width=True)
-                st.caption(f"{len(nodes_rows)} source nodes · {edge_count} connections · hover nodes for details")
+                st.caption(
+                    f"{len(nodes_rows)} source nodes · {edge_count} connections · hover nodes for details"
+                )
 
         except ImportError:
             st.warning("Install plotly and networkx: `uv add plotly networkx`")
@@ -961,6 +994,7 @@ else:
         st.markdown("#### Everything in your knowledge base")
         try:
             import sqlite3
+
             flows = get_flows()
             conn = sqlite3.connect(flows["settings"].graph_db_path)
             conn.row_factory = sqlite3.Row
@@ -984,14 +1018,16 @@ else:
                 for row in source_nodes:
                     if search_term and search_term.lower() not in row["title"].lower():
                         continue
-                    kind_emoji = {"paper": "📄", "note": "📝", "experiment": "🧪"}.get(row["kind"], "•")
+                    kind_emoji = {"paper": "📄", "note": "📝", "experiment": "🧪"}.get(
+                        row["kind"], "•"
+                    )
                     date = row["created_at"][:10] if row["created_at"] else ""
                     st.markdown(
                         f'<div class="citation-card">'
                         f'<div class="citation-title">{kind_emoji} {row["title"][:70]}</div>'
                         f'<div class="citation-id">{row["id"]}</div>'
                         f'<span style="font-size:0.7rem;color:{text_muted}">{date}</span>'
-                        f'</div>',
+                        f"</div>",
                         unsafe_allow_html=True,
                     )
         except Exception as e:

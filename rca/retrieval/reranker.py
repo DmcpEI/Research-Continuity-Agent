@@ -28,7 +28,9 @@ class CrossEncoderReranker:
             raise RuntimeError("sentence-transformers is not installed")
         return CrossEncoder(self.model_name)
 
-    def rerank(self, query: str, hits: list["RetrievalHit"], top_k: int | None = None) -> list["RetrievalHit"]:
+    def rerank(
+        self, query: str, hits: list[RetrievalHit], top_k: int | None = None
+    ) -> list[RetrievalHit]:
         if not hits:
             return hits
 

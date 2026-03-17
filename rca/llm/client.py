@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from rca.config.settings import get_settings
 
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -52,6 +53,7 @@ def _stable_embedding(text: str, dimensions: int) -> list[float]:
     for index in range(dimensions):
         vector.append(values[index % len(values)] / 255.0)
     return vector
+
 
 class OllamaLLMClient(LLMClient):
     """Default Ollama client with optional OpenAI-compatible API support."""
@@ -101,12 +103,16 @@ class OllamaLLMClient(LLMClient):
             result = self._post_json(self._openai_path("embeddings"), payload, timeout=120)
             data = result.get("data")
             if not isinstance(data, list):
-                raise RuntimeError("OpenAI-compatible embedding response did not include a 'data' list.")
+                raise RuntimeError(
+                    "OpenAI-compatible embedding response did not include a 'data' list."
+                )
             vectors: list[list[float]] = []
             for item in data:
                 embedding = item.get("embedding") if isinstance(item, dict) else None
                 if not isinstance(embedding, list):
-                    raise RuntimeError("OpenAI-compatible embedding item did not include an 'embedding' vector.")
+                    raise RuntimeError(
+                        "OpenAI-compatible embedding item did not include an 'embedding' vector."
+                    )
                 vectors.append([float(value) for value in embedding])
             return vectors
 
@@ -120,7 +126,9 @@ class OllamaLLMClient(LLMClient):
             )
             embedding = result.get("embedding")
             if not isinstance(embedding, list):
-                raise RuntimeError("Ollama embedding response did not include an 'embedding' vector.")
+                raise RuntimeError(
+                    "Ollama embedding response did not include an 'embedding' vector."
+                )
             vectors.append([float(value) for value in embedding])
         return vectors
 
@@ -151,7 +159,11 @@ class OllamaLLMClient(LLMClient):
         if isinstance(content, list):
             parts: list[str] = []
             for item in content:
-                if isinstance(item, dict) and item.get("type") == "text" and isinstance(item.get("text"), str):
+                if (
+                    isinstance(item, dict)
+                    and item.get("type") == "text"
+                    and isinstance(item.get("text"), str)
+                ):
                     parts.append(item["text"])
             if parts:
                 return "\n".join(parts)

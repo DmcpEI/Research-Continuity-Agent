@@ -22,13 +22,13 @@ from typing import Any
 
 from rca.config.settings import get_settings
 from rca.flows.generate_flow import GenerateFlow
-from rca.flows.retrieve_flow import RetrieveFlow, RetrievalHit
+from rca.flows.retrieve_flow import RetrievalHit, RetrieveFlow
 from rca.llm.client import ChatMessage, OllamaLLMClient
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
 
 CHUNK_SUFFIX = re.compile(r":\d+$")
-FETCH_K = 10   # how many results to retrieve per config
+FETCH_K = 10  # how many results to retrieve per config
 HIT_AT = (5, 10)  # report both hit@5 and hit@10
 
 
@@ -95,12 +95,8 @@ def summarize_subset(cases: list[dict[str, Any]], config_keys: list[str]) -> dic
 
     return {
         "cases": total,
-        "summary_hit_at_5": {
-            key: round(hit_counts_5[key] / total, 4) for key in config_keys
-        },
-        "summary_hit_at_10": {
-            key: round(hit_counts_10[key] / total, 4) for key in config_keys
-        },
+        "summary_hit_at_5": {key: round(hit_counts_5[key] / total, 4) for key in config_keys},
+        "summary_hit_at_10": {key: round(hit_counts_10[key] / total, 4) for key in config_keys},
         "summary_hit_at_5_ci": {
             key: {
                 "lower": round(wilson_interval(hit_counts_5[key], total)[0], 4),
@@ -121,7 +117,10 @@ def summarize_subset(cases: list[dict[str, Any]], config_keys: list[str]) -> dic
 
 
 def build_bucket_summary(
-    per_case: list[dict[str, Any]], config_keys: list[str], field: str, ordered_values: list[str] | None = None
+    per_case: list[dict[str, Any]],
+    config_keys: list[str],
+    field: str,
+    ordered_values: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     evaluated = [case for case in per_case if not case["skipped"]]
     if ordered_values is None:
@@ -229,17 +228,24 @@ def rewrite_query(llm: OllamaLLMClient, question: str) -> str:
         return question
 
 
-def run_config1(question: str, vector_store: VectorStore, graph_store: GraphStore) -> list[RetrievalHit]:
+def run_config1(
+    question: str, vector_store: VectorStore, graph_store: GraphStore
+) -> list[RetrievalHit]:
     """Vector-only: no graph keyword search, no expansion."""
     hits = []
     for r in vector_store.query(question, limit=FETCH_K):
         node = graph_store.get_node(r.id)
         title = node.title if node else r.metadata.get("title", r.id)
         metadata = node.metadata if node else r.metadata
-        hits.append(RetrievalHit(
-            node_id=r.id, score=r.score, title=title,
-            excerpt=r.document[:240], metadata=metadata,
-        ))
+        hits.append(
+            RetrievalHit(
+                node_id=r.id,
+                score=r.score,
+                title=title,
+                excerpt=r.document[:240],
+                metadata=metadata,
+            )
+        )
     return hits
 
 
@@ -259,7 +265,9 @@ def run_config0(question: str, graph_store: GraphStore) -> list[RetrievalHit]:
     return hits
 
 
-def run_config2(question: str, vector_store: VectorStore, graph_store: GraphStore) -> list[RetrievalHit]:
+def run_config2(
+    question: str, vector_store: VectorStore, graph_store: GraphStore
+) -> list[RetrievalHit]:
     """Vector + keyword-search merge, no expansion."""
     hit_map: dict[str, RetrievalHit] = {}
     for r in vector_store.query(question, limit=FETCH_K):
@@ -269,15 +277,20 @@ def run_config2(question: str, vector_store: VectorStore, graph_store: GraphStor
         current = hit_map.get(r.id)
         if current is None or r.score > current.score:
             hit_map[r.id] = RetrievalHit(
-                node_id=r.id, score=r.score, title=title,
-                excerpt=r.document[:240], metadata=metadata,
+                node_id=r.id,
+                score=r.score,
+                title=title,
+                excerpt=r.document[:240],
+                metadata=metadata,
             )
     for node in graph_store.search_nodes(question, limit=FETCH_K):
         current = hit_map.get(node.id)
         score = current.score if current else 0.5
         hit_map[node.id] = RetrievalHit(
-            node_id=node.id, score=max(score, 0.5),
-            title=node.title, excerpt=(node.text or "")[:240],
+            node_id=node.id,
+            score=max(score, 0.5),
+            title=node.title,
+            excerpt=(node.text or "")[:240],
             metadata=node.metadata,
         )
     return sorted(hit_map.values(), key=lambda h: h.score, reverse=True)[:FETCH_K]
@@ -318,20 +331,24 @@ def main() -> None:
     for i, pair in enumerate(golden_pairs):
         question = pair["question"]
         expected = expected_source_ids(pair)
-        print(f"[{i+1:02d}/{len(golden_pairs)}] {pair['id']}: {question[:65]}...")
+        print(f"[{i + 1:02d}/{len(golden_pairs)}] {pair['id']}: {question[:65]}...")
 
         if not is_retrieval_case(pair):
-            skip_reason = "unanswerable" if not pair.get("answerable", True) else "missing expected source"
-            per_case.append({
-                "id": pair["id"],
-                "difficulty": pair["difficulty"],
-                "category": pair.get("category"),
-                "bucket": pair.get("category"),
-                "expected_source": pair.get("expected_source"),
-                "expected_sources": expected,
-                "skipped": True,
-                "skip_reason": skip_reason,
-            })
+            skip_reason = (
+                "unanswerable" if not pair.get("answerable", True) else "missing expected source"
+            )
+            per_case.append(
+                {
+                    "id": pair["id"],
+                    "difficulty": pair["difficulty"],
+                    "category": pair.get("category"),
+                    "bucket": pair.get("category"),
+                    "expected_source": pair.get("expected_source"),
+                    "expected_sources": expected,
+                    "skipped": True,
+                    "skip_reason": skip_reason,
+                }
+            )
             print(f"  skipped ({skip_reason})")
             continue
 
@@ -353,22 +370,28 @@ def main() -> None:
             hits5[key].append(hit_at_k(hit_list, expected, k=5))
             hits10[key].append(hit_at_k(hit_list, expected, k=10))
 
-        per_case.append({
-            "id": pair["id"],
-            "difficulty": pair["difficulty"],
-            "category": pair.get("category"),
-            "bucket": pair.get("category"),
-            "expected_source": pair.get("expected_source"),
-            "expected_sources": expected,
-            "rewritten_query": rewritten if rewritten != question else None,
-            "hit_at_5":  {k: hits5[k][-1]  for k in config_keys},
-            "hit_at_10": {k: hits10[k][-1] for k in config_keys},
-            "skipped": False,
-        })
-        h5  = [int(hits5[k][-1])  for k in config_keys]
+        per_case.append(
+            {
+                "id": pair["id"],
+                "difficulty": pair["difficulty"],
+                "category": pair.get("category"),
+                "bucket": pair.get("category"),
+                "expected_source": pair.get("expected_source"),
+                "expected_sources": expected,
+                "rewritten_query": rewritten if rewritten != question else None,
+                "hit_at_5": {k: hits5[k][-1] for k in config_keys},
+                "hit_at_10": {k: hits10[k][-1] for k in config_keys},
+                "skipped": False,
+            }
+        )
+        h5 = [int(hits5[k][-1]) for k in config_keys]
         h10 = [int(hits10[k][-1]) for k in config_keys]
-        print(f"  @5  fts5={h5[0]}  dense={h5[1]}  +fts5={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}")
-        print(f"  @10 fts5={h10[0]}  dense={h10[1]}  +fts5={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}")
+        print(
+            f"  @5  fts5={h5[0]}  dense={h5[1]}  +fts5={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}"
+        )
+        print(
+            f"  @10 fts5={h10[0]}  dense={h10[1]}  +fts5={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}"
+        )
 
     n = evaluated_cases
     if n == 0:
@@ -379,11 +402,11 @@ def main() -> None:
         summary10 = {k: round(sum(v) / n, 4) for k, v in hits10.items()}
 
     rows = [
-        ("0. fts5-only (BM25 baseline)",       "0_fts5_only"),
-        ("1. vector-only (dense baseline)",    "1_vector_only"),
-        ("2. vector + keyword (FTS5)",         "2_vector_keyword"),
-        ("3. vector + keyword + expansion",    "3_vector_keyword_expand"),
-        ("4. full pipeline (+ rewrite)",       "4_full_rewrite"),
+        ("0. fts5-only (BM25 baseline)", "0_fts5_only"),
+        ("1. vector-only (dense baseline)", "1_vector_only"),
+        ("2. vector + keyword (FTS5)", "2_vector_keyword"),
+        ("3. vector + keyword + expansion", "3_vector_keyword_expand"),
+        ("4. full pipeline (+ rewrite)", "4_full_rewrite"),
     ]
     category_summary = build_bucket_summary(per_case, config_keys, "category")
     difficulty_summary = build_bucket_summary(
@@ -422,7 +445,7 @@ def main() -> None:
         "loaded_cases": len(golden_pairs),
         "cases": n,
         "skipped_cases": len(golden_pairs) - n,
-        "summary_hit_at_5":  summary5,
+        "summary_hit_at_5": summary5,
         "summary_hit_at_10": summary10,
         "summary_by_category": category_summary,
         "summary_by_difficulty": difficulty_summary,

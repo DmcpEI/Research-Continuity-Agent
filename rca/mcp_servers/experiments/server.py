@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 from uuid import uuid4
@@ -56,7 +56,7 @@ class ExperimentServer:
             status=self._normalize_status(status),
             metrics=metrics or {},
             metadata=metadata or {},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         with self.connect() as connection:
             connection.execute(
@@ -99,7 +99,7 @@ class ExperimentServer:
             )
             for row in rows
         ]
-    
+
     def update_run(
         self,
         run_id: str,
@@ -117,7 +117,7 @@ class ExperimentServer:
         new_status = self._normalize_status(status) if status is not None else existing.status
         new_metrics = {**existing.metrics, **(metrics or {})}
         new_metadata = {**existing.metadata, **(metadata or {})}
-        updated_at = datetime.now(timezone.utc).isoformat()
+        updated_at = datetime.now(UTC).isoformat()
 
         with self.connect() as connection:
             connection.execute(
@@ -138,7 +138,6 @@ class ExperimentServer:
         # Return the updated record
         return self.get_run(run_id)
 
-
     def get_run(self, run_id: str) -> ExperimentRecord | None:
         """Fetch a single experiment by run_id."""
         with self.connect() as connection:
@@ -150,14 +149,16 @@ class ExperimentServer:
         if row is None:
             return None
 
-        return ExperimentRecord.model_validate({
-            "run_id": row["run_id"],
-            "name": row["name"],
-            "status": row["status"],
-            "metrics": json.loads(row["metrics"]),
-            "metadata": json.loads(row["metadata"]),
-            "created_at": row["created_at"],
-        })
+        return ExperimentRecord.model_validate(
+            {
+                "run_id": row["run_id"],
+                "name": row["name"],
+                "status": row["status"],
+                "metrics": json.loads(row["metrics"]),
+                "metadata": json.loads(row["metadata"]),
+                "created_at": row["created_at"],
+            }
+        )
 
     @staticmethod
     def _normalize_status(status: str) -> Literal["pending", "running", "complete", "failed"]:
@@ -166,8 +167,10 @@ class ExperimentServer:
         if normalized not in allowed:
             raise ValueError(f"Unsupported experiment status: {status}")
         return cast(Literal["pending", "running", "complete", "failed"], normalized)
-    
+
+
 # --- MCP Server setup ---
+
 
 def make_server(db_path: str) -> Server:
     exp = ExperimentServer(db_path)
@@ -231,7 +234,7 @@ def make_server(db_path: str) -> Server:
                     },
                     "required": ["run_id"],
                 },
-            )
+            ),
         ]
 
     @server.call_tool()
@@ -242,10 +245,10 @@ def make_server(db_path: str) -> Server:
                 text = f"Run recorded: {result.run_id}"
             elif name == "list_runs":
                 runs = exp.list_runs(limit=arguments.get("limit", 20))
-                text = "\n".join(
-                    f"{r.run_id} | {r.name} | {r.status} | {r.created_at}"
-                    for r in runs
-                ) or "No runs found."
+                text = (
+                    "\n".join(f"{r.run_id} | {r.name} | {r.status} | {r.created_at}" for r in runs)
+                    or "No runs found."
+                )
             elif name == "update_run":
                 result = exp.update_run(**arguments)
                 text = f"Run updated: {result.run_id}"
@@ -270,12 +273,16 @@ def make_server(db_path: str) -> Server:
 
     return server
 
+
 async def main(db_path: str) -> None:
     server = make_server(db_path)
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
+
 if __name__ == "__main__":
-    import asyncio, sys
+    import asyncio
+    import sys
+
     db_path = sys.argv[1] if len(sys.argv) > 1 else ".rca/experiments.sqlite3"
     asyncio.run(main(db_path))

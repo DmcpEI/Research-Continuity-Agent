@@ -43,7 +43,9 @@ class VectorStore:
 
         if chromadb is not None:
             from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+
             from rca.config.settings import get_settings
+
             settings = get_settings()
 
             embedding_fn = OllamaEmbeddingFunction(
@@ -110,7 +112,9 @@ class VectorStore:
                         document=document,
                         metadata=metadata or {},
                     )
-                    for record_id, document, metadata, distance in zip(ids, documents, metadatas, distances, strict=True)
+                    for record_id, document, metadata, distance in zip(
+                        ids, documents, metadatas, distances, strict=True
+                    )
                 ]
             except Exception as exc:
                 self._disable_chroma(exc, operation="query")
@@ -130,7 +134,9 @@ class VectorStore:
     ) -> None:
         for record_id, document, metadata in zip(ids, documents, metadatas, strict=True):
             self._documents[record_id] = {"document": document, "metadata": metadata}
-        self._fallback_path.write_text(json.dumps(self._documents, indent=2, sort_keys=True), encoding="utf-8")
+        self._fallback_path.write_text(
+            json.dumps(self._documents, indent=2, sort_keys=True), encoding="utf-8"
+        )
 
     def _query_fallback(self, query_text: str, limit: int) -> list[VectorQueryResult]:
         query_counter = Counter(self._tokenize(query_text))

@@ -1,5 +1,7 @@
 # Research Continuity Agent (RCA)
 
+![CI](https://github.com/DmcpEI/Research-Continuity-Agent/actions/workflows/ci.yml/badge.svg)
+
 A **local-first research knowledge system** that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations — built to support a Master's thesis on structured visual perception for robotic inventory generation.
 
 ---

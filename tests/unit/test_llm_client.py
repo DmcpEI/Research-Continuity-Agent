@@ -16,7 +16,7 @@ def test_ollama_llm_client_embed_uses_embeddings_endpoint(monkeypatch) -> None:
         def read(self) -> bytes:
             return json.dumps(self.payload).encode("utf-8")
 
-        def __enter__(self) -> "FakeResponse":
+        def __enter__(self) -> FakeResponse:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> bool:
@@ -63,7 +63,7 @@ def test_llm_client_uses_configured_openai_compatible_base_url(monkeypatch) -> N
         def read(self) -> bytes:
             return json.dumps(self.payload).encode("utf-8")
 
-        def __enter__(self) -> "FakeResponse":
+        def __enter__(self) -> FakeResponse:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> bool:
@@ -78,13 +78,7 @@ def test_llm_client_uses_configured_openai_compatible_base_url(monkeypatch) -> N
                 "timeout": timeout,
             }
         )
-        return FakeResponse(
-            {
-                "choices": [
-                    {"message": {"content": "Configured backend response"}}
-                ]
-            }
-        )
+        return FakeResponse({"choices": [{"message": {"content": "Configured backend response"}}]})
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
 

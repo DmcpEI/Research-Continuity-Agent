@@ -10,8 +10,8 @@ import mcp.types as types
 from mcp.server import Server
 from pydantic import BaseModel
 
-
 # --- Data models ---
+
 
 class FileInfo(BaseModel):
     path: str
@@ -22,6 +22,7 @@ class FileInfo(BaseModel):
 # --- Core logic class ---
 
 MAX_FILE_BYTES = 1_000_000
+
 
 class FilesystemServer:
     def __init__(self, root: str | Path) -> None:
@@ -41,7 +42,9 @@ class FilesystemServer:
     def read_text_file(self, path: str) -> str:
         target = self._resolve(path)
         if target.stat().st_size > MAX_FILE_BYTES:
-            raise ValueError(f"File too large: {target.stat().st_size} bytes (limit {MAX_FILE_BYTES})")
+            raise ValueError(
+                f"File too large: {target.stat().st_size} bytes (limit {MAX_FILE_BYTES})"
+            )
         return target.read_text(encoding="utf-8")
 
     def search_text(self, pattern: str, path: str = ".") -> list[str]:
@@ -62,6 +65,7 @@ class FilesystemServer:
 
 
 # --- MCP server wiring ---
+
 
 def make_server(root: str) -> Server:
     fs = FilesystemServer(root)
@@ -107,16 +111,13 @@ def make_server(root: str) -> Server:
         ]
 
     @server.call_tool()
-    async def call_tool(
-        name: str, arguments: dict
-    ) -> list[types.TextContent]:
+    async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         """Route tool calls to the right method."""
         try:
             if name == "list_directory":
                 result = fs.list_directory(arguments.get("path", "."))
                 text = "\n".join(
-                    f"{'[DIR]' if f.is_dir else '[FILE]'} {f.path} ({f.size}b)"
-                    for f in result
+                    f"{'[DIR]' if f.is_dir else '[FILE]'} {f.path} ({f.size}b)" for f in result
                 )
             elif name == "read_text_file":
                 text = fs.read_text_file(arguments["path"])
@@ -137,6 +138,7 @@ def make_server(root: str) -> Server:
 
 
 # --- Entry point ---
+
 
 async def main(root: str) -> None:
     server = make_server(root)

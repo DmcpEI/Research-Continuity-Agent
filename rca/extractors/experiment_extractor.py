@@ -24,7 +24,9 @@ class ExperimentExtractor:
             data = json.loads(raw_text)
         elif suffix in {".yaml", ".yml"}:
             if yaml is None:
-                raise RuntimeError("YAML experiment extraction requires the optional 'PyYAML' dependency.")
+                raise RuntimeError(
+                    "YAML experiment extraction requires the optional 'PyYAML' dependency."
+                )
             data = yaml.safe_load(raw_text) or {}
         else:
             raise ValueError(f"Unsupported experiment file type: {experiment_path.suffix}")
@@ -35,7 +37,9 @@ class ExperimentExtractor:
         return {
             "title": title,
             "content": json.dumps(data, indent=2, sort_keys=True),
-            "sections": [{"heading": "Experiment", "text": json.dumps(data, indent=2, sort_keys=True)}],
+            "sections": [
+                {"heading": "Experiment", "text": json.dumps(data, indent=2, sort_keys=True)}
+            ],
             "metadata": {
                 "kind": "experiment",
                 "path": str(experiment_path),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Literal
@@ -60,7 +60,9 @@ class EvaluationCaseResult(BaseModel):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run generation evaluation against eval/golden.json.")
+    parser = argparse.ArgumentParser(
+        description="Run generation evaluation against eval/golden.json."
+    )
     parser.add_argument(
         "--golden-path",
         default=str(Path("eval") / "golden.json"),
@@ -85,14 +87,18 @@ def load_golden_pairs(path: Path) -> list[GoldenPair]:
     return [GoldenPair.model_validate(item) for item in raw_pairs]
 
 
-def evaluate_pair(flow: GenerateFlow, pair: GoldenPair) -> tuple[EvaluationCaseResult, dict[str, Any] | None]:
+def evaluate_pair(
+    flow: GenerateFlow, pair: GoldenPair
+) -> tuple[EvaluationCaseResult, dict[str, Any] | None]:
     started_at = perf_counter()
     expected_sources = pair.expected_source_ids()
     try:
         generated = flow.generate_answer(pair.question)
         latency_ms = (perf_counter() - started_at) * 1000.0
         citation_source_ids = [citation.source_id for citation in generated.citations]
-        matched_keywords, missing_keywords = keyword_matches(generated.answer, pair.expected_keywords)
+        matched_keywords, missing_keywords = keyword_matches(
+            generated.answer, pair.expected_keywords
+        )
         keyword_hits = calculate_keyword_hit_rate(matched_keywords, pair.expected_keywords)
         if not pair.answerable:
             source_correct = generated.abstained
@@ -197,12 +203,12 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
         "overall_grounded_rate": sum(result.grounded for result in results) / total,
         "citation_precision": (
             sum(result.source_correct for result in scored_answerable) / len(scored_answerable)
-            if scored_answerable else 0.0
+            if scored_answerable
+            else 0.0
         ),
         "citation_precision_cases": len(scored_answerable),
         "abstention_recall": (
-            sum(result.abstained for result in negatives) / len(negatives)
-            if negatives else 0.0
+            sum(result.abstained for result in negatives) / len(negatives) if negatives else 0.0
         ),
         "abstention_cases": len(negatives),
         "answerable_abstentions": sum(result.abstained for result in answerable),
@@ -234,11 +240,11 @@ def summarize_subset(results: list[EvaluationCaseResult]) -> dict[str, Any]:
         "grounded_rate": sum(result.grounded for result in results) / total,
         "citation_precision": (
             sum(result.source_correct for result in scored_answerable) / len(scored_answerable)
-            if scored_answerable else 0.0
+            if scored_answerable
+            else 0.0
         ),
         "abstention_recall": (
-            sum(result.abstained for result in negatives) / len(negatives)
-            if negatives else 0.0
+            sum(result.abstained for result in negatives) / len(negatives) if negatives else 0.0
         ),
         "answerable_abstentions": sum(result.abstained for result in answerable),
         "average_keyword_hit_rate": sum(result.keyword_hits for result in results) / total,
@@ -297,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
 
     golden_pairs = load_golden_pairs(golden_path)
     flow = GenerateFlow()
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     trace_dir = output_dir / "traces" / timestamp
     trace_dir.mkdir(parents=True, exist_ok=True)
 

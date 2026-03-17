@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import re
-from enum import Enum
+from enum import StrEnum
 
 
-class QueryType(str, Enum):
+class QueryType(StrEnum):
     proper_noun = "proper_noun"
     conceptual = "conceptual"
     hybrid = "hybrid"
@@ -71,11 +71,7 @@ def classify_query(query: str) -> QueryType:
         if any(char.isdigit() for char in token) and any(char.isalpha() for char in token):
             strong_signals += 1
             continue
-        if (
-            token[:1].isupper()
-            and token[1:].islower()
-            and normalized not in QUESTION_WORDS
-        ):
+        if token[:1].isupper() and token[1:].islower() and normalized not in QUESTION_WORDS:
             weak_signals += 1
 
     if strong_signals >= 1 or weak_signals >= 2:

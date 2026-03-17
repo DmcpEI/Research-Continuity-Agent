@@ -22,9 +22,35 @@ LEXICAL_BASE_SCORE = 0.45
 LEXICAL_TITLE_WEIGHT = 0.12
 LEXICAL_TEXT_WEIGHT = 0.05
 STOPWORDS = {
-    "a", "an", "and", "are", "as", "at", "be", "by", "does", "for", "from",
-    "how", "in", "is", "it", "of", "on", "or", "the", "to", "what", "which",
-    "with", "easy", "error", "most", "observed", "scene", "specific",
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "does",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "what",
+    "which",
+    "with",
+    "easy",
+    "error",
+    "most",
+    "observed",
+    "scene",
+    "specific",
 }
 
 
@@ -54,7 +80,9 @@ class RetrieveFlow:
     ) -> None:
         self.settings = settings or get_settings()
         self.graph_store = graph_store or GraphStore(self.settings.graph_db_path)
-        self.vector_store = vector_store or VectorStore(self.settings.vector_dir, self.settings.default_collection)
+        self.vector_store = vector_store or VectorStore(
+            self.settings.vector_dir, self.settings.default_collection
+        )
         self._reranker: CrossEncoderReranker | None = (
             CrossEncoderReranker(self.settings.reranker_model)
             if self.settings.enable_reranker
@@ -204,7 +232,9 @@ class RetrieveFlow:
             ]
             trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
 
-        return RetrievalBundle(query=query, hits=final_hits, related_edges=related_edges, trace=trace)
+        return RetrievalBundle(
+            query=query, hits=final_hits, related_edges=related_edges, trace=trace
+        )
 
     def _merge_vector_hit(
         self,
@@ -227,17 +257,17 @@ class RetrieveFlow:
                 excerpt=excerpt,
                 metadata=metadata,
             )
-    
+
     def _expand_to_sources(self, hits: list[RetrievalHit]) -> list[RetrievalHit]:
         """Follow chunk → source edges to surface parent paper nodes."""
         expanded: dict[str, RetrievalHit] = {}
-        
+
         for hit in hits:
             if hit.node_id.startswith("src:"):
                 if hit.node_id not in expanded:
                     expanded[hit.node_id] = hit
                 continue
-            
+
             edges = self.graph_store.list_edges(hit.node_id)
             for edge in edges:
                 if edge.target == hit.node_id and edge.kind == EdgeKind.contains:
@@ -280,9 +310,7 @@ class RetrieveFlow:
 
         return min(
             0.95,
-            base
-            + (LEXICAL_TITLE_WEIGHT * title_overlap)
-            + (LEXICAL_TEXT_WEIGHT * text_overlap),
+            base + (LEXICAL_TITLE_WEIGHT * title_overlap) + (LEXICAL_TEXT_WEIGHT * text_overlap),
         )
 
     @staticmethod
