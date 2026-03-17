@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -22,6 +23,8 @@ if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = True
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "agent_messages" not in st.session_state:
+    st.session_state.agent_messages = []
 if "mode" not in st.session_state:
     st.session_state.mode = "chat"
 if "generating" not in st.session_state:
@@ -534,6 +537,17 @@ def get_flows():
     }
 
 
+@st.cache_resource
+def get_agent_loop():
+    import atexit
+
+    from rca.agent.loop import AgentLoop
+
+    loop = AgentLoop()
+    atexit.register(loop.close)
+    return loop
+
+
 def get_store_stats(flows):
     import sqlite3
 
@@ -655,6 +669,65 @@ def render_trace(trace: dict) -> None:
                 st.caption("no provenance data")
 
 
+def render_agent_trace(trace: dict) -> None:
+    iterations = trace.get("iterations", 0)
+    tool_calls = trace.get("tool_calls", [])
+    total_ms = trace.get("total_latency_ms", 0.0)
+    stopped = html.escape(str(trace.get("stopped_reason") or "—"))
+    prompt_tok = trace.get("prompt_tokens", 0)
+    completion_tok = trace.get("completion_tokens", 0)
+    model = html.escape(str(trace.get("model", "—")))
+    warnings = trace.get("warnings", [])
+
+    with st.expander(
+        f"🔧 Agent trace · {iterations} iterations · {len(tool_calls)} tool calls",
+        expanded=False,
+    ):
+        st.markdown(
+            f'<div class="trace-meta-row">'
+            f'<span class="trace-meta-chip"><b>model</b> {model}</span>'
+            f'<span class="trace-meta-chip"><b>latency</b> {total_ms:.0f} ms</span>'
+            f'<span class="trace-meta-chip"><b>prompt</b> {int(prompt_tok)} tok</span>'
+            f'<span class="trace-meta-chip"><b>completion</b> {int(completion_tok)} tok</span>'
+            f'<span class="trace-meta-chip"><b>stopped</b> {stopped}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        for warning in warnings:
+            st.markdown(
+                f'<div class="trace-warning">⚠ {html.escape(str(warning))}</div>',
+                unsafe_allow_html=True,
+            )
+
+        if tool_calls:
+            st.markdown(
+                '<div class="trace-section-label" style="margin-top:0.8rem">Tool calls</div>',
+                unsafe_allow_html=True,
+            )
+            rows: list[str] = []
+            for tool_call in tool_calls:
+                status_color = accent2 if tool_call.get("status") == "success" else "#ff6b6b"
+                input_text = json.dumps(tool_call.get("input", {}), default=str, sort_keys=True)
+                short_input, full_input = format_trace_note(input_text, limit=80)
+                short_output, full_output = format_trace_note(
+                    tool_call.get("output", ""), limit=120
+                )
+                rows.append(
+                    f'<div class="trace-row">'
+                    f'<span class="trace-stage-name" style="color:{status_color}">'
+                    f"{html.escape(str(tool_call.get('tool_name', 'tool')))}"
+                    f"</span>"
+                    f'<span class="trace-ms">{float(tool_call.get("duration_ms", 0.0)):.0f} ms</span>'
+                    f'<span class="trace-hits" title="{full_input} → {full_output}">'
+                    f"{short_input} → {short_output}</span>"
+                    f"</div>"
+                )
+            st.markdown("".join(rows), unsafe_allow_html=True)
+        else:
+            st.caption("no tool calls recorded")
+
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="rca-header">🧠 RCA</div>', unsafe_allow_html=True)
@@ -679,15 +752,23 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown('<div class="mode-label">Mode</div>', unsafe_allow_html=True)
+    mode_options = {
+        "💬 Chat": "chat",
+        "🤖 Agent": "agent",
+        "🔬 Workspace": "workspace",
+    }
+    mode_labels = list(mode_options)
     mode_choice = st.radio(
         "Mode",
-        ["💬 Chat", "🔬 Workspace"],
-        index=0 if st.session_state.mode == "chat" else 1,
+        mode_labels,
+        index=mode_labels.index(
+            next(label for label, value in mode_options.items() if value == st.session_state.mode)
+        ),
         horizontal=False,
         label_visibility="collapsed",
         key="mode_radio",
     )
-    new_mode = "chat" if mode_choice == "💬 Chat" else "workspace"
+    new_mode = mode_options[mode_choice]
     if new_mode != st.session_state.mode and not st.session_state.generating:
         st.session_state.mode = new_mode
         st.rerun()
@@ -708,8 +789,21 @@ with st.sidebar:
         st.caption(f"Store not ready: {e}")
 
     st.markdown("---")
-    if st.button("🗑 Clear chat"):
-        st.session_state.messages = []
+    clear_label = (
+        "🗑 Clear chat"
+        if st.session_state.mode == "chat"
+        else "🗑 Clear agent"
+        if st.session_state.mode == "agent"
+        else "🗑 Clear conversations"
+    )
+    if st.button(clear_label):
+        if st.session_state.mode == "chat":
+            st.session_state.messages = []
+        elif st.session_state.mode == "agent":
+            st.session_state.agent_messages = []
+        else:
+            st.session_state.messages = []
+            st.session_state.agent_messages = []
         st.rerun()
 
 
@@ -804,6 +898,71 @@ if st.session_state.mode == "chat":
                         "content": f"Error: {e}",
                         "grounded": False,
                         "citations": [],
+                    }
+                )
+        st.session_state.generating = False
+        st.rerun()
+
+
+# ── AGENT MODE ────────────────────────────────────────────────────────────────
+elif st.session_state.mode == "agent":
+    st.markdown(
+        '<div class="rca-header">Research Agent</div>'
+        '<div class="rca-subheader">multi-turn · tool use · knowledge base + filesystem + experiments</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not st.session_state.agent_messages:
+        st.markdown(
+            '<div class="empty-state">'
+            '<div class="empty-state-icon">🤖</div>'
+            '<div class="empty-state-text">Ask the agent to inspect your knowledge base, files, or experiment history.<br><br>'
+            '<em>Try: "Search my knowledge base for bin packing approaches and list my recent experiment runs."</em>'
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        for msg in st.session_state.agent_messages:
+            if msg["role"] == "user":
+                st.markdown(f'<div class="msg-user">{msg["content"]}</div>', unsafe_allow_html=True)
+            else:
+                answer_html = format_answer_with_citations(msg["content"])
+                st.markdown(f'<div class="msg-agent">{answer_html}</div>', unsafe_allow_html=True)
+                if msg.get("trace"):
+                    render_agent_trace(msg["trace"])
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.form(key="agent_form", clear_on_submit=True):
+        col_input, col_btn = st.columns([5, 1])
+        with col_input:
+            agent_query = st.text_input(
+                "agent_query",
+                placeholder="Ask the agent to search, inspect files, or check experiments…",
+                label_visibility="collapsed",
+            )
+        with col_btn:
+            agent_send = st.form_submit_button("Run →")
+
+    if agent_send and agent_query.strip():
+        st.session_state.generating = True
+        st.session_state.agent_messages.append({"role": "user", "content": agent_query})
+        with st.spinner("Agent is reasoning…"):
+            try:
+                loop = get_agent_loop()
+                result = loop.run(agent_query)
+                st.session_state.agent_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": result.answer,
+                        "trace": result.trace.model_dump(mode="json"),
+                    }
+                )
+            except Exception as e:
+                st.session_state.agent_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": f"Error: {e}",
+                        "trace": None,
                     }
                 )
         st.session_state.generating = False

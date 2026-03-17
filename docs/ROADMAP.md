@@ -19,10 +19,11 @@ RCA today is a local-first research knowledge system with:
 - dual-store ingest into SQLite graph data plus ChromaDB embeddings
 - hybrid retrieval using FTS5/BM25, dense search, source expansion, and cross-encoder reranking
 - grounded answer generation with citation enforcement and QueryTrace observability
-- Streamlit chat/workspace UI plus MCP servers for filesystem and experiment logs
+- Streamlit chat/workspace/agent UI plus MCP servers for filesystem and experiment logs
+- an MCP-backed agent loop for filesystem and experiment inspection, plus a native knowledge-base search adapter
 - a 100-question evaluation corpus and a local CI baseline of Ruff plus pytest
 
-The current implementation still orchestrates queries directly through `RetrieveFlow` and `GenerateFlow`. An explicit agent loop is planned, not shipped.
+The current implementation now has two orchestration paths: direct `RetrieveFlow`/`GenerateFlow` for grounded chat, and a separate agent loop for multi-turn tool use.
 
 ---
 
@@ -35,7 +36,7 @@ The current implementation still orchestrates queries directly through `Retrieve
 | Citation precision | `92.1%` over `89` answerable, non-abstained cases |
 | Negative abstention recall | `2/10` (`20.0%`) |
 | Average latency | `11.3 s` |
-| Tests | `52` passing |
+| Tests | `59` passing |
 
 Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/EVAL.md). System structure lives in [ARCHITECTURE.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/ARCHITECTURE.md). The user-facing overview stays in [README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/README.md).
 
@@ -55,7 +56,6 @@ These are the highest-priority milestones for reliability and correctness.
 
 These are the next capability-building milestones once the correctness gaps above are addressed.
 
-- **MCP agent loop** — Build a planning agent that receives a research question, decides which MCP tools to call across the filesystem, knowledge base, and experiment logs, executes them, and synthesizes a response with a full observable trace in the UI. Rationale: it is the biggest missing agent-systems capability in the current architecture and has strong portfolio value.
 - **Document versioning and idempotent re-ingest** — Track document revisions and make re-ingest safe for already indexed sources. Rationale: it improves operational discipline and makes the system more realistic for long-running research use.
 - **Research connectors** — Add `arxiv` and `Zotero` MCP ingestion paths. Rationale: they reduce manual ingest work and make the eventual agent loop materially more useful.
 
@@ -92,6 +92,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 - [x] SQLite graph store and ChromaDB vector store
 - [x] Direct retrieval and generation flows
 - [x] Filesystem and experiment MCP servers
+- [x] MCP agent loop with read-only filesystem and experiment inspection plus native knowledge-base search
 - [x] Streamlit chat and workspace UI
 
 ### Retrieval and grounding
@@ -123,5 +124,5 @@ These are worthwhile, but they should follow the correctness and workflow milest
 ## Guardrails
 
 - RCA is currently a research memory and grounded QA system, not a robot controller.
-- Orchestration claims should stay honest: direct flow composition is shipped; an agent loop is future work.
+- Orchestration claims should stay honest: grounded chat uses direct flow composition; the agent loop is shipped separately for tool use.
 - Local-first remains the default. Cloud deployment and API backends are optional extensions, not the core identity of the project.

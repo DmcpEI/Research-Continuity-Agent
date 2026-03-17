@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     app_name: str = "research-continuity-agent"
     environment: str = "development"
     workspace_root: Path = Field(default_factory=Path.cwd)
+    filesystem_root: Path = Field(default_factory=Path.cwd)
     data_dir: Path = Field(default_factory=lambda: Path(".rca"))
     graph_db_path: Path = Field(default_factory=lambda: Path(".rca/graph.sqlite3"))
     vector_dir: Path = Field(default_factory=lambda: Path(".rca/vectors"))
@@ -86,6 +87,7 @@ class Settings(BaseSettings):
         return {
             "RCA_ENVIRONMENT": "environment",
             "RCA_WORKSPACE_ROOT": "workspace_root",
+            "RCA_FILESYSTEM_ROOT": "filesystem_root",
             "RCA_DATA_DIR": "data_dir",
             "RCA_GRAPH_DB_PATH": "graph_db_path",
             "RCA_VECTOR_DIR": "vector_dir",

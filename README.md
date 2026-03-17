@@ -76,11 +76,12 @@ Given a corpus of research PDFs, RCA:
 2. **Rewrites** queries before retrieval to improve keyword density and recall
 3. **Retrieves** via hybrid search: semantic vector similarity + graph keyword search + graph neighbourhood expansion
 4. **Generates** grounded answers with inline citations enforced at the prompt level
-5. **Evaluates** answer quality against a golden Q&A set with retrieval, citation, and keyword metrics
+5. **Executes** a multi-turn agent loop for knowledge-base search plus read-only filesystem and experiment inspection
+6. **Evaluates** answer quality against a golden Q&A set with retrieval, citation, and keyword metrics
 
 ## Design notes
 
-Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`. A LangGraph-based agent workflow is on the roadmap.
+Grounded chat is still handled directly via `RetrieveFlow` and `GenerateFlow`, while the agent mode uses a separate multi-turn tool loop.
 
 **Why two stores?**
 
@@ -99,7 +100,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **ID system.** All identifiers are stable and deterministic. Source nodes follow the pattern `src:namespace/name` (e.g., `src:pdf/attention-is-all-you-need`). Chunk nodes derive from their source: `chk:namespace/name:0000`. Identifiers are validated with regular expressions at the contract boundary so invalid IDs cannot enter the stores.
 
-**MCP servers.** Two MCP servers expose tools over stdio. The filesystem server sandboxes all path resolution to a configured root directory and delegates text search to ripgrep. The experiments server provides full CRUD for experiment runs (record, list, update, get) with a status lifecycle of `pending → running → complete / failed`, backed by a separate SQLite database.
+**MCP servers.** Two MCP servers expose tools over stdio. The filesystem server sandboxes all path resolution to a configured root directory and delegates text search to ripgrep. The experiments server provides full CRUD for experiment runs (record, list, update, get) with a status lifecycle of `pending → running → complete / failed`, backed by a separate SQLite database. The agent loop currently uses these servers in read-only mode for `list/read/search` on the filesystem and `list/get` for experiment runs.
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
 
@@ -110,11 +111,11 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
 3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
 
-**LLM client.** `OllamaLLMClient` defaults to local Ollama (`/api/chat`, `/api/embeddings`) and now also supports OpenAI-compatible endpoints when `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` are configured. The default generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. `EchoLLMClient` is a deterministic stub for tests.
+**LLM client.** `OllamaLLMClient` defaults to local Ollama (`/api/chat`, `/api/embeddings`) and now also supports OpenAI-compatible endpoints when `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` are configured. The default generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. It now also exposes a tool-calling path used by the agent loop. `EchoLLMClient` is a deterministic stub for tests.
 
 **Contracts layer.** `rca/contracts/` defines the identifier rules, node/edge models, and other shared DTOs that every other layer imports. No layer other than `store` performs persistence; no persistence layer makes model calls.
 
-**Streamlit UI.** `app.py` provides a browser interface with two modes. *Research Chat* accepts natural-language questions and streams grounded answers with inline citation cards and a `✓ grounded` / `⚠ unverified` badge. *Research Workspace* has three tabs: Ingest (drag-and-drop PDF upload, single or batch), Knowledge Map (interactive Plotly/NetworkX graph of source nodes and edges), and Store (searchable list of all ingested items). The sidebar shows live paper/chunk counts and supports dark/light theme toggling.
+**Streamlit UI.** `app.py` provides a browser interface with three modes. *Research Chat* accepts natural-language questions and streams grounded answers with inline citation cards and a `✓ grounded` / `⚠ unverified` badge. *Research Agent* runs a multi-turn tool-using loop with a full agent trace, using the knowledge base via a native adapter and the filesystem/experiments tools via MCP stdio. *Research Workspace* has three tabs: Ingest (drag-and-drop PDF upload, single or batch), Knowledge Map (interactive Plotly/NetworkX graph of source nodes and edges), and Store (searchable list of all ingested items). The sidebar shows live paper/chunk counts and supports dark/light theme toggling.
 
 ---
 
@@ -137,7 +138,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 | Vector DB | ChromaDB | Persistent, zero-infrastructure prototype |
 | Graph/metadata | SQLite | Zero-dependency, portable, easy to audit |
 | UI | Streamlit | Prototype interface — FastAPI migration planned |
-| Orchestration | Direct flow composition | `RetrieveFlow` and `GenerateFlow` are called directly today; an agent workflow is future work |
+| Orchestration | Mixed | Grounded chat uses direct flow composition; agent mode uses a separate multi-turn tool loop |
 
 ---
 
@@ -181,6 +182,7 @@ The most important current evaluation takeaways are:
 - Source expansion is still the biggest lift over dense retrieval alone.
 - Query rewriting now helps when treated as a small append-only retrieval expansion rather than a full query replacement.
 - Abstention is still heuristic and remains one of the main correctness limitations.
+- Agent mode is intentionally separated from grounded chat so tool-use experimentation does not affect the measured QA path.
 
 Live metrics depend on the local Ollama/Chroma environment, so the right way to refresh results is to rerun the eval scripts on the target machine rather than trusting stale checked-in numbers after a corpus change. The detailed evaluation notes live in `docs/EVAL.md`.
 
@@ -195,6 +197,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] Query rewriting before retrieval
 - [x] Grounded answer generation with citation enforcement
 - [x] Streamlit UI (chat + ingest + knowledge map + store)
+- [x] MCP agent loop — native knowledge-base adapter plus MCP stdio tools for filesystem and experiments
 - [x] Integration tests
 - [x] Evaluation harness with golden Q&A pairs
 - [x] **Fix citation precision** — source-ID resolution bug
@@ -246,6 +249,7 @@ Key environment variables:
 |---|---|---|
 | `RCA_WORKSPACE_ROOT` | current directory | Root of the research workspace exposed to the filesystem server |
 | `RCA_DATA_DIR` | `.rca` | Directory where all runtime data is stored |
+| `RCA_FILESYSTEM_ROOT` | current directory | Root exposed to the MCP filesystem tools and agent mode |
 | `RCA_CHUNK_SIZE` | `1200` | Target chunk size in characters |
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
 | `RCA_GENERATION_MODEL` | `qwen2.5:14b` | Ollama model used for answer generation and query rewriting |
@@ -270,7 +274,7 @@ To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA
 uv run streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Use *Research Chat* to ask questions about ingested papers. Use *Workspace → Ingest* to drag-and-drop PDFs directly from Finder.
+Opens at `http://localhost:8501`. Use *Research Chat* for grounded QA, *Research Agent* for multi-turn tool use, and *Workspace → Ingest* to drag-and-drop PDFs directly from Finder.
 
 **Ingest documents**
 
@@ -341,7 +345,7 @@ uv run python eval/run_ablations.py
 
 ```
 .
-├── app.py                      # Streamlit UI — Research Chat and Workspace
+├── app.py                      # Streamlit UI — Research Chat, Agent, and Workspace
 ├── .streamlit/
 │   └── config.toml             # Theme configuration (base: dark)
 ├── rca/                        # Main package
@@ -354,6 +358,7 @@ uv run python eval/run_ablations.py
 │   │   ├── ingest_flow.py      # File → chunks → graph + vector store
 │   │   ├── retrieve_flow.py    # Vector + lexical search, graph expansion, scored bundles
 │   │   └── generate_flow.py    # Query rewriting → retrieval → grounded LLM answer
+│   ├── agent/                  # Agent loop, MCP client manager, tool registry, trace contracts
 │   ├── llm/                    # LLM client interface: OllamaLLMClient, EchoLLMClient
 │   ├── orchestrator/           # Routing helpers and typed state models
 │   ├── telemetry/              # Tracing and metrics instrumentation (skeletal)
