@@ -73,8 +73,6 @@ These are worthwhile, but they should follow the correctness and workflow milest
 
 ## Phase 2 platform path
 
-This preserves the earlier next-phase direction in a shorter form.
-
 - **FastAPI backend** — Split the current UI-first packaging into a cleaner API service boundary.
 - **Next.js frontend** — Replace the Streamlit-only surface if RCA evolves into a more polished multi-page application.
 - **Background ingest worker** — Move long-running ingest and indexing off the request path.
