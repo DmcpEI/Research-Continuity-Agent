@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/DmcpEI/Research-Continuity-Agent/actions/workflows/ci.yml/badge.svg)
 
-A **local-first research knowledge system** that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations — built to support a Master's thesis on structured visual perception for robotic inventory generation.
+A **local-first research knowledge system** that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations — built around research on structured visual perception for robotic inventory generation.
 
 ---
 
@@ -180,7 +180,7 @@ The most important current evaluation takeaways are:
 - FTS5/BM25 remains the strongest single-method retrieval baseline on this corpus.
 - Source expansion is still the biggest lift over dense retrieval alone.
 - Query rewriting now helps when treated as a small append-only retrieval expansion rather than a full query replacement.
-- Abstention is still heuristic and remains one of the main thesis-facing limitations.
+- Abstention is still heuristic and remains one of the main correctness limitations.
 
 Live metrics depend on the local Ollama/Chroma environment, so the right way to refresh results is to rerun the eval scripts on the target machine rather than trusting stale checked-in numbers after a corpus change. The detailed evaluation notes live in `docs/EVAL.md`.
 
@@ -203,7 +203,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] **Expand golden set** — 30 → 100 grounded questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
-- [ ] **Add a human-authored external eval subset** — reduce self-bias for thesis reporting
+- [ ] **Add a human-authored external eval subset** — reduce self-bias for external reporting
 - [ ] arxiv MCP server
 - [ ] Zotero MCP server
 - [ ] Weekly digest generator
@@ -375,4 +375,4 @@ uv run python eval/run_ablations.py
 
 ## Project context
 
-Built alongside a Master's thesis at Instituto Superior Técnico on *Structured Perception for Packing-Relevant Inventory Generation* — a system that generates machine-readable grocery inventories from RGB images for robotic bagging. RCA serves as the research memory layer: ingesting related papers, tracking design decisions, and enabling grounded retrieval over the full literature corpus.
+Built around research on *Structured Perception for Packing-Relevant Inventory Generation* — a system that generates machine-readable grocery inventories from RGB images for robotic bagging. RCA serves as the research memory layer: ingesting related papers, tracking design decisions, and enabling grounded retrieval over the full literature corpus.

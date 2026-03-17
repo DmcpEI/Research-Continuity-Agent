@@ -28,7 +28,7 @@ Coverage includes:
 Metric definitions:
 - `citation_precision`: fraction of answerable, non-abstained cases where every expected source appears in the returned citation IDs
 - `abstention_recall`: fraction of negative questions where the system abstains correctly
-- `grounded_rate`: fraction of all cases where the model returned a cited answer; for thesis reporting, the more meaningful view is answerable questions answered with citation
+- `grounded_rate`: fraction of all cases where the model returned a cited answer; for reporting, the more meaningful view is answerable questions answered with citation
 - `keyword_hit_rate`: fraction of `expected_keywords` matched by case-insensitive substring in the generated answer
 - `hit@k`: retrieval-only metric indicating whether the expected source appears in the top-k resolved retrieval hits
 
@@ -133,7 +133,7 @@ What is true today, independent of any single artifact:
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
 - abstention remains heuristic and is still one of the main open weaknesses
-- a human-authored external subset would still be stronger for thesis bias reduction than self-authored or model-authored additions
+- a human-authored external subset would still be stronger for bias reduction than self-authored or model-authored additions
 
 Known active failure themes:
 - citation selection drift on otherwise relevant retrieval bundles
@@ -145,7 +145,7 @@ Known active failure themes:
 
 ## Practical Reporting Guidance
 
-For thesis writeups and portfolio material:
+For writeups and portfolio material:
 - report corpus size, answerable/negative counts, and split sizes explicitly
 - state which backend produced the metrics
 - avoid comparing runs produced under different retrieval backends, especially JSON fallback versus Chroma
