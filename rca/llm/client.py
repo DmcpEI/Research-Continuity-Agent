@@ -103,11 +103,13 @@ class OllamaLLMClient(LLMClient):
         options: dict[str, Any] | None = None,
         embedding_model: str | None = None,
         api_key: str | None = None,
+        api_style: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.embedding_model = embedding_model or get_settings().embedding_model
         self.api_key = api_key or "ollama"
+        self.api_style = api_style
         self.options = {"temperature": 0}
         if options:
             self.options.update(options)
@@ -216,6 +218,8 @@ class OllamaLLMClient(LLMClient):
 
     @property
     def _api_style(self) -> str:
+        if self.api_style in {"ollama", "openai"}:
+            return self.api_style
         parsed = urlparse(self.base_url)
         if parsed.path.rstrip("/").endswith("/v1"):
             return "openai"

@@ -13,7 +13,7 @@ Target audience: AI/ML, orchestration, and agent-systems roles in robotics-adjac
 
 ---
 
-## Current state (v1.2.2 — 2026-03-17)
+## Current state (v1.3.0 — 2026-03-18)
 
 RCA today is a local-first research knowledge system with:
 - dual-store ingest into SQLite graph data plus ChromaDB embeddings
@@ -21,6 +21,7 @@ RCA today is a local-first research knowledge system with:
 - grounded answer generation with citation enforcement and QueryTrace observability
 - Streamlit chat/workspace/agent UI plus MCP servers for filesystem and experiment logs
 - an MCP-backed agent loop for filesystem and experiment inspection, plus a native knowledge-base search adapter
+- configurable backend parity for local Ollama or OpenAI-compatible chat and embedding APIs
 - a 100-question evaluation corpus and a local CI baseline of Ruff plus pytest
 
 The current implementation now has two orchestration paths: direct `RetrieveFlow`/`GenerateFlow` for grounded chat, and a separate agent loop for multi-turn tool use.
@@ -36,7 +37,7 @@ The current implementation now has two orchestration paths: direct `RetrieveFlow
 | Citation precision | `92.1%` over `89` answerable, non-abstained cases |
 | Negative abstention recall | `2/10` (`20.0%`) |
 | Average latency | `11.3 s` |
-| Tests | `59` passing |
+| Tests | `63` passing |
 
 Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/EVAL.md). System structure lives in [ARCHITECTURE.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/ARCHITECTURE.md). The user-facing overview stays in [README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/README.md).
 
@@ -66,7 +67,6 @@ These are the next capability-building milestones once the correctness gaps abov
 These are worthwhile, but they should follow the correctness and workflow milestones above.
 
 - **AWS deployment** — Containerize and deploy RCA on AWS, most likely via ECS first and possibly Lambda + API Gateway for narrower serving paths. Rationale: it demonstrates cloud deployment competence and removes the assumption of a fully local setup.
-- **API backend parity** — Extend the current OpenAI-compatible chat backend support into full backend parity, including embedding-side and deployment-facing configuration. Rationale: local-first should stay a deliberate tradeoff rather than an Ollama-only constraint.
 - **Production-shaped backend split** — Move from the current Streamlit-first packaging toward a cleaner FastAPI plus frontend split with a cloud-friendly store story. Rationale: it is the right path if RCA needs to become a more deployable multi-surface system rather than a local-only research tool.
 
 ---
@@ -116,7 +116,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 ### Tooling and delivery
 
 - [x] Docker, docker-compose, and Makefile-based local boot
-- [x] Configurable OpenAI-compatible chat backend support in the LLM client
+- [x] Configurable backend parity for chat, agent tool use, and embeddings across Ollama and OpenAI-compatible APIs
 - [x] GitHub Actions CI workflow added; local Ruff and pytest baseline verified
 
 ---

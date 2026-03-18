@@ -42,15 +42,14 @@ class VectorStore:
         self._chroma_error: str | None = None
 
         if chromadb is not None:
-            from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
-
             from rca.config.settings import get_settings
+            from rca.llm.embeddings import ConfigurableEmbeddingFunction
+            from rca.llm.factory import get_llm_client
 
             settings = get_settings()
-
-            embedding_fn = OllamaEmbeddingFunction(
-                url=f"{settings.embedding_base_url}/api/embeddings",
-                model_name=settings.embedding_model,
+            embedding_fn = ConfigurableEmbeddingFunction(
+                client=get_llm_client(settings),
+                dimensions=settings.embedding_dimensions,
             )
 
             client = chromadb.PersistentClient(path=str(self.persist_dir))

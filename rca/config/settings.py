@@ -3,6 +3,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import AliasChoices, Field
 
@@ -35,6 +36,7 @@ class Settings(BaseSettings):
     chunk_size: int = 1200
     chunk_overlap: int = 150
     embedding_dimensions: int = 768
+    llm_backend: Literal["ollama", "openai_compatible"] = "ollama"
     embedding_model: str = "nomic-embed-text"
     embedding_base_url: str = "http://localhost:11434"  # Ollama default
     llm_base_url: str = Field(
@@ -46,6 +48,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("RCA_LLM_API_KEY", "LLM_API_KEY"),
     )
     generation_model: str = "qwen2.5:14b"
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("RCA_OPENAI_API_KEY", "OPENAI_API_KEY"),
+    )
+    openai_chat_model: str = "gpt-4o-mini"
+    openai_embed_model: str = "text-embedding-3-small"
     enable_reranker: bool = True
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 10
@@ -56,9 +65,10 @@ class Settings(BaseSettings):
             env_prefix="RCA_",
             env_file=".env",
             extra="ignore",
+            populate_by_name=True,
         )
     else:
-        model_config = {"extra": "ignore"}
+        model_config = {"extra": "ignore", "populate_by_name": True}
 
     def __init__(self, **data: object) -> None:
         if _HAS_PYDANTIC_SETTINGS:
@@ -99,6 +109,7 @@ class Settings(BaseSettings):
             "RCA_CHUNK_SIZE": "chunk_size",
             "RCA_CHUNK_OVERLAP": "chunk_overlap",
             "RCA_EMBEDDING_DIMENSIONS": "embedding_dimensions",
+            "RCA_LLM_BACKEND": "llm_backend",
             "RCA_EMBEDDING_MODEL": "embedding_model",
             "RCA_EMBEDDING_BASE_URL": "embedding_base_url",
             "RCA_LLM_BASE_URL": "llm_base_url",
@@ -106,6 +117,11 @@ class Settings(BaseSettings):
             "RCA_LLM_API_KEY": "llm_api_key",
             "LLM_API_KEY": "llm_api_key",
             "RCA_GENERATION_MODEL": "generation_model",
+            "RCA_OPENAI_BASE_URL": "openai_base_url",
+            "RCA_OPENAI_API_KEY": "openai_api_key",
+            "OPENAI_API_KEY": "openai_api_key",
+            "RCA_OPENAI_CHAT_MODEL": "openai_chat_model",
+            "RCA_OPENAI_EMBED_MODEL": "openai_embed_model",
             "RCA_ENABLE_RERANKER": "enable_reranker",
             "RCA_RERANKER_MODEL": "reranker_model",
             "RCA_RERANKER_TOP_K": "reranker_top_k",

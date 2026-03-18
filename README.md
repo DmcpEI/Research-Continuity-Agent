@@ -111,7 +111,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
 3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
 
-**LLM client.** `OllamaLLMClient` defaults to local Ollama (`/api/chat`, `/api/embeddings`) and now also supports OpenAI-compatible endpoints when `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` are configured. The default generation model is `qwen2.5:14b`; embeddings use `nomic-embed-text`. It now also exposes a tool-calling path used by the agent loop. `EchoLLMClient` is a deterministic stub for tests.
+**LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `qwen2.5:14b` for generation and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
 
 **Contracts layer.** `rca/contracts/` defines the identifier rules, node/edge models, and other shared DTOs that every other layer imports. No layer other than `store` performs persistence; no persistence layer makes model calls.
 
@@ -227,12 +227,12 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 
 ## Setup
 
-**Requirements:** Python 3.11+, [uv](https://docs.astral.sh/uv/), [Ollama](https://ollama.com), [ripgrep](https://github.com/BurntSushi/ripgrep)
+**Requirements:** Python 3.11+, [uv](https://docs.astral.sh/uv/), [ripgrep](https://github.com/BurntSushi/ripgrep). [Ollama](https://ollama.com) is required only for the default local backend.
 
 ```bash
 brew install ripgrep
 
-# Pull models
+# Pull models for the default local backend
 ollama pull nomic-embed-text   # embeddings (768-dim)
 ollama pull qwen2.5:14b        # answer generation and query rewriting
 
@@ -252,15 +252,20 @@ Key environment variables:
 | `RCA_FILESYSTEM_ROOT` | current directory | Root exposed to the MCP filesystem tools and agent mode |
 | `RCA_CHUNK_SIZE` | `1200` | Target chunk size in characters |
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
+| `RCA_LLM_BACKEND` | `ollama` | Backend selector for chat, tool use, and embeddings (`ollama` or `openai_compatible`) |
 | `RCA_GENERATION_MODEL` | `qwen2.5:14b` | Ollama model used for answer generation and query rewriting |
 | `RCA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model used for vector embeddings |
-| `RCA_LLM_BASE_URL` | `http://localhost:11434` | Base URL for the generation/chat API; defaults to local Ollama, but can point to any OpenAI-compatible endpoint |
+| `RCA_LLM_BASE_URL` | `http://localhost:11434` | Base URL for the local Ollama generation/chat API |
 | `RCA_LLM_API_KEY` | `ollama` | API key for the configured LLM endpoint; ignored by default local Ollama |
+| `RCA_OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL for OpenAI-compatible chat and embedding APIs |
+| `RCA_OPENAI_API_KEY` | empty | API key for the OpenAI-compatible backend |
+| `RCA_OPENAI_CHAT_MODEL` | `gpt-4o-mini` | Chat model used when `RCA_LLM_BACKEND=openai_compatible` |
+| `RCA_OPENAI_EMBED_MODEL` | `text-embedding-3-small` | Embedding model used when `RCA_LLM_BACKEND=openai_compatible` |
 | `ANONYMIZED_TELEMETRY` | `False` | Disable ChromaDB telemetry |
 
 Runtime directories under `.rca/` are created automatically on first use.
 
-To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA_LLM_BASE_URL` and `RCA_LLM_API_KEY` in your `.env` file. Unprefixed `LLM_BASE_URL` and `LLM_API_KEY` are also accepted for convenience.
+To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA_LLM_BACKEND=openai_compatible`, provide `RCA_OPENAI_API_KEY`, and override `RCA_OPENAI_BASE_URL` / model names as needed. The currently selected embedding model must match the embeddings used to build the active vector collection; switching providers for an existing corpus may require re-ingest.
 
 > **Always use `uv run python`.** Never bare `python` — the system Python lacks ChromaDB and silently falls back to the JSON backend, returning 0 documents.
 

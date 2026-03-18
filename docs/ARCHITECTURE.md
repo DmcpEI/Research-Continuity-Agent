@@ -163,8 +163,11 @@ Key settings:
 |---|---|---|
 | `RCA_CHUNK_SIZE` | 1200 | Characters per chunk |
 | `RCA_CHUNK_OVERLAP` | 150 | Overlap between chunks in characters |
+| `RCA_LLM_BACKEND` | ollama | Backend selector for chat, tool use, and embeddings |
 | `RCA_EMBEDDING_MODEL` | nomic-embed-text | Ollama embedding model |
 | `RCA_GENERATION_MODEL` | qwen2.5:14b | Ollama generation model |
-| `RCA_EMBEDDING_BASE_URL` | http://localhost:11434 | Ollama base URL |
+| `RCA_EMBEDDING_BASE_URL` | http://localhost:11434 | Ollama embedding base URL |
+| `RCA_LLM_BASE_URL` | http://localhost:11434 | Ollama chat base URL |
+| `RCA_OPENAI_BASE_URL` | https://api.openai.com/v1 | OpenAI-compatible base URL |
 | `RCA_GRAPH_DB_PATH` | .rca/graph.sqlite3 | SQLite graph store path |
 | `RCA_VECTOR_DIR` | .rca/vectors | ChromaDB persist directory |

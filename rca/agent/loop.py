@@ -9,7 +9,8 @@ from typing import Any
 from rca.agent.contracts import AgentResult, AgentTrace, ToolCallTrace
 from rca.agent.tools import ToolRegistry
 from rca.config.settings import Settings, get_settings
-from rca.llm.client import EchoLLMClient, LLMClient, OllamaLLMClient
+from rca.llm.client import EchoLLMClient, LLMClient
+from rca.llm.factory import get_llm_client
 
 MAX_ITERATIONS = 8
 
@@ -42,11 +43,7 @@ class AgentLoop:
         if llm_client is not None:
             self.llm = llm_client
         elif self.settings.generation_model:
-            self.llm = OllamaLLMClient(
-                base_url=self.settings.llm_base_url,
-                model=self.settings.generation_model,
-                api_key=self.settings.llm_api_key,
-            )
+            self.llm = get_llm_client(self.settings)
         else:
             self.llm = EchoLLMClient()
 

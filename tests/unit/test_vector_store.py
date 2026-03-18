@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from rca.llm.embeddings import ConfigurableEmbeddingFunction
 from rca.store.vector_store import VectorStore
 
 
@@ -32,3 +33,21 @@ def test_vector_store_logs_warning_when_chroma_query_falls_back(tmp_path, caplog
     assert store.backend == "json"
     assert "Disabling Chroma backend during query" in caplog.text
     assert "RuntimeError: simulated chroma outage" in caplog.text
+
+
+def test_configurable_embedding_function_uses_client_embed_dimensions() -> None:
+    class FakeClient:
+        def __init__(self) -> None:
+            self.calls: list[tuple[list[str], int]] = []
+
+        def embed(self, texts: list[str], dimensions: int = 32) -> list[list[float]]:
+            self.calls.append((texts, dimensions))
+            return [[0.1, 0.2], [0.3, 0.4]]
+
+    client = FakeClient()
+    embedding_fn = ConfigurableEmbeddingFunction(client=client, dimensions=768)
+
+    vectors = embedding_fn(["alpha", "beta"])
+
+    assert vectors == [[0.1, 0.2], [0.3, 0.4]]
+    assert client.calls == [(["alpha", "beta"], 768)]

@@ -11,6 +11,7 @@ from rca.config.settings import Settings, get_settings
 from rca.contracts.trace import QueryTrace, StageTrace
 from rca.flows.retrieve_flow import RetrievalBundle, RetrieveFlow
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
+from rca.llm.factory import get_llm_client
 from rca.retrieval.query_classifier import QueryType, classify_query
 
 
@@ -70,13 +71,7 @@ Rules:
         if llm_client is not None:
             self.llm = llm_client
         elif self.settings.generation_model:
-            from rca.llm.client import OllamaLLMClient
-
-            self.llm = OllamaLLMClient(
-                base_url=self.settings.llm_base_url,
-                model=self.settings.generation_model,
-                api_key=self.settings.llm_api_key,
-            )
+            self.llm = get_llm_client(self.settings)
         else:
             self.llm = EchoLLMClient()
 
