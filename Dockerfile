@@ -7,12 +7,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies first (layer-cached unless lockfile changes)
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen
+# Install Python dependencies first (layer-cached unless lockfile changes).
+# The project itself depends on repo files like README.md and package sources,
+# so we defer installing it until after the full copy step.
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-install-project
 
 # Copy application code plus the baked demo corpus under .rca/
 COPY . .
+
+# Install the project itself once the package sources are present.
+RUN uv sync --frozen
 
 ENV RCA_ENVIRONMENT=production \
     RCA_LLM_BACKEND=openai_compatible \
