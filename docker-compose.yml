@@ -27,15 +27,26 @@ services:
     env_file:
       - .env
     environment:
+      RCA_LLM_BACKEND: ollama
+      RCA_ENABLE_FILESYSTEM_TOOLS: "true"
+      RCA_WORKSPACE_ROOT: /app
+      RCA_FILESYSTEM_ROOT: /app
       # Override Ollama URL so the container can reach the host's Ollama process.
       # On Linux, Docker maps host-gateway → host machine IP automatically via extra_hosts.
       RCA_EMBEDDING_BASE_URL: http://host.docker.internal:11434
+      RCA_LLM_BASE_URL: http://host.docker.internal:11434
     extra_hosts:
       # Needed on Linux; no-op on Mac Docker Desktop (already defined there).
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5).status == 200 else 1)",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

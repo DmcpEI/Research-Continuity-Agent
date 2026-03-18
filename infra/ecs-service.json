@@ -1,0 +1,24 @@
+{
+  "serviceName": "__RCA_SERVICE_NAME__",
+  "launchType": "FARGATE",
+  "desiredCount": 1,
+  "enableExecuteCommand": false,
+  "deploymentController": {
+    "type": "ECS"
+  },
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": __RCA_SUBNETS_JSON__,
+      "securityGroups": __RCA_SECURITY_GROUPS_JSON__,
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "__RCA_TARGET_GROUP_ARN__",
+      "containerName": "rca",
+      "containerPort": 8501
+    }
+  ],
+  "healthCheckGracePeriodSeconds": 60
+}

@@ -2,7 +2,7 @@
 
 ## Overview
 
-RCA is a local-first research knowledge system. Given a corpus of technical PDFs, it ingests documents into a dual-store, rewrites queries before retrieval, performs hybrid search, and generates grounded answers with source citations.
+RCA is a local-first research knowledge system. Given a corpus of technical PDFs, it ingests documents into a dual-store, rewrites queries before retrieval, performs hybrid search, and generates grounded answers with source citations. The same application can now run against local Ollama or an OpenAI-compatible backend for both generation and embeddings.
 
 ```
 PDF / Notes
@@ -11,7 +11,7 @@ PDF / Notes
 IngestFlow
     ├── chunking (size=1200 chars, overlap=150)
     ├── metadata extraction (title, authors, source ID)
-    ├── VectorStore  ← dense embeddings (nomic-embed-text via Ollama)
+    ├── VectorStore  ← dense embeddings (via configurable client-backed embedding function)
     └── GraphStore   ← document registry + lexical indices (SQLite)
     │
     ▼
@@ -28,7 +28,7 @@ GenerateFlow
     ├── query rewrite (inside GenerateFlow, optional)
     ├── retrieval via RetrieveFlow
     ├── prompt assembly (system + context chunks + query)
-    ├── LLM generation (qwen2.5:14b via Ollama)
+    ├── LLM generation (qwen2.5:14b locally or OpenAI-compatible in deployment)
     ├── citation extraction (_extract_citations)
     ├── source-ID resolution (chunk ID → parent src: node)
     ├── abstention check (hedge phrases + retrieval confidence)
@@ -50,7 +50,7 @@ Entry point for adding documents to the knowledge base. Accepts a PDF path or fo
 
 1. **Parse** — extracts text and metadata from PDF
 2. **Chunk** — splits into overlapping text windows (`chunk_size`, `chunk_overlap` from settings)
-3. **Embed** — sends chunks to `nomic-embed-text` via Ollama for dense vector embeddings
+3. **Embed** — sends chunks through the configured embedding backend for dense vector embeddings
 4. **Store (vector)** — writes embeddings to ChromaDB with chunk ID as document ID
 5. **Store (graph)** — writes `paper` source node and `chunk` nodes to SQLite; registers edges
 
@@ -88,7 +88,7 @@ Grounded answer generation with citation enforcement.
 2. **Retrieve** — calls `RetrieveFlow.retrieve()`
 3. **Assemble context** — formats retrieved hits into the prompt context block
 4. **Prompt** — system prompt enforces citation format `[[src:paper_name]]` or `[[chk:paper:NNNN]]`
-5. **Generate** — calls `qwen2.5:14b` via Ollama
+5. **Generate** — calls the configured generation backend
 6. **Extract citations** — parses inline citation markers from generated text
 7. **Resolve source IDs** — strips `:NNNN` suffix and resolves chunk IDs to parent `src:` nodes unconditionally
 8. **Abstention gate** — unsupported answers can be suppressed using hedge phrases plus retrieval confidence
@@ -109,7 +109,7 @@ See [DATA_MODEL.md](DATA_MODEL.md) for node kinds, edge kinds, and ID patterns.
 
 ### VectorStore (`rca/store/vector_store.py`)
 
-ChromaDB-backed dense retrieval index. Stores chunk embeddings with chunk IDs as document keys. Queried by the RetrieveFlow for approximate nearest-neighbour search.
+ChromaDB-backed dense retrieval index. Stores chunk embeddings with chunk IDs as document keys. Queried by the RetrieveFlow for approximate nearest-neighbour search. Embeddings now flow through a small configurable wrapper, so the same store boundary can use the default local Ollama models or an OpenAI-compatible embedding endpoint.
 
 In v2, this will be replaced by `pgvector` in Postgres for a unified store with better production operability.
 
@@ -164,10 +164,12 @@ Key settings:
 | `RCA_CHUNK_SIZE` | 1200 | Characters per chunk |
 | `RCA_CHUNK_OVERLAP` | 150 | Overlap between chunks in characters |
 | `RCA_LLM_BACKEND` | ollama | Backend selector for chat, tool use, and embeddings |
+| `RCA_ENABLE_FILESYSTEM_TOOLS` | true | Enable or disable filesystem MCP tools in the agent loop |
 | `RCA_EMBEDDING_MODEL` | nomic-embed-text | Ollama embedding model |
 | `RCA_GENERATION_MODEL` | qwen2.5:14b | Ollama generation model |
 | `RCA_EMBEDDING_BASE_URL` | http://localhost:11434 | Ollama embedding base URL |
 | `RCA_LLM_BASE_URL` | http://localhost:11434 | Ollama chat base URL |
 | `RCA_OPENAI_BASE_URL` | https://api.openai.com/v1 | OpenAI-compatible base URL |
+| `RCA_FILESYSTEM_ROOT` | current directory | Root exposed to filesystem MCP tools when enabled |
 | `RCA_GRAPH_DB_PATH` | .rca/graph.sqlite3 | SQLite graph store path |
 | `RCA_VECTOR_DIR` | .rca/vectors | ChromaDB persist directory |

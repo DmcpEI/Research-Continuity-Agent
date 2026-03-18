@@ -124,12 +124,18 @@ class ToolRegistry:
         if self._mcp_loaded:
             return
 
-        for server_name in ("filesystem", "experiments"):
+        for server_name in self._enabled_server_names():
             for tool in self._mcp_manager.list_tools(server_name):
                 self._tools[tool.name] = self._to_ollama_tool_definition(tool)
                 self._handlers[tool.name] = self._build_mcp_handler(tool.name)
 
         self._mcp_loaded = True
+
+    def _enabled_server_names(self) -> tuple[str, ...]:
+        servers = ["experiments"]
+        if self.settings.enable_filesystem_tools:
+            servers.insert(0, "filesystem")
+        return tuple(servers)
 
     def _build_mcp_handler(self, tool_name: str) -> Callable[..., str]:
         def handler(**arguments: Any) -> str:

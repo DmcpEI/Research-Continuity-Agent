@@ -5,6 +5,7 @@ import mcp.types as mcp_types
 from rca.agent.contracts import ToolCallStatus, ToolCallTrace
 from rca.agent.loop import MAX_ITERATIONS, AgentLoop
 from rca.agent.tools import ToolRegistry
+from rca.config.settings import Settings
 from rca.llm.client import ToolChatResponse
 
 
@@ -227,3 +228,39 @@ def test_tool_registry_exposes_read_only_tools_with_fakes() -> None:
     call_trace = registry.call("search_knowledge_base", {"query": "bin packing", "limit": 3})
     assert call_trace.status == ToolCallStatus.success
     assert call_trace.output == "KB:bin packing:3"
+
+
+def test_tool_registry_can_disable_filesystem_tools() -> None:
+    class FakeMCPManager:
+        def list_tools(self, server_name: str) -> list[mcp_types.Tool]:
+            if server_name == "filesystem":
+                return [
+                    mcp_types.Tool(
+                        name="list_directory",
+                        description="List files",
+                        inputSchema={"type": "object", "properties": {}},
+                    )
+                ]
+            return [
+                mcp_types.Tool(
+                    name="list_runs",
+                    description="List runs",
+                    inputSchema={"type": "object", "properties": {}},
+                )
+            ]
+
+        def call_tool(self, tool_name: str, arguments: dict) -> str:
+            return f"{tool_name}:{arguments}"
+
+        def close(self) -> None:
+            return None
+
+    registry = ToolRegistry(
+        settings=Settings(enable_filesystem_tools=False),
+        knowledge_base_search=lambda query, limit=5: f"KB:{query}:{limit}",
+        mcp_manager=FakeMCPManager(),
+    )
+
+    tool_names = {tool["function"]["name"] for tool in registry.ollama_tool_definitions()}
+
+    assert tool_names == {"search_knowledge_base", "list_runs"}

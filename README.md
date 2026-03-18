@@ -96,7 +96,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Component details
 
-**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database also maintains an FTS5 virtual table, and BM25 is now the production lexical search path. The original token-wise `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the earlier design that was later outperformed in ablation. `VectorStore` wraps ChromaDB with an Ollama embedding function using `nomic-embed-text` (768 dimensions, cosine similarity). When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
+**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database also maintains an FTS5 virtual table, and BM25 is now the production lexical search path. The original token-wise `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the earlier design that was later outperformed in ablation. `VectorStore` wraps ChromaDB with a configurable embedding function routed through the RCA client boundary, so the default local `nomic-embed-text` path and OpenAI-compatible embedding APIs share one integration layer. When ChromaDB is unavailable, it falls back to a JSON file with bag-of-words cosine scoring.
 
 **ID system.** All identifiers are stable and deterministic. Source nodes follow the pattern `src:namespace/name` (e.g., `src:pdf/attention-is-all-you-need`). Chunk nodes derive from their source: `chk:namespace/name:0000`. Identifiers are validated with regular expressions at the contract boundary so invalid IDs cannot enter the stores.
 
@@ -206,6 +206,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] **Expand golden set** — 30 → 100 grounded questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
+- [x] AWS deployment-ready package — baked demo image, ECS task templates, one-off demo script
 - [ ] **Add a human-authored external eval subset** — reduce self-bias for external reporting
 - [ ] arxiv MCP server
 - [ ] Zotero MCP server
@@ -250,6 +251,7 @@ Key environment variables:
 | `RCA_WORKSPACE_ROOT` | current directory | Root of the research workspace exposed to the filesystem server |
 | `RCA_DATA_DIR` | `.rca` | Directory where all runtime data is stored |
 | `RCA_FILESYSTEM_ROOT` | current directory | Root exposed to the MCP filesystem tools and agent mode |
+| `RCA_ENABLE_FILESYSTEM_TOOLS` | `true` | Enable or disable filesystem MCP tools for the agent loop |
 | `RCA_CHUNK_SIZE` | `1200` | Target chunk size in characters |
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
 | `RCA_LLM_BACKEND` | `ollama` | Backend selector for chat, tool use, and embeddings (`ollama` or `openai_compatible`) |
@@ -267,7 +269,26 @@ Runtime directories under `.rca/` are created automatically on first use.
 
 To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA_LLM_BACKEND=openai_compatible`, provide `RCA_OPENAI_API_KEY`, and override `RCA_OPENAI_BASE_URL` / model names as needed. The currently selected embedding model must match the embeddings used to build the active vector collection; switching providers for an existing corpus may require re-ingest.
 
+For a production-shaped demo container, use `.env.production.example` as the starting point instead of `.env`. The deployment image defaults to `RCA_LLM_BACKEND=openai_compatible` and disables filesystem MCP tools unless you explicitly re-enable them.
+
 > **Always use `uv run python`.** Never bare `python` — the system Python lacks ChromaDB and silently falls back to the JSON backend, returning 0 documents.
+
+### AWS demo path
+
+The repo now includes a **cost-aware AWS deployment-ready package** under [infra/README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/README.md). The intended student-friendly flow is:
+
+1. build and push the image
+2. run a short-lived ECS task for screenshots or a demo
+3. tear it down immediately
+
+Key artifacts:
+- [infra/demo.sh](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/demo.sh) — one-off Fargate demo task with automatic teardown prompt
+- [infra/deploy.sh](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/deploy.sh) — longer-lived ECS service deployment against pre-created infra
+- [infra/teardown_service.sh](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/teardown_service.sh) — scale the ECS service back to zero
+- [infra/ecs-task-def.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/ecs-task-def.json) — Fargate task definition template
+- [infra/ecs-service.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/ecs-service.json) — ECS service template
+
+This is deliberately a deployment-ready package, not a promise that RCA should stay live on AWS full time.
 
 ---
 

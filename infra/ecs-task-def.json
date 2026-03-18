@@ -1,0 +1,63 @@
+{
+  "family": "__RCA_TASK_FAMILY__",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "__RCA_TASK_CPU__",
+  "memory": "__RCA_TASK_MEMORY__",
+  "executionRoleArn": "__RCA_EXECUTION_ROLE_ARN__",
+  "taskRoleArn": "__RCA_TASK_ROLE_ARN__",
+  "containerDefinitions": [
+    {
+      "name": "rca",
+      "image": "__RCA_IMAGE_URI__",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8501,
+          "hostPort": 8501,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {"name": "RCA_ENVIRONMENT", "value": "production"},
+        {"name": "RCA_LLM_BACKEND", "value": "openai_compatible"},
+        {"name": "RCA_ENABLE_FILESYSTEM_TOOLS", "value": "__RCA_ENABLE_FILESYSTEM_TOOLS__"},
+        {"name": "RCA_WORKSPACE_ROOT", "value": "/app"},
+        {"name": "RCA_FILESYSTEM_ROOT", "value": "__RCA_FILESYSTEM_ROOT__"},
+        {"name": "RCA_DATA_DIR", "value": "/app/.rca"},
+        {"name": "RCA_GRAPH_DB_PATH", "value": "/app/.rca/graph.sqlite3"},
+        {"name": "RCA_VECTOR_DIR", "value": "/app/.rca/vectors"},
+        {"name": "RCA_EXPERIMENT_DB_PATH", "value": "/app/.rca/experiments.sqlite3"},
+        {"name": "RCA_OPENAI_BASE_URL", "value": "__RCA_OPENAI_BASE_URL__"},
+        {"name": "RCA_OPENAI_CHAT_MODEL", "value": "__RCA_OPENAI_CHAT_MODEL__"},
+        {"name": "RCA_OPENAI_EMBED_MODEL", "value": "__RCA_OPENAI_EMBED_MODEL__"},
+        {"name": "RCA_ENABLE_RERANKER", "value": "true"},
+        {"name": "ANONYMIZED_TELEMETRY", "value": "False"}
+      ],
+      "secrets": [
+        {
+          "name": "RCA_OPENAI_API_KEY",
+          "valueFrom": "__RCA_OPENAI_API_KEY_SECRET_ARN__"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c \"import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5).status == 200 else 1)\""
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 20
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "__RCA_LOG_GROUP__",
+          "awslogs-region": "__AWS_REGION__",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
