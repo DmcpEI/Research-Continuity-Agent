@@ -2020,11 +2020,11 @@ wheels = [
 
 [[package]]
 name = "pyjwt"
-version = "2.11.0"
+version = "2.12.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5c/5a/b46fa56bf322901eee5b0454a34343cdbdae202cd421775a8ee4e42fd519/pyjwt-2.11.0.tar.gz", hash = "sha256:35f95c1f0fbe5d5ba6e43f00271c275f7a1a4db1dab27bf708073b75318ea623", size = 98019, upload-time = "2026-01-30T19:59:55.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c2/27/a3b6e5bf6ff856d2509292e95c8f57f0df7017cf5394921fc4e4ef40308a/pyjwt-2.12.1.tar.gz", hash = "sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b", size = 102564, upload-time = "2026-03-13T19:27:37.25Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/01/c26ce75ba460d5cd503da9e13b21a33804d38c2165dec7b716d06b13010c/pyjwt-2.11.0-py3-none-any.whl", hash = "sha256:94a6bde30eb5c8e04fee991062b534071fd1439ef58d2adc9ccb823e7bcd0469", size = 28224, upload-time = "2026-01-30T19:59:54.539Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/7a/8dd906bd22e79e47397a61742927f6747fe93242ef86645ee9092e610244/pyjwt-2.12.1-py3-none-any.whl", hash = "sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c", size = 29726, upload-time = "2026-03-13T19:27:35.677Z" },
 ]
 
 [package.optional-dependencies]
@@ -2034,11 +2034,11 @@ crypto = [
 
 [[package]]
 name = "pypdf"
-version = "5.9.0"
+version = "6.9.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/89/3a/584b97a228950ed85aec97c811c68473d9b8d149e6a8c155668287cf1a28/pypdf-5.9.0.tar.gz", hash = "sha256:30f67a614d558e495e1fbb157ba58c1de91ffc1718f5e0dfeb82a029233890a1", size = 5035118, upload-time = "2025-07-27T14:04:52.364Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/fb/dc2e8cb006e80b0020ed20d8649106fe4274e82d8e756ad3e24ade19c0df/pypdf-6.9.1.tar.gz", hash = "sha256:ae052407d33d34de0c86c5c729be6d51010bf36e03035a8f23ab449bca52377d", size = 5311551, upload-time = "2026-03-17T10:46:07.876Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/d9/6cff57c80a6963e7dd183bf09e9f21604a77716644b1e580e97b259f7612/pypdf-5.9.0-py3-none-any.whl", hash = "sha256:be10a4c54202f46d9daceaa8788be07aa8cd5ea8c25c529c50dd509206382c35", size = 313193, upload-time = "2025-07-27T14:04:50.53Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/f4/75543fa802b86e72f87e9395440fe1a89a6d149887e3e55745715c3352ac/pypdf-6.9.1-py3-none-any.whl", hash = "sha256:f35a6a022348fae47e092a908339a8f3dc993510c026bb39a96718fc7185e89f", size = 333661, upload-time = "2026-03-17T10:46:06.286Z" },
 ]
 
 [[package]]
@@ -2345,6 +2345,7 @@ dependencies = [
     { name = "plotly" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pyjwt" },
     { name = "pypdf" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
@@ -2373,8 +2374,9 @@ requires-dist = [
     { name = "plotly", specifier = ">=6.6.0" },
     { name = "pydantic", specifier = ">=2.8,<3.0" },
     { name = "pydantic-settings", specifier = ">=2.4,<3.0" },
-    { name = "pypdf", specifier = ">=5.9.0" },
-    { name = "pypdf", marker = "extra == 'pdf'", specifier = ">=5.0,<6.0" },
+    { name = "pyjwt", specifier = ">=2.12.0,<3.0" },
+    { name = "pypdf", specifier = ">=6.8.0,<7.0" },
+    { name = "pypdf", marker = "extra == 'pdf'", specifier = ">=6.8.0,<7.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<9.0" },
     { name = "python-dotenv", specifier = ">=1.0,<2.0" },
     { name = "pyyaml", specifier = ">=6.0,<7.0" },
