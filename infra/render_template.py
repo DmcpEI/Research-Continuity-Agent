@@ -40,9 +40,7 @@ def main(argv: list[str]) -> int:
         "__RCA_OPENAI_EMBED_MODEL__": os.environ.get(
             "RCA_OPENAI_EMBED_MODEL", "text-embedding-3-small"
         ),
-        "__RCA_OPENAI_API_KEY_SECRET_ARN__": os.environ.get(
-            "RCA_OPENAI_API_KEY_SECRET_ARN", ""
-        ),
+        "__RCA_OPENAI_API_KEY_SECRET_ARN__": os.environ.get("RCA_OPENAI_API_KEY_SECRET_ARN", ""),
         "__RCA_ENABLE_FILESYSTEM_TOOLS__": os.environ.get(
             "RCA_ENABLE_FILESYSTEM_TOOLS", "false"
         ).lower(),
