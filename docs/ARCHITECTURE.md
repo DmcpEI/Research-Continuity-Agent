@@ -68,17 +68,17 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 6. **Cross-encoder rerank** — reranks the merged candidate set with `cross-encoder/ms-marco-MiniLM-L-6-v2`, preserving the original retrieval score scale for downstream context selection
 7. **Edge collection** — gathers related edges for the returned nodes
 
-**Ablation results** (hit@5 / hit@10, n=60 answerable pairs):
+**Ablation results** (hit@5 / hit@10, n=90 answerable pairs):
 
 | Config | hit@5 | hit@10 |
 |---|---|---|
-| fts5-only (BM25 baseline) | 95.0% | 98.3% |
-| vector-only (dense baseline) | 76.7% | 91.7% |
-| vector + keyword (FTS5) | 76.7% | 91.7% |
-| vector + keyword + expansion | 95.0% | 96.7% |
-| full + query rewrite | 95.0% | 98.3% |
+| fts5-only (BM25 baseline) | 95.6% | 98.9% |
+| vector-only (dense baseline) | 76.7% | 88.9% |
+| vector + keyword (FTS5) | 76.7% | 88.9% |
+| vector + keyword + expansion | 94.4% | 96.7% |
+| full + query rewrite | 96.7% | 98.9% |
 
-The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. After adding the cross-encoder reranker, the full rewrite pipeline now matches the pure BM25 baseline on both hit@5 and hit@10, while the raw expansion pipeline still trails slightly at hit@10.
+The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. On the current 100-question corpus, the full rewrite pipeline edges past the pure BM25 baseline at hit@5 and matches it at hit@10, while the raw expansion pipeline still trails slightly on both metrics.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 

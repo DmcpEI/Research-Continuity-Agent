@@ -50,7 +50,7 @@ Source: `rca/contracts/nodes.py` — `NodeKind` enum
 | `experiment` | Recorded experiment or run result |
 | `digest` | Generated summary or digest document |
 
-In practice the graph currently contains `paper` nodes (source-level) and `chunk` nodes. The `note`, `experiment`, and `digest` kinds are reserved for planned features.
+In practice, PDF ingest materializes `paper` source nodes plus `chunk` nodes most heavily, while note and experiment ingest paths already use the `note` and `experiment` kinds. `digest` remains reserved for future summarization features.
 
 ### Node fields
 
@@ -101,7 +101,7 @@ class Edge(BaseModel):
 ├── vectors/            # VectorStore: ChromaDB persistent embeddings
 ├── events.jsonl        # Event log (append-only ingest events)
 ├── telemetry.jsonl     # Telemetry log
-└── experiments.sqlite3 # Experiment tracking (planned)
+└── experiments.sqlite3 # MCP-backed experiment run registry
 ```
 
 ### SQLite schema (graph.sqlite3)

@@ -154,7 +154,7 @@ The checked-in eval assets now include:
 - `eval/run_coefficient_sweep.py` for held-out lexical-reranker tuning on the current split
 
 Latest local artifacts:
-- `eval/results/run_20260316T200915Z.json`
+- `eval/results/run_20260317T173540Z.json`
 - `eval/results/ablations.json`
 
 Current generation results on the 100-question corpus:
@@ -165,7 +165,7 @@ Current generation results on the 100-question corpus:
 | Negative abstention recall | `2/10` (`20.0%`) |
 | Answerable abstentions | `1` |
 | Average keyword hit rate | `0.259` |
-| Average latency | `11.3 s` |
+| Average latency | `11.0 s` |
 
 Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
@@ -190,7 +190,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 
 ## Roadmap
 
-### v1.1 — Local system (current)
+### v1.x — Current shipped system
 
 - [x] PDF ingest → chunking → dual-store (vector + graph)
 - [x] Hybrid retrieval (vector + keyword search + graph expansion)
@@ -206,7 +206,9 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] **Expand golden set** — 30 → 100 grounded questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
+- [x] GitHub Actions CI — Ruff + pytest on push / PR
 - [x] AWS deployment-ready package — baked demo image, ECS task templates, one-off demo script
+- [ ] **Confidence-calibrated abstention** — improve negative handling without destabilizing grounded answers
 - [ ] **Add a human-authored external eval subset** — reduce self-bias for external reporting
 - [ ] arxiv MCP server
 - [ ] Zotero MCP server
@@ -220,8 +222,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - Object storage for raw PDFs (S3 or equivalent)
 - Postgres + pgvector (replace ChromaDB in cloud deployment)
 - Structured logs + metrics dashboard
-- GitHub Actions CI (lint + tests + smoke deploy)
-- Docker Compose
+- Cloud deploy automation / smoke deploy
 - Optional auth / multi-user namespaces
 
 ---

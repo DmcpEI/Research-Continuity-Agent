@@ -37,7 +37,7 @@ The current implementation now has two orchestration paths: direct `RetrieveFlow
 | Retrieval, full pipeline | `96.7%` hit@5 / `98.9%` hit@10 |
 | Citation precision | `92.1%` over `89` answerable, non-abstained cases |
 | Negative abstention recall | `2/10` (`20.0%`) |
-| Average latency | `11.3 s` |
+| Average latency | `11.0 s` |
 | Tests | `64` passing |
 
 Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/EVAL.md). System structure lives in [ARCHITECTURE.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/ARCHITECTURE.md). The user-facing overview stays in [README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/README.md).
@@ -48,7 +48,7 @@ Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/D
 
 These are the highest-priority milestones for reliability and correctness.
 
-- **Confidence-calibrated abstention** — Replace the current threshold heuristic with a lightweight classifier over retrieval features such as max score, score spread, query length, and hits above threshold. Rationale: `2/10` abstention recall is the clearest current correctness gap.
+- **Confidence-calibrated abstention** — Replace the current threshold heuristic with a better-calibrated abstention policy; if a larger negative set is collected, evaluate a lightweight classifier over retrieval features such as max score, score spread, query length, and hits above threshold. Rationale: `2/10` abstention recall is the clearest current correctness gap.
 - **Human-authored external eval subset** — Add a small independently written subset to the golden set. Rationale: it reduces self-bias in external reporting better than adding more self-authored questions.
 - **Retrieval auditability in eval** — Expose retrieved hit lists and per-chunk provenance in harness output, then add a compact failure taxonomy. Rationale: it will make ranking-versus-generation errors easier to explain and defend.
 
