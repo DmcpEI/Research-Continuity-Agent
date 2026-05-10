@@ -16,3 +16,4 @@ eval/results/*.json
 eval/results/traces/
 !eval/results/.gitkeep
 .claude/
+.agent_handoff/
