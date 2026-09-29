@@ -8,6 +8,9 @@ export type ApiChatResponse = {
   answer: string;
   citations: ApiCitation[];
   grounded: boolean;
+  failure_labels?: string[];
+  active_source_ids?: string[];
+  model?: string;
   trace: Record<string, unknown> | null;
 };
 
@@ -40,6 +43,7 @@ export type ApiAgentResponse = {
   answer: string;
   trace: ApiAgentTrace;
   error: string | null;
+  model?: string;
 };
 
 export type ApiAgentModelsResponse = {
@@ -176,6 +180,7 @@ export async function sendChat(
 export async function sendAgent(
   query: string,
   conversationId?: string,
+  model?: string,
   messages: ApiChatMessage[] = [],
 ): Promise<ApiAgentResponse> {
   const response = await fetch('/api/agent', {
@@ -186,6 +191,7 @@ export async function sendAgent(
     body: JSON.stringify({
       query,
       conversation_id: conversationId ?? null,
+      model: model ?? null,
       messages,
     }),
   });

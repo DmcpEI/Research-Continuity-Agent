@@ -30,6 +30,7 @@ export function AnswerBubble({
 
   const displayContent = content
     .replace(/\[\[[\w:/.-]+\]\]/g, '')
+    .replace(/\[(?:src|chk):[^\]\s]+\]/g, '')
     .split('\n')
     .map((line) => line.trimEnd())
     .join('\n')

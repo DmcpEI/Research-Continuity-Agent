@@ -17,3 +17,5 @@ eval/results/traces/
 !eval/results/.gitkeep
 .claude/
 .agent_handoff/
+docs/RCA Research Assistant.html
+frontend/*.tsbuildinfo

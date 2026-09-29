@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChatView } from './ChatView';
 
@@ -34,6 +34,10 @@ vi.mock('../../hooks/useChat', async () => {
 });
 
 describe('Conversation-scoped citation state', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('CIT-010: keeps selected source linkage scoped by conversation', async () => {
     const user = userEvent.setup();
     const onCitationClick = vi.fn();
@@ -51,5 +55,44 @@ describe('Conversation-scoped citation state', () => {
 
     await user.click(screen.getByRole('button', { name: 'conv-1' }));
     expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-1');
+  });
+
+  it('CIT-011: restores graph focus from assistant active source IDs', async () => {
+    const onGraphFocusChange = vi.fn();
+    window.localStorage.setItem(
+      'rca-conversations',
+      JSON.stringify({
+        conversations: [
+          {
+            id: 'conv-active',
+            title: 'Active',
+            timestamp: new Date().toISOString(),
+            messageCount: 1,
+            model: 'llama3.1:8b',
+          },
+        ],
+        messagesByConversation: {
+          'conv-active': [
+            {
+              id: 'msg-assistant',
+              role: 'assistant',
+              content: 'Answer',
+              citations: [],
+              activeSourceIds: ['src:pdf/paper_a'],
+              grounded: true,
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        },
+        selectedSourceByConversation: {},
+        activeConversationId: 'conv-active',
+      }),
+    );
+
+    render(<ChatView onGraphFocusChange={onGraphFocusChange} />);
+
+    await waitFor(() =>
+      expect(onGraphFocusChange).toHaveBeenLastCalledWith(['src:pdf/paper_a']),
+    );
   });
 });

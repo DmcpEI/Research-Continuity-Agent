@@ -13,6 +13,12 @@ type AgentViewProps = {
   conversationId?: string;
 };
 
+const AGENT_MODEL_STORAGE_KEY = 'rca-current-agent-model';
+
+type AgentModelSelectedEventDetail = {
+  model: string;
+};
+
 type AgentMessage = {
   id: string;
   role: 'user' | 'assistant';
@@ -148,6 +154,9 @@ export function AgentView({ conversationId }: AgentViewProps) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeModel, setActiveModel] = useState<string | undefined>(() =>
+    window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY) ?? undefined,
+  );
 
   const latestTrace = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -180,7 +189,16 @@ export function AgentView({ conversationId }: AgentViewProps) {
     setIsLoading(true);
 
     try {
-      const response: ApiAgentResponse = await sendAgent(trimmed, conversationId, history);
+      const response: ApiAgentResponse = await sendAgent(
+        trimmed,
+        conversationId,
+        activeModel,
+        history,
+      );
+      if (response.model) {
+        window.localStorage.setItem(AGENT_MODEL_STORAGE_KEY, response.model);
+        setActiveModel(response.model);
+      }
       const assistantMessage: AgentMessage = {
         id: `agent-assistant-${Date.now()}`,
         role: 'assistant',
@@ -204,6 +222,18 @@ export function AgentView({ conversationId }: AgentViewProps) {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const model = (event as CustomEvent<AgentModelSelectedEventDetail>).detail?.model;
+      if (model) {
+        setActiveModel(model);
+      }
+    };
+
+    window.addEventListener('rca-agent-model-selected', handler as EventListener);
+    return () => window.removeEventListener('rca-agent-model-selected', handler as EventListener);
+  }, []);
 
   return (
     <section className="agent-view">
@@ -233,6 +263,7 @@ export function AgentView({ conversationId }: AgentViewProps) {
                 {(() => {
                   const displayContent = _dedupeResultsContentByPaperId(message.content)
                     .replace(/\[\[[\w:/.-]+\]\]/g, '')
+                    .replace(/\[(?:src|chk):[^\]\s]+\]/g, '')
                     .split('\n')
                     .map((line) => line.trimEnd())
                     .join('\n')

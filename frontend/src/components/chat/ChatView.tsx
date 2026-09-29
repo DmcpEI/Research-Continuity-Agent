@@ -48,6 +48,16 @@ function makeConversationTitleFromQuery(query: string): string {
   return trimmed.length > 56 ? `${trimmed.slice(0, 56)}...` : trimmed;
 }
 
+function toPaperSourceId(sourceId: string): string {
+  if (sourceId.startsWith('src:')) {
+    return sourceId;
+  }
+  if (!sourceId.startsWith('chk:')) {
+    return sourceId;
+  }
+  return sourceId.replace(/^chk:/, 'src:').replace(/:\d+$/, '');
+}
+
 const initialConversations: Conversation[] = [
   {
     id: 'conv-1',
@@ -81,12 +91,6 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   const [isHydrated, setIsHydrated] = useState(false);
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
 
-  const { send, isLoading } = useChat({
-    conversationId: activeConversationId,
-    messagesByConversation,
-    setMessagesByConversation,
-  });
-
   const computedConversations = useMemo(
     () =>
       conversations.map((conversation) => ({
@@ -101,6 +105,15 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   const activeConversation = computedConversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
+  const activeConversationModel =
+    activeConversation?.model ?? window.localStorage.getItem(CHAT_MODEL_STORAGE_KEY) ?? undefined;
+
+  const { send, isLoading } = useChat({
+    conversationId: activeConversationId,
+    activeModel: activeConversationModel,
+    messagesByConversation,
+    setMessagesByConversation,
+  });
 
   const hasGlobalPending = pendingConversationId !== null;
   const isWaitingOnOtherConversation =
@@ -252,7 +265,10 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   useEffect(() => {
     const citedSourceIds = activeMessages
       .filter((message) => message.role === 'assistant')
-      .flatMap((message) => message.citations?.map((citation) => citation.source_id) ?? []);
+      .flatMap((message) => [
+        ...(message.activeSourceIds ?? []),
+        ...(message.citations?.map((citation) => citation.source_id) ?? []),
+      ]);
 
     const focusSourceIds = Array.from(
       new Set(
@@ -266,11 +282,12 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   }, [activeMessages, activeSelectedSourceId, onGraphFocusChange]);
 
   const handleCitationClick = (sourceId: string) => {
+    const normalizedSourceId = toPaperSourceId(sourceId);
     setSelectedSourceByConversation((previous) => ({
       ...previous,
-      [activeConversationId]: sourceId,
+      [activeConversationId]: normalizedSourceId,
     }));
-    onCitationClick?.(sourceId);
+    onCitationClick?.(normalizedSourceId);
   };
 
   const handleSend = async (query: string) => {
@@ -319,7 +336,20 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
 
     setPendingConversationId(activeConversationId);
     try {
-      await send(query);
+      const response = await send(query, currentModel);
+      if (response?.model) {
+        window.localStorage.setItem(CHAT_MODEL_STORAGE_KEY, response.model);
+        setConversations((previous) =>
+          previous.map((conversation) =>
+            conversation.id === activeConversationId
+              ? {
+                  ...conversation,
+                  model: response.model,
+                }
+              : conversation,
+          ),
+        );
+      }
     } finally {
       setPendingConversationId((current) =>
         current === activeConversationId ? null : current,

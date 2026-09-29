@@ -48,7 +48,8 @@ class Settings(BaseSettings):
         default="ollama",
         validation_alias=AliasChoices("RCA_LLM_API_KEY", "LLM_API_KEY"),
     )
-    generation_model: str = "qwen2.5:14b"
+    generation_model: str = "gemma3:12b"
+    agent_model: str = "qwen2.5:14b"
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = Field(
         default="",
@@ -60,6 +61,9 @@ class Settings(BaseSettings):
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 10
     retrieval_fetch_limit: int = 20
+    model_recommend_include: list[str] = []
+    model_recommend_exclude: list[str] = []
+    model_recommend_preferred: list[str] = []
 
     if _HAS_PYDANTIC_SETTINGS:
         model_config = SettingsConfigDict(
@@ -119,6 +123,7 @@ class Settings(BaseSettings):
             "RCA_LLM_API_KEY": "llm_api_key",
             "LLM_API_KEY": "llm_api_key",
             "RCA_GENERATION_MODEL": "generation_model",
+            "RCA_AGENT_MODEL": "agent_model",
             "RCA_OPENAI_BASE_URL": "openai_base_url",
             "RCA_OPENAI_API_KEY": "openai_api_key",
             "OPENAI_API_KEY": "openai_api_key",
@@ -128,6 +133,9 @@ class Settings(BaseSettings):
             "RCA_RERANKER_MODEL": "reranker_model",
             "RCA_RERANKER_TOP_K": "reranker_top_k",
             "RCA_RETRIEVAL_FETCH_LIMIT": "retrieval_fetch_limit",
+            "RCA_MODEL_RECOMMEND_INCLUDE": "model_recommend_include",
+            "RCA_MODEL_RECOMMEND_EXCLUDE": "model_recommend_exclude",
+            "RCA_MODEL_RECOMMEND_PREFERRED": "model_recommend_preferred",
         }
 
     @staticmethod

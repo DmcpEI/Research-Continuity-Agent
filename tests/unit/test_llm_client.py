@@ -99,6 +99,7 @@ def test_llm_client_uses_configured_openai_compatible_base_url(monkeypatch) -> N
         "model": "gpt-test",
         "messages": [{"role": "user", "content": "Hello"}],
         "temperature": 0,
+        "max_tokens": 512,
         "stream": False,
     }
 

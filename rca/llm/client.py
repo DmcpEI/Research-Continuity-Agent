@@ -110,7 +110,7 @@ class OllamaLLMClient(LLMClient):
         self.embedding_model = embedding_model or get_settings().embedding_model
         self.api_key = api_key or "ollama"
         self.api_style = api_style
-        self.options = {"temperature": 0}
+        self.options = {"temperature": 0, "num_predict": 512}
         if options:
             self.options.update(options)
 
@@ -120,6 +120,7 @@ class OllamaLLMClient(LLMClient):
                 "model": self.model,
                 "messages": [{"role": m.role, "content": m.content} for m in messages],
                 "temperature": self.options.get("temperature", 0),
+                "max_tokens": self.options.get("num_predict"),
                 "stream": False,
             }
             result = self._post_json(self._openai_path("chat/completions"), payload, timeout=120)
@@ -148,6 +149,7 @@ class OllamaLLMClient(LLMClient):
                 "messages": normalized_messages,
                 "tools": tools,
                 "temperature": self.options.get("temperature", 0),
+                "max_tokens": self.options.get("num_predict"),
                 "stream": False,
             }
             result = self._post_json(self._openai_path("chat/completions"), payload, timeout=120)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from time import perf_counter
 from typing import Any
@@ -31,12 +32,37 @@ class KnowledgeBaseAdapter:
         if not bundle.hits:
             return "No relevant documents found."
 
-        lines: list[str] = []
+        best_hit_by_source: dict[str, Any] = {}
         for hit in bundle.hits:
-            lines.append(f"[{hit.node_id}] {hit.title} (score={hit.score:.3f})")
-            lines.append(hit.excerpt[:300])
+            source_id = self._to_source_id(hit.node_id)
+            current = best_hit_by_source.get(source_id)
+            if current is None or hit.score > current.score:
+                best_hit_by_source[source_id] = hit
+
+        unique_hits = sorted(
+            best_hit_by_source.values(),
+            key=lambda item: item.score,
+            reverse=True,
+        )[:limit]
+
+        lines: list[str] = []
+        for index, hit in enumerate(unique_hits, start=1):
+            source_id = self._to_source_id(hit.node_id)
+            lines.append(f"RESULT {index}")
+            lines.append(f"source_id: {source_id}")
+            lines.append(f"title: {hit.title}")
+            lines.append(f"score: {hit.score:.3f}")
+            lines.append(f"excerpt: {hit.excerpt[:300]}")
             lines.append("")
         return "\n".join(lines).strip()
+
+    @staticmethod
+    def _to_source_id(node_id: str) -> str:
+        if node_id.startswith("src:"):
+            return node_id
+        if node_id.startswith("chk:"):
+            return re.sub(r":\d+$", "", node_id.replace("chk:", "src:", 1))
+        return node_id
 
 
 class ToolRegistry:
@@ -66,6 +92,21 @@ class ToolRegistry:
     def call(self, tool_name: str, arguments: dict[str, Any]) -> ToolCallTrace:
         self._ensure_mcp_tools_loaded()
         started = perf_counter()
+
+        if tool_name == "read_text_file":
+            raw_path = arguments.get("path")
+            if isinstance(raw_path, str) and raw_path.strip().lower().endswith(".pdf"):
+                return ToolCallTrace(
+                    tool_name=tool_name,
+                    input=arguments,
+                    output=(
+                        "This is a PDF file. Use `search_knowledge_base` to query its content "
+                        "instead of reading it directly."
+                    ),
+                    status=ToolCallStatus.success,
+                    duration_ms=(perf_counter() - started) * 1000.0,
+                )
+
         handler = self._handlers.get(tool_name)
         if handler is None:
             return ToolCallTrace(

@@ -6,7 +6,7 @@ from rca.agent.contracts import ToolCallStatus, ToolCallTrace
 from rca.agent.loop import MAX_ITERATIONS, AgentLoop
 from rca.agent.tools import ToolRegistry
 from rca.config.settings import Settings
-from rca.llm.client import ToolChatResponse
+from rca.llm.client import ChatResponse, ToolChatResponse
 
 
 class FakeLLM:
@@ -20,6 +20,22 @@ class FakeLLM:
         index = min(self.calls, len(self.responses) - 1)
         self.calls += 1
         return self.responses[index]
+
+    def chat(self, messages):
+        del messages
+        return ChatResponse(text="Fallback answer from plain chat.", raw={})
+
+
+class ToolCallingFailsLLM:
+    model = "tool-calling-fails-model"
+
+    def chat_with_tools(self, messages, tools) -> ToolChatResponse:
+        del messages, tools
+        raise RuntimeError("HTTP Error 400: Bad Request")
+
+    def chat(self, messages):
+        del messages
+        return ChatResponse(text="Recovered without tool-calling.", raw={})
 
 
 class FakeRegistry:
@@ -166,6 +182,92 @@ def test_malformed_tool_call_arguments_fall_back_to_plain_text_answer() -> None:
     assert "malformed" in result.trace.warnings[0]
 
 
+def test_http_400_tool_calling_returns_explicit_unsupported_error() -> None:
+    registry = FakeRegistry()
+    loop = AgentLoop(registry=registry, llm_client=ToolCallingFailsLLM())
+
+    result = loop.run("Search papers and summarize evidence")
+
+    assert result.error == "HTTP Error 400: Bad Request"
+    assert result.trace.stopped_reason == "error"
+    assert result.trace.tool_calls == []
+    assert "tool-calling unsupported" in result.trace.warnings[0]
+    assert "does not support agent mode tool-calling" in result.answer
+
+
+def test_textual_tool_call_output_is_parsed_and_executed() -> None:
+    registry = FakeRegistry()
+    loop = AgentLoop(
+        registry=registry,
+        llm_client=FakeLLM(
+            [
+                ToolChatResponse(
+                    text='search_knowledge_base({"query": "supermarkets", "limit": 5})',
+                    tool_calls=[],
+                    raw={},
+                ),
+                ToolChatResponse(
+                    text="Here are the top results.",
+                    tool_calls=[],
+                    raw={},
+                ),
+            ]
+        ),
+    )
+
+    result = loop.run("Search papers related to supermarkets")
+
+    assert result.answer == "Here are the top results."
+    assert registry.calls == [("search_knowledge_base", {"query": "supermarkets", "limit": 5})]
+    assert any("parsed textual tool call" in warning for warning in result.trace.warnings)
+
+
+def test_low_confidence_specific_paper_query_requests_clarification() -> None:
+    class LowConfidenceRegistry(FakeRegistry):
+        def call(self, tool_name: str, arguments: dict) -> ToolCallTrace:
+            self.calls.append((tool_name, arguments))
+            return ToolCallTrace(
+                tool_name=tool_name,
+                input=arguments,
+                output=(
+                    "RESULT 1\n"
+                    "source_id: src:pdf/robotics\n"
+                    "title: Robotics Paper\n"
+                    "score: 0.55\n"
+                    "excerpt: sample\n"
+                ),
+                status=ToolCallStatus.success,
+                duration_ms=8.0,
+            )
+
+    registry = LowConfidenceRegistry()
+    loop = AgentLoop(
+        registry=registry,
+        llm_client=FakeLLM(
+            [
+                ToolChatResponse(
+                    text="",
+                    tool_calls=[
+                        {
+                            "function": {
+                                "name": "search_knowledge_base",
+                                "arguments": {"query": "my PIC2 paper", "limit": 5},
+                            }
+                        }
+                    ],
+                    raw={},
+                )
+            ]
+        ),
+    )
+
+    result = loop.run("Find my PIC2 paper")
+
+    assert result.trace.stopped_reason == "clarification_needed"
+    assert "full title or author names" in result.answer
+    assert registry.calls == [("search_knowledge_base", {"query": "my PIC2 paper", "limit": 5})]
+
+
 def test_tool_registry_exposes_read_only_tools_with_fakes() -> None:
     class FakeMCPManager:
         def list_tools(self, server_name: str) -> list[mcp_types.Tool]:
@@ -264,3 +366,39 @@ def test_tool_registry_can_disable_filesystem_tools() -> None:
     tool_names = {tool["function"]["name"] for tool in registry.ollama_tool_definitions()}
 
     assert tool_names == {"search_knowledge_base", "list_runs"}
+
+
+def test_read_text_file_on_pdf_returns_helpful_guidance() -> None:
+    class FakeMCPManager:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, dict]] = []
+
+        def list_tools(self, server_name: str) -> list[mcp_types.Tool]:
+            if server_name == "filesystem":
+                return [
+                    mcp_types.Tool(
+                        name="read_text_file",
+                        description="Read text",
+                        inputSchema={"type": "object", "properties": {"path": {"type": "string"}}},
+                    )
+                ]
+            return []
+
+        def call_tool(self, tool_name: str, arguments: dict) -> str:
+            self.calls.append((tool_name, arguments))
+            return "should not be called for pdf"
+
+        def close(self) -> None:
+            return None
+
+    manager = FakeMCPManager()
+    registry = ToolRegistry(
+        knowledge_base_search=lambda query, limit=5: f"KB:{query}:{limit}",
+        mcp_manager=manager,
+    )
+
+    trace = registry.call("read_text_file", {"path": "/tmp/paper.pdf"})
+
+    assert trace.status == ToolCallStatus.success
+    assert "Use `search_knowledge_base`" in trace.output
+    assert manager.calls == []

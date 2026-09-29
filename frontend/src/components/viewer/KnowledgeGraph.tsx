@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 import type { ApiSourceSummary } from '../../api/client';
 import { useSources } from '../../hooks/useSources';
@@ -36,6 +36,16 @@ function nodeLabel(sourceId: string): string {
 function shortSourceId(sourceId: string): string {
   const parts = sourceId.split('/');
   return parts[parts.length - 1] || sourceId;
+}
+
+function toPaperSourceId(sourceId: string): string {
+  if (sourceId.startsWith('src:')) {
+    return sourceId;
+  }
+  if (!sourceId.startsWith('chk:')) {
+    return sourceId;
+  }
+  return sourceId.replace(/^chk:/, 'src:').replace(/:\d+$/, '');
 }
 
 function extractConceptsFromTitles(titles: string[]): string[] {
@@ -99,7 +109,11 @@ type KnowledgeGraphProps = {
 export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }: KnowledgeGraphProps) {
   const { data: sources = [] } = useSources();
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const focusSet = new Set(focusSourceIds);
+  const focusSet = useMemo(
+    () => new Set(focusSourceIds.map(toPaperSourceId)),
+    [focusSourceIds],
+  );
+  const selectedPaperSourceId = selectedSourceId ? toPaperSourceId(selectedSourceId) : null;
   const focusedSources = sources.filter((source) => focusSet.has(source.id));
   const maxChunkCount = Math.max(1, ...focusedSources.map((source) => source.chunk_count));
   const activeSourceRows = focusedSources
@@ -154,7 +168,7 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
       .data(nodes)
       .join('circle')
       .attr('r', (node: GraphNode) => {
-        if (selectedSourceId && node.id === selectedSourceId) {
+        if (selectedPaperSourceId && node.id === selectedPaperSourceId) {
           return 10;
         }
         if (focusSet.has(node.id)) {
@@ -167,7 +181,7 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
         if (focusSet.size === 0) {
           return 0.9;
         }
-        if (selectedSourceId && node.id === selectedSourceId) {
+        if (selectedPaperSourceId && node.id === selectedPaperSourceId) {
           return 1;
         }
         return focusSet.has(node.id) ? 0.95 : 0.32;
@@ -184,7 +198,7 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
       .attr('font-family', 'IBM Plex Mono, monospace')
       .attr('font-size', 9)
       .attr('fill', (node: GraphNode) =>
-        selectedSourceId && node.id === selectedSourceId ? '#e2e2e8' : '#a0a0b8',
+        selectedPaperSourceId && node.id === selectedPaperSourceId ? '#e2e2e8' : '#a0a0b8',
       )
       .attr('text-anchor', 'middle')
       .attr('opacity', (node: GraphNode) => (focusSet.size === 0 || focusSet.has(node.id) ? 0.95 : 0.28))
@@ -221,7 +235,7 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
     return () => {
       simulation.stop();
     };
-  }, [focusSet, selectedSourceId, sources]);
+  }, [focusSet, selectedPaperSourceId, sources]);
 
   return (
     <div className="knowledge-graph">

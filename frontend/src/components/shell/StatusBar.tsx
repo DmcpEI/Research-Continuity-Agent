@@ -6,6 +6,7 @@ import { useStatus } from '../../hooks/useStatus';
 
 const CONVERSATIONS_STORAGE_KEY = 'rca-conversations';
 const CHAT_MODEL_STORAGE_KEY = 'rca-current-chat-model';
+const AGENT_MODEL_STORAGE_KEY = 'rca-current-agent-model';
 
 type ChatLoadingEventDetail = {
   isLoading: boolean;
@@ -61,6 +62,13 @@ export function StatusBar() {
             }),
           );
         }
+      } else if (isAgentRoute) {
+        window.localStorage.setItem(AGENT_MODEL_STORAGE_KEY, result.model);
+        window.dispatchEvent(
+          new CustomEvent('rca-agent-model-selected', {
+            detail: { model: result.model },
+          }),
+        );
       }
       void queryClient.invalidateQueries({ queryKey: ['status'] });
       void queryClient.invalidateQueries({ queryKey: ['models'] });
@@ -189,6 +197,17 @@ export function StatusBar() {
       window.localStorage.setItem(CHAT_MODEL_STORAGE_KEY, currentModel);
     }
   }, [currentModel, isChatRoute]);
+
+  useEffect(() => {
+    if (!isAgentRoute) {
+      return;
+    }
+
+    const storedModel = window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY);
+    if (storedModel && storedModel !== currentModel && !selectMutation.isPending) {
+      selectMutation.mutate(storedModel);
+    }
+  }, [currentModel, isAgentRoute, selectMutation.isPending]);
 
   const rightLabel =
     ollamaConnected === null

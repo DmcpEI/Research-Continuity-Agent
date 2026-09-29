@@ -55,6 +55,20 @@ describe('Citation rendering conformance', () => {
     expect(screen.getByRole('button', { name: 'src:pdf/paper_a' })).toBeInTheDocument();
   });
 
+  it('CIT-004b: removes loose source markers from displayed answer text', () => {
+    render(
+      <AnswerBubble
+        content={'Result [src:pdf/paper_a] with details [chk:pdf/paper_a:0009]'}
+        citations={[{ source_id: 'src:pdf/paper_a', title: 'a', excerpt: 'x' }]}
+        grounded={true}
+        trace={null}
+      />,
+    );
+
+    expect(screen.getByText('Result with details')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'src:pdf/paper_a' })).toBeInTheDocument();
+  });
+
   it('CIT-005: ignores malformed IDs safely and keeps valid entries', () => {
     render(
       <AnswerBubble
