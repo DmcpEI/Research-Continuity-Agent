@@ -13,6 +13,7 @@ class StubLLMClient(LLMClient):
     def __init__(self, responses: list[str] | None = None) -> None:
         self.model = "stub-model"
         self.calls = 0
+        self.last_messages = None
         self.responses = responses or [
             "JamPacker components planning recovery packing efficiency",
             "JamPacker combines planning and recovery modules. [[src:pdf/jampacker]]",
@@ -20,6 +21,7 @@ class StubLLMClient(LLMClient):
 
     def chat(self, messages):
         self.calls += 1
+        self.last_messages = messages
         index = min(self.calls - 1, len(self.responses) - 1)
         return ChatResponse(
             text=self.responses[index],
@@ -52,13 +54,64 @@ class StubRetrieveFlow:
                     node_id="src:pdf/jampacker",
                     score=self.score,
                     title="JamPacker",
-                    excerpt="JamPacker uses planning and recovery modules.",
+                    excerpt=(
+                        "JamPacker uses planning and recovery modules for robotic bin packing "
+                        "and placement heuristics."
+                    ),
                     metadata={},
                 )
             ],
             related_edges=[],
             trace=trace,
         )
+
+
+def test_generate_answer_conversational_skips_retrieval() -> None:
+    class ExplodingRetrieveFlow(StubRetrieveFlow):
+        def retrieve(
+            self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None
+        ) -> RetrievalBundle:
+            raise AssertionError("retrieval should be skipped for conversational queries")
+
+    llm = StubLLMClient(responses=["Yes, I can see our prior messages."])
+    flow = GenerateFlow(retrieve_flow=ExplodingRetrieveFlow(), llm_client=llm)
+
+    result = flow.generate_answer(
+        "Why didn't you respond?",
+        conversation_messages=[
+            {"role": "user", "content": "Is there a paper about LLM-Pack?"},
+            {"role": "assistant", "content": "Yes, I found it."},
+        ],
+    )
+
+    assert result.abstained is False
+    assert result.grounded is False
+    assert result.citations == []
+    assert "prior messages" in result.answer
+
+
+def test_generate_answer_empty_response_falls_back_to_title() -> None:
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=StubLLMClient(responses=[""]))
+
+    result = flow.generate_answer("Is JamPacker in the database?")
+
+    assert result.abstained is False
+    assert result.grounded is False
+    assert "missing_citation" in result.failure_labels
+    assert "JamPacker" in result.answer
+    assert "src:pdf/jampacker" in result.answer
+    assert "couldn't generate a summary" in result.answer
+
+
+def test_generate_answer_empty_response_generic_fallback_for_conceptual_query() -> None:
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=StubLLMClient(responses=[""]))
+
+    result = flow.generate_answer("What approaches exist for robotic bin packing?")
+
+    assert result.abstained is False
+    assert result.grounded is False
+    assert "missing_citation" in result.failure_labels
+    assert "relevant sources" in result.answer
 
 
 def test_generate_answer_attaches_query_trace() -> None:
@@ -137,7 +190,7 @@ def test_generate_answer_abstains_on_hedged_citation_when_retrieval_confidence_i
     assert "does not contain information" in result.answer
 
 
-def test_generate_answer_appends_citation_for_supported_answer_without_model_citation() -> None:
+def test_generate_answer_marks_uncited_supported_answer_as_ungrounded() -> None:
     flow = GenerateFlow(
         retrieve_flow=StubRetrieveFlow(),
         llm_client=StubLLMClient(
@@ -151,9 +204,28 @@ def test_generate_answer_appends_citation_for_supported_answer_without_model_cit
     result = flow.generate_answer("What are the two main components of JamPacker?")
 
     assert result.abstained is False
+    assert result.grounded is False
+    assert result.citations == []
+    assert result.failure_labels == ["missing_citation"]
+    assert not result.answer.endswith("[[src:pdf/jampacker]]")
+
+
+def test_generate_answer_normalizes_single_bracket_citations_when_resolvable() -> None:
+    flow = GenerateFlow(
+        retrieve_flow=StubRetrieveFlow(),
+        llm_client=StubLLMClient(
+            responses=[
+                "JamPacker combines planning and recovery modules. [src:pdf/jampacker]",
+            ]
+        ),
+    )
+
+    result = flow.generate_answer("What are the two main components of JamPacker?")
+
+    assert result.abstained is False
     assert result.grounded is True
-    assert [citation.source_id for citation in result.citations] == ["src:pdf/jampacker"]
     assert result.answer.endswith("[[src:pdf/jampacker]]")
+    assert [citation.source_id for citation in result.citations] == ["src:pdf/jampacker"]
 
 
 def test_generate_answer_skips_rewrite_for_proper_noun_queries(
@@ -204,6 +276,30 @@ def test_generate_answer_keeps_rewrite_for_conceptual_queries() -> None:
     assert "robotic" in retrieve_flow.queries[0]
     assert "packing" in retrieve_flow.queries[0]
     assert retrieve_flow.query_types == [QueryType.conceptual]
+
+
+def test_generate_answer_includes_conversation_history_in_prompt() -> None:
+    llm = StubLLMClient(
+        responses=[
+            "robotic bin packing methods heuristics planning placement stability",
+            "JamPacker combines planning and recovery modules. [[src:pdf/jampacker]]",
+        ]
+    )
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=llm)
+
+    flow.generate_answer(
+        "Can you be more specific?",
+        conversation_messages=[
+            {"role": "user", "content": "What approaches exist for robotic bin packing?"},
+            {"role": "assistant", "content": "Two approaches are compared in JamPacker."},
+        ],
+    )
+
+    assert llm.last_messages is not None
+    prompt = llm.last_messages[-1].content
+    assert "Conversation history:" in prompt
+    assert "- User: What approaches exist for robotic bin packing?" in prompt
+    assert "- Assistant: Two approaches are compared in JamPacker." in prompt
 
 
 def test_sanitize_rewritten_query_appends_additional_terms_to_original() -> None:

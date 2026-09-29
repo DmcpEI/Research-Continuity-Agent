@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -11,7 +14,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from rca.config.settings import Settings
 from rca.flows.generate_flow import GenerateFlow
+from rca.llm.client import ChatMessage
+from rca.llm.factory import get_llm_client
 
 
 class GoldenPair(BaseModel):
@@ -56,6 +62,7 @@ class EvaluationCaseResult(BaseModel):
     unique_sources_top5: int = 0
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
+    failure_labels: list[str] = Field(default_factory=list)
     latency_ms: float
     trace_path: str | None = None
     error: str | None = None
@@ -71,9 +78,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the golden evaluation JSON file.",
     )
     parser.add_argument(
+        "--external-golden-path",
+        default=None,
+        help=(
+            "Optional human-authored external golden file. When supplied, the harness "
+            "runs this file instead of --golden-path and labels the dataset as external."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         default=str(Path("eval") / "results"),
         help="Directory where run artifacts should be written.",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Generation model for this eval run. Defaults to RCA_EVAL_MODEL, then "
+            "RCA_GENERATION_MODEL / Settings().generation_model."
+        ),
+    )
+    parser.add_argument(
+        "--strict-model-check",
+        action="store_true",
+        help="Exit if the configured eval model is not loaded in Ollama.",
+    )
+    parser.add_argument(
+        "--rewrite-model",
+        default=None,
+        help="Optional query-rewrite model override for this run.",
     )
     return parser
 
@@ -132,6 +165,7 @@ def evaluate_pair(
                 unique_sources_top5=unique_sources_top5,
                 matched_keywords=matched_keywords,
                 missing_keywords=missing_keywords,
+                failure_labels=generated.failure_labels,
                 latency_ms=latency_ms,
             ),
             generated.trace.model_dump(mode="json") if generated.trace is not None else None,
@@ -158,6 +192,7 @@ def evaluate_pair(
                 unique_sources_top5=0,
                 matched_keywords=[],
                 missing_keywords=pair.expected_keywords,
+                failure_labels=["error"],
                 latency_ms=latency_ms,
                 error=f"{type(exc).__name__}: {exc}",
             ),
@@ -205,6 +240,7 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
             "answerable_abstentions": 0,
             "average_keyword_hit_rate": 0.0,
             "average_latency_ms": 0.0,
+            "failure_label_counts": {},
             "by_difficulty": {},
             "top_failures": [],
         }
@@ -236,6 +272,7 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
         "answerable_abstentions": sum(result.abstained for result in answerable),
         "average_keyword_hit_rate": sum(result.keyword_hits for result in results) / total,
         "average_latency_ms": sum(result.latency_ms for result in results) / total,
+        "failure_label_counts": count_failure_labels(results),
         "by_difficulty": by_difficulty,
         "top_failures": [
             {
@@ -245,11 +282,20 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
                 "grounded": result.grounded,
                 "abstained": result.abstained,
                 "source_correct": result.source_correct,
+                "failure_labels": result.failure_labels,
                 "error": result.error,
             }
             for result in top_failures
         ],
     }
+
+
+def count_failure_labels(results: list[EvaluationCaseResult]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for result in results:
+        for label in result.failure_labels:
+            counts[label] = counts.get(label, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def summarize_subset(results: list[EvaluationCaseResult]) -> dict[str, Any]:
@@ -290,6 +336,11 @@ def print_summary(summary: dict[str, Any], total_cases: int) -> None:
     print(f"Answerable abstentions: {summary['answerable_abstentions']}")
     print(f"Average keyword hit rate: {summary['average_keyword_hit_rate']:.3f}")
     print(f"Average latency: {summary['average_latency_ms']:.1f} ms")
+    if summary.get("failure_label_counts"):
+        labels = ", ".join(
+            f"{label}={count}" for label, count in summary["failure_label_counts"].items()
+        )
+        print(f"Failure labels: {labels}")
     print("")
     print("Breakdown by difficulty:")
     for difficulty in ("easy", "medium", "hard"):
@@ -308,23 +359,117 @@ def print_summary(summary: dict[str, Any], total_cases: int) -> None:
     print("Top 5 failures:")
     for failure in summary["top_failures"]:
         error_suffix = f", error={failure['error']}" if failure["error"] else ""
+        labels_suffix = (
+            f", labels={','.join(failure['failure_labels'])}" if failure["failure_labels"] else ""
+        )
         print(
             f"- {failure['id']} ({failure['difficulty']}): "
             f"keyword_hits={failure['keyword_hits']:.3f}, "
             f"grounded={failure['grounded']}, "
             f"abstained={failure['abstained']}, "
-            f"source_correct={failure['source_correct']}{error_suffix}"
+            f"source_correct={failure['source_correct']}{labels_suffix}{error_suffix}"
         )
+
+
+def validate_eval_llm(flow: GenerateFlow) -> None:
+    try:
+        flow.llm.chat([ChatMessage(role="user", content="ping")])
+    except Exception as exc:
+        model = getattr(flow.llm, "model", "unknown")
+        base_url = getattr(flow.llm, "base_url", "unknown")
+        raise RuntimeError(
+            "LLM validation failed before eval run. "
+            f"Model='{model}', base_url='{base_url}'. "
+            "Check RCA_GENERATION_MODEL or available local models. "
+            f"Error: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
+def fetch_available_ollama_models(base_url: str = "http://localhost:11434") -> set[str]:
+    url = f"{base_url.rstrip('/')}/api/tags"
+    try:
+        with urllib.request.urlopen(url, timeout=2.0) as response:
+            payload = json.load(response)
+    except (urllib.error.URLError, json.JSONDecodeError):
+        return set()
+
+    models = payload.get("models", []) if isinstance(payload, dict) else []
+    loaded: set[str] = set()
+    for model in models:
+        name = model.get("name")
+        if name:
+            loaded.add(name)
+    return loaded
+
+
+def build_settings(eval_model: str | None) -> Settings:
+    model = eval_model or os.environ.get("RCA_EVAL_MODEL")
+    base_settings = Settings()
+    if model:
+        if base_settings.llm_backend == "openai_compatible":
+            return Settings(openai_chat_model=model)
+        return Settings(generation_model=model)
+    return base_settings
+
+
+def build_run_config(
+    settings: Settings,
+    flow: GenerateFlow,
+    dataset_kind: str,
+) -> dict[str, Any]:
+    return {
+        "dataset_kind": dataset_kind,
+        "llm_backend": settings.llm_backend,
+        "generation_model": settings.generation_model
+        if settings.llm_backend == "ollama"
+        else settings.openai_chat_model,
+        "resolved_model": getattr(flow.llm, "model", flow.llm.__class__.__name__),
+        "resolved_rewrite_model": getattr(
+            flow.rewrite_llm, "model", flow.rewrite_llm.__class__.__name__
+        ),
+        "embedding_model": settings.embedding_model
+        if settings.llm_backend == "ollama"
+        else settings.openai_embed_model,
+        "graph_db_path": str(settings.graph_db_path),
+        "vector_dir": str(settings.vector_dir),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    golden_path = Path(args.golden_path)
+    golden_path = Path(args.external_golden_path or args.golden_path)
+    dataset_kind = "external" if args.external_golden_path else "golden"
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     golden_pairs = load_golden_pairs(golden_path)
-    flow = GenerateFlow()
+    settings = build_settings(args.model)
+    loaded_models = (
+        fetch_available_ollama_models(settings.llm_base_url)
+        if settings.llm_backend == "ollama"
+        else set()
+    )
+    if loaded_models and settings.generation_model not in loaded_models:
+        warning = (
+            f"Warning: configured model {settings.generation_model} is not available in Ollama. "
+            f"Load it with: ollama pull {settings.generation_model}"
+        )
+        print(warning)
+        if args.strict_model_check:
+            return 3
+    flow = GenerateFlow(settings=settings)
+    if args.rewrite_model and args.rewrite_model.strip():
+        rewrite_model = args.rewrite_model.strip()
+        rewrite_settings = settings.model_copy(deep=True)
+        rewrite_settings.generation_model = rewrite_model
+        rewrite_settings.openai_chat_model = rewrite_model
+        flow.rewrite_llm = get_llm_client(rewrite_settings)
+    try:
+        validate_eval_llm(flow)
+    except RuntimeError as exc:
+        print(str(exc))
+        return 2
+    run_config = build_run_config(settings, flow, dataset_kind)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     trace_dir = output_dir / "traces" / timestamp
     trace_dir.mkdir(parents=True, exist_ok=True)
@@ -344,8 +489,10 @@ def main(argv: list[str] | None = None) -> int:
     output_path = output_dir / f"run_{timestamp}.json"
     payload = {
         "timestamp": timestamp,
+        "dataset_kind": dataset_kind,
         "golden_path": str(golden_path),
         "cases": len(golden_pairs),
+        "run_config": run_config,
         "trace_dir": str(trace_dir),
         "summary": summary,
         "results": [result.model_dump(mode="json") for result in results],

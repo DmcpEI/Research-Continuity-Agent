@@ -163,6 +163,7 @@ def test_harness_evaluate_pair_records_trace_retrieval_features() -> None:
                 citations=[Citation(source_id="src:pdf/a", title="A", excerpt="")],
                 grounded=True,
                 abstained=False,
+                failure_labels=["unsupported_claim"],
                 trace=trace,
             )
 
@@ -179,7 +180,43 @@ def test_harness_evaluate_pair_records_trace_retrieval_features() -> None:
 
     assert result.max_retrieval_score == 0.91
     assert result.unique_sources_top5 == 2
+    assert result.failure_labels == ["unsupported_claim"]
     assert trace_payload is not None
+
+
+def test_harness_build_settings_uses_explicit_eval_model() -> None:
+    harness = load_module(ROOT / "eval" / "harness.py", "eval_harness_model_config")
+
+    settings = harness.build_settings("explicit-eval-model")
+
+    assert settings.generation_model == "explicit-eval-model"
+
+
+def test_harness_aggregate_results_counts_failure_labels() -> None:
+    harness = load_module(ROOT / "eval" / "harness.py", "eval_harness_failure_labels")
+
+    result = harness.EvaluationCaseResult(
+        id="ans-001",
+        question="Supported?",
+        difficulty="medium",
+        category="results",
+        answerable=True,
+        answer="Answer",
+        grounded=False,
+        abstained=False,
+        citations=[],
+        source_correct=False,
+        keyword_hits=0.0,
+        failure_labels=["missing_citation", "low_retrieval_confidence"],
+        latency_ms=10.0,
+    )
+
+    summary = harness.aggregate_results([result])
+
+    assert summary["failure_label_counts"] == {
+        "low_retrieval_confidence": 1,
+        "missing_citation": 1,
+    }
 
 
 def test_ablation_summary_includes_wilson_intervals() -> None:

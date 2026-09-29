@@ -17,6 +17,9 @@ from rca.retrieval.query_classifier import QueryType, classify_query
         ("explain transformer attention mechanisms", QueryType.conceptual),
         ("What did Smith propose?", QueryType.hybrid),
         ("explain Bagging", QueryType.hybrid),
+        ("Why didn't you respond?", QueryType.conversational),
+        ("Do you have context from this chat?", QueryType.conversational),
+        ("Did you mention LLM-Pack earlier?", QueryType.hybrid),
     ],
 )
 def test_classify_query(query: str, expected: QueryType) -> None:

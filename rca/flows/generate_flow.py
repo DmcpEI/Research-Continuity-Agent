@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import re
+from collections.abc import Sequence
 from time import perf_counter
 
 from pydantic import BaseModel, Field
@@ -13,6 +15,8 @@ from rca.flows.retrieve_flow import RetrievalBundle, RetrieveFlow
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
 from rca.llm.factory import get_llm_client
 from rca.retrieval.query_classifier import QueryType, classify_query
+
+logger = logging.getLogger(__name__)
 
 
 class Citation(BaseModel):
@@ -27,7 +31,19 @@ class GeneratedAnswer(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     grounded: bool = False
     abstained: bool = False
+    failure_labels: list[str] = Field(default_factory=list)
     trace: QueryTrace | None = None
+
+
+class GroundingCheck(BaseModel):
+    valid: bool = False
+    failure_labels: list[str] = Field(default_factory=list)
+
+
+class AbstentionDecision(BaseModel):
+    abstain: bool = False
+    answer: str | None = None
+    failure_labels: list[str] = Field(default_factory=list)
 
 
 class GenerateFlow:
@@ -40,7 +56,16 @@ Rules:
 - Use the full ID as written, e.g. [[src:pdf/paper_name]] or [[chk:pdf/paper_name:0012]]
 - If the context does not contain enough information, say so clearly and do not include any [[...]] citations
 - Never invent facts, authors, or results not present in the context
-- Be concise and precise — this is a research tool, not a chatbot"""
+- Use clean markdown formatting with readable structure.
+- Default style: concise prose paragraph(s), not a list.
+- Use bullet points only when:
+    1) the user explicitly asks for points/list/steps, or
+    2) the answer naturally contains multiple distinct items that are clearer as a list.
+- If the user asks for more detail, expand with specific evidence from context and keep structure readable.
+- Use blank lines between sections when formatting longer answers.
+- Keep tone precise and informative — this is a research tool, not a chatbot
+- If no retrieved chunks directly support your answer with specific facts, you must abstain
+- Do not generate answers that only restate the question without adding factual content from the sources"""
     _ABSTENTION_SIGNALS = (
         "does not contain information",
         "no information",
@@ -52,6 +77,8 @@ Rules:
     )
     _CITATION_PATTERN = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
     _ABSTENTION_SCORE_THRESHOLD = 0.50
+    _CONTENT_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+_.-]*")
+    _LOOSE_CITATION_PATTERN = re.compile(r"(?<!\[)\[((?:src|chk):[^\]\s]+)\](?!\])")
     _REWRITE_PROMPT_TEMPLATE = (
         "Return 1 to 3 short additional search keywords or phrases that would improve retrieval "
         "for this research question. Keep exact method names or acronyms only if helpful. "
@@ -64,6 +91,7 @@ Rules:
         settings: Settings | None = None,
         retrieve_flow: RetrieveFlow | None = None,
         llm_client: LLMClient | None = None,
+        rewrite_llm: LLMClient | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.retrieve_flow = retrieve_flow or RetrieveFlow()
@@ -75,13 +103,52 @@ Rules:
         else:
             self.llm = EchoLLMClient()
 
+        # Optional dedicated model/client for query rewriting.
+        # If omitted, rewriting uses the same client as generation.
+        self.rewrite_llm = rewrite_llm or self.llm
+
     def generate_answer(
-        self, query: str, limit: int = 5, trace: QueryTrace | None = None
+        self,
+        query: str,
+        limit: int = 5,
+        trace: QueryTrace | None = None,
+        conversation_messages: Sequence[dict[str, str]] | None = None,
     ) -> GeneratedAnswer:
         trace = trace or QueryTrace(query=query)
         trace.model = getattr(self.llm, "model", self.llm.__class__.__name__)
         query_type = classify_query(query)
         trace.query_type = query_type.value
+
+        if query_type is QueryType.conversational:
+            messages = [
+                ChatMessage(role="system", content=self.SYSTEM_PROMPT),
+                ChatMessage(
+                    role="user",
+                    content=(
+                        f"{self._build_conversation_history_block(conversation_messages)}"
+                        f"Question: {query}"
+                    ),
+                ),
+            ]
+            llm_started = perf_counter()
+            response = self.llm.chat(messages)
+            trace.stages.append(
+                StageTrace(
+                    name="llm_generate",
+                    duration_ms=(perf_counter() - llm_started) * 1000.0,
+                    hit_count=0,
+                )
+            )
+            self._accumulate_usage(trace, response.raw)
+            trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
+            return GeneratedAnswer(
+                query=query,
+                answer=response.text.strip() or "I don't have prior context to answer that yet.",
+                citations=[],
+                grounded=False,
+                abstained=False,
+                trace=trace,
+            )
 
         # Step 1: retrieve grounded context
         if query_type is QueryType.proper_noun:
@@ -107,6 +174,7 @@ Rules:
                 answer="No relevant context found in your knowledge base.",
                 grounded=False,
                 abstained=True,
+                failure_labels=["empty_retrieval", "low_retrieval_confidence"],
                 trace=trace,
             )
 
@@ -135,13 +203,20 @@ Rules:
                 answer="No relevant context found in your knowledge base.",
                 grounded=False,
                 abstained=True,
+                failure_labels=["empty_context", "low_retrieval_confidence"],
                 trace=trace,
             )
 
         # Step 3: call LLM with strict grounding instructions
         messages = [
             ChatMessage(role="system", content=self.SYSTEM_PROMPT),
-            ChatMessage(role="user", content=f"Context:\n{context}\n\nQuestion: {query}"),
+            ChatMessage(
+                role="user",
+                content=(
+                    f"{self._build_conversation_history_block(conversation_messages)}"
+                    f"Context:\n{context}\n\nQuestion: {query}"
+                ),
+            ),
         ]
         llm_started = perf_counter()
         response = self.llm.chat(messages)
@@ -155,38 +230,50 @@ Rules:
         self._accumulate_usage(trace, response.raw)
 
         # Step 4: extract citations from response
-        answer_text = response.text
-        abstained_text = self._abstained_response(answer_text, bundle)
-        if abstained_text is not None:
-            self._append_warning(trace, "llm abstained")
+        answer_text = self._normalize_loose_citation_markers(response.text, bundle)
+        citations = self._extract_citations(answer_text, bundle)
+        grounding = self._verify_grounding(answer_text, citations, bundle)
+        abstention = self._decide_abstention(answer_text, bundle, grounding)
+        self._append_failure_warnings(trace, abstention.failure_labels)
+
+        if abstention.abstain:
             trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
             return GeneratedAnswer(
                 query=query,
-                answer=abstained_text,
+                answer=abstention.answer or self._strip_citation_markers(answer_text),
                 citations=[],
                 grounded=False,
                 abstained=True,
+                failure_labels=abstention.failure_labels,
                 trace=trace,
             )
 
-        citations = self._extract_citations(answer_text, bundle)
-
-        # Step 4b: fallback — if LLM produced no citations, inject top source hit
-        if not citations:
-            top = next((h for h in bundle.hits if h.node_id.startswith("src:")), bundle.hits[0])
-            answer_text = answer_text + f"\n\n[[{top.node_id}]]"
-            citations = [
-                Citation(source_id=top.node_id, title=top.title, excerpt=top.excerpt[:150])
-            ]
-
-        # Step 5: verify grounding
-        hit_ids = {hit.node_id for hit in bundle.hits}
-        hit_source_ids = {self._resolve_source_id(hit.node_id) for hit in bundle.hits}
-        grounded = len(citations) > 0 and all(
-            citation.source_id in hit_ids or citation.source_id in hit_source_ids
-            for citation in citations
-        )
+        grounded = grounding.valid
         trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
+
+        if not self._strip_citation_markers(answer_text) and bundle.hits:
+            logger.warning("Empty model answer for query %r (raw=%r)", query, answer_text)
+            top = citations[0] if citations else None
+            title = top.title if top else bundle.hits[0].title
+            source_id = top.source_id if top else self._resolve_source_id(bundle.hits[0].node_id)
+            if query_type is QueryType.proper_noun:
+                if title:
+                    answer_text = (
+                        f"I found **{title}** (`{source_id}`) in your knowledge base, "
+                        "but couldn't generate a summary. "
+                        "Try asking a more specific question about it."
+                    )
+                else:
+                    answer_text = (
+                        f"I found a source (`{source_id}`) in your knowledge base, "
+                        "but couldn't generate a summary. "
+                        "Try asking a more specific question about it."
+                    )
+            else:
+                answer_text = (
+                    "I found relevant sources but the response was empty. "
+                    "Please try rephrasing your question."
+                )
 
         return GeneratedAnswer(
             query=query,
@@ -194,6 +281,7 @@ Rules:
             citations=citations,
             grounded=grounded,
             abstained=False,
+            failure_labels=grounding.failure_labels,
             trace=trace,
         )
 
@@ -205,6 +293,27 @@ Rules:
             lines.append(hit.excerpt)
             lines.append("")
         return "\n".join(lines)
+
+    @staticmethod
+    def _build_conversation_history_block(
+        conversation_messages: Sequence[dict[str, str]] | None,
+    ) -> str:
+        if not conversation_messages:
+            return ""
+
+        lines = ["Conversation history:"]
+        for item in conversation_messages:
+            role = str(item.get("role", "")).strip().lower()
+            content = str(item.get("content", "")).strip()
+            if role not in {"user", "assistant"} or not content:
+                continue
+
+            speaker = "User" if role == "user" else "Assistant"
+            lines.append(f"- {speaker}: {content}")
+
+        if len(lines) == 1:
+            return ""
+        return "\n".join(lines) + "\n\n"
 
     @staticmethod
     def _select_context_hits(bundle: RetrievalBundle) -> list:
@@ -268,7 +377,8 @@ Rules:
                 if parent_hit is not None:
                     hit = parent_hit
                 else:
-                    parent_node = self.retrieve_flow.graph_store.get_node(parent_id)
+                    graph_store = getattr(self.retrieve_flow, "graph_store", None)
+                    parent_node = graph_store.get_node(parent_id) if graph_store else None
                     if parent_node is not None:
                         citations.append(
                             Citation(
@@ -290,26 +400,147 @@ Rules:
 
         return citations
 
+    def _normalize_loose_citation_markers(self, answer_text: str, bundle: RetrievalBundle) -> str:
+        """Normalize model-emitted [src:...] markers when they point at retrieved evidence."""
+
+        hit_ids = {hit.node_id for hit in bundle.hits}
+        hit_source_ids = {self._resolve_source_id(hit.node_id) for hit in bundle.hits}
+
+        def replace(match: re.Match[str]) -> str:
+            cited_id = match.group(1).strip()
+            cited_source_id = self._resolve_source_id(cited_id)
+            if cited_id in hit_ids or cited_source_id in hit_source_ids:
+                return f"[[{cited_id}]]"
+            return match.group(0)
+
+        return self._LOOSE_CITATION_PATTERN.sub(replace, answer_text)
+
     @classmethod
     def _contains_abstention_signal(cls, answer_text: str) -> bool:
         normalized = answer_text.casefold()
         return any(signal in normalized for signal in cls._ABSTENTION_SIGNALS)
 
-    @classmethod
-    def _abstained_response(
-        cls,
+    def _verify_grounding(
+        self,
+        answer_text: str,
+        citations: list[Citation],
+        bundle: RetrievalBundle,
+    ) -> GroundingCheck:
+        labels: list[str] = []
+        raw_citation_ids = self._CITATION_PATTERN.findall(answer_text)
+        hit_ids = {hit.node_id for hit in bundle.hits}
+        hit_source_ids = {self._resolve_source_id(hit.node_id) for hit in bundle.hits}
+
+        if not raw_citation_ids:
+            return GroundingCheck(valid=False, failure_labels=["missing_citation"])
+        if not citations:
+            return GroundingCheck(valid=False, failure_labels=["invalid_citation"])
+
+        for citation in citations:
+            if citation.source_id not in hit_ids and citation.source_id not in hit_source_ids:
+                labels.append("invalid_citation")
+                break
+
+        if not labels and not self._answer_supported_by_cited_evidence(
+            answer_text, citations, bundle
+        ):
+            labels.append("unsupported_claim")
+
+        return GroundingCheck(valid=not labels, failure_labels=self._dedupe_labels(labels))
+
+    def _decide_abstention(
+        self,
         answer_text: str,
         bundle: RetrievalBundle,
-    ) -> str | None:
-        has_hedge = cls._contains_abstention_signal(answer_text)
-        has_citation = bool(cls._CITATION_PATTERN.search(answer_text))
+        grounding: GroundingCheck,
+    ) -> AbstentionDecision:
+        labels = list(grounding.failure_labels)
+        has_hedge = self._contains_abstention_signal(answer_text)
         max_retrieval_score = max((hit.score for hit in bundle.hits), default=0.0)
 
-        if has_hedge and not has_citation:
-            return cls._strip_citation_markers(answer_text)
-        if has_hedge and has_citation and max_retrieval_score < cls._ABSTENTION_SCORE_THRESHOLD:
-            return cls._strip_citation_markers(answer_text)
-        return None
+        if has_hedge:
+            labels.append("llm_abstained")
+        if max_retrieval_score < self._ABSTENTION_SCORE_THRESHOLD:
+            labels.append("low_retrieval_confidence")
+
+        labels = self._dedupe_labels(labels)
+        should_abstain = False
+        if has_hedge and (
+            not grounding.valid or max_retrieval_score < self._ABSTENTION_SCORE_THRESHOLD
+        ):
+            should_abstain = True
+        if "invalid_citation" in labels or "unsupported_claim" in labels:
+            should_abstain = True
+        if "missing_citation" in labels and "low_retrieval_confidence" in labels:
+            should_abstain = True
+
+        return AbstentionDecision(
+            abstain=should_abstain,
+            answer=self._strip_citation_markers(answer_text) if should_abstain else None,
+            failure_labels=labels,
+        )
+
+    def _answer_supported_by_cited_evidence(
+        self,
+        answer_text: str,
+        citations: list[Citation],
+        bundle: RetrievalBundle,
+    ) -> bool:
+        answer_tokens = self._content_tokens(self._strip_citation_markers(answer_text))
+        if not answer_tokens:
+            return False
+
+        evidence_by_source: dict[str, list[str]] = {}
+        for hit in bundle.hits:
+            source_id = self._resolve_source_id(hit.node_id)
+            evidence_by_source.setdefault(source_id, []).extend([hit.title, hit.excerpt])
+            evidence_by_source.setdefault(hit.node_id, []).extend([hit.title, hit.excerpt])
+
+        for citation in citations:
+            evidence_text = " ".join(evidence_by_source.get(citation.source_id, []))
+            if not evidence_text:
+                continue
+            if self._has_basic_support(answer_tokens, evidence_text):
+                return True
+        return False
+
+    @classmethod
+    def _has_basic_support(cls, answer_tokens: set[str], evidence_text: str) -> bool:
+        evidence_tokens = cls._content_tokens(evidence_text)
+        shared = answer_tokens & evidence_tokens
+        if len(shared) >= 2:
+            return True
+        if len(answer_tokens) <= 4 and any(len(token) >= 4 for token in shared):
+            return True
+        return False
+
+    @classmethod
+    def _content_tokens(cls, text: str) -> set[str]:
+        stopwords = cls._REWRITE_STOPWORDS | {
+            "about",
+            "above",
+            "below",
+            "but",
+            "context",
+            "describe",
+            "describes",
+            "did",
+            "do",
+            "given",
+            "into",
+            "not",
+            "provided",
+            "requested",
+            "that",
+            "this",
+            "was",
+            "were",
+        }
+        return {
+            cleaned
+            for token in cls._CONTENT_TOKEN.findall(text)
+            if len(cleaned := token.strip("._-+").casefold()) >= 3 and cleaned not in stopwords
+        }
 
     @classmethod
     def _strip_citation_markers(cls, answer_text: str) -> str:
@@ -326,7 +557,7 @@ Rules:
                     content=self.build_rewrite_prompt(query),
                 )
             ]
-            response = self.llm.chat(messages)
+            response = self.rewrite_llm.chat(messages)
             if trace is not None and started_at is not None:
                 trace.stages.append(
                     StageTrace(
@@ -418,3 +649,16 @@ Rules:
     def _append_warning(trace: QueryTrace, warning: str) -> None:
         if warning not in trace.warnings:
             trace.warnings.append(warning)
+
+    @classmethod
+    def _append_failure_warnings(cls, trace: QueryTrace, labels: list[str]) -> None:
+        for label in labels:
+            cls._append_warning(trace, f"failure:{label}")
+
+    @staticmethod
+    def _dedupe_labels(labels: list[str]) -> list[str]:
+        deduped: list[str] = []
+        for label in labels:
+            if label not in deduped:
+                deduped.append(label)
+        return deduped

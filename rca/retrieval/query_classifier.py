@@ -10,6 +10,7 @@ class QueryType(StrEnum):
     proper_noun = "proper_noun"
     conceptual = "conceptual"
     hybrid = "hybrid"
+    conversational = "conversational"
 
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+_.-]*")
@@ -22,6 +23,8 @@ QUESTION_WORDS = {
     "can",
     "compare",
     "describe",
+    "did",
+    "do",
     "does",
     "explain",
     "how",
@@ -36,6 +39,22 @@ QUESTION_WORDS = {
     "why",
 }
 
+CONVERSATIONAL_PATTERNS = (
+    r"\bwhy did you\b",
+    r"\bwhy didn't you\b",
+    r"\bwhy didnt you\b",
+    r"\bwhat did you\b",
+    r"\bdid you respond\b",
+    r"\bdo you have context\b",
+    r"\bfrom this chat\b",
+    r"\bfrom our chat\b",
+    r"\bfrom this conversation\b",
+    r"\bdo you remember\b",
+    r"\bcan you remember\b",
+    r"\bdid you mention\b",
+)
+CONVERSATIONAL_PATTERN = re.compile("|".join(CONVERSATIONAL_PATTERNS), re.IGNORECASE)
+
 
 def classify_query(query: str) -> QueryType:
     """Classify a query as proper_noun, conceptual, or hybrid.
@@ -49,6 +68,7 @@ def classify_query(query: str) -> QueryType:
     strong_signals = 0
     weak_signals = 0
     tokens = TOKEN_PATTERN.findall(query)
+    has_conversational_signal = CONVERSATIONAL_PATTERN.search(query) is not None
 
     if AUTHOR_LIKE_PATTERN.search(query):
         strong_signals += 1
@@ -74,6 +94,12 @@ def classify_query(query: str) -> QueryType:
         if token[:1].isupper() and token[1:].islower() and normalized not in QUESTION_WORDS:
             weak_signals += 1
 
+    has_entity = strong_signals >= 1 or weak_signals >= 1
+
+    if has_conversational_signal and not has_entity:
+        return QueryType.conversational
+    if has_conversational_signal and has_entity:
+        return QueryType.hybrid
     if strong_signals >= 1 or weak_signals >= 2:
         return QueryType.proper_noun
     if weak_signals == 1:
