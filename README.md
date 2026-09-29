@@ -64,7 +64,7 @@ uv run python eval/run_ablations.py
 uv run python eval/harness.py --model gemma3:12b
 ```
 
-The checked-in golden set currently contains `100` questions: `90` answerable and `10` explicit negative / unanswerable queries. Refresh `eval/results/` locally after any corpus or backend change.
+The checked-in golden set currently contains `129` questions: `90` answerable and `39` explicit negative / unanswerable queries. Refresh `eval/results/` locally after any corpus or backend change.
 
 ---
 
@@ -144,12 +144,12 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Evaluation
 
-RCA is currently evaluated on **100 golden questions**: `90` answerable and `10` explicit negative / unanswerable queries.
+RCA is currently evaluated on **129 golden questions**: `90` answerable and `39` explicit negative / unanswerable queries, typed by failure mode (unreported detail, false premise, out-of-corpus, fabricated, off-domain).
 
 The checked-in eval assets now include:
-- `eval/golden.json` with the full 100-question corpus
+- `eval/golden.json` with the full 129-question corpus
 - `eval/splits/dev.json` and `eval/splits/test.json` with a stratified `69 / 31` split
-- `eval/harness.py` for answer-level evaluation over all `100` questions
+- `eval/harness.py` for answer-level evaluation over all `129` questions
 - `eval/run_ablations.py` for retrieval-only evaluation over the `90` answerable questions
 - `eval/run_coefficient_sweep.py` for held-out lexical-reranker tuning on the current split
 
@@ -168,7 +168,7 @@ Current generation results on the 100-question corpus (production baseline `gemm
 | Average latency | `9.7 s` |
 | Grounded rate | `94.0%` |
 
-These numbers come from the 2026-04-21 `gemma3:12b` run, before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
+These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
 
 Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
@@ -210,6 +210,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] **Retrieval baselines and ablations** — FTS5/BM25, dense-only, LIKE, graph expansion, rewrite
 - [x] **Retrieval ranking hardening** — exact-word title/text rescoring to remove partial-word false positives
 - [x] **Expand golden set** — 30 → 100 grounded questions
+- [x] **Expand negative set** — 10 → 39 typed unanswerable questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
 - [x] GitHub Actions CI — Ruff + pytest on push / PR

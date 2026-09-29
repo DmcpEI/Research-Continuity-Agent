@@ -1,7 +1,7 @@
 {
   "split": "dev",
   "seed": 42,
-  "count": 69,
+  "count": 89,
   "ids": [
     "vlmsurvey-002",
     "review-001",
@@ -71,6 +71,26 @@
     "synth-007",
     "synth-002",
     "synth-006",
-    "synth-005"
+    "synth-005",
+    "neg-026",
+    "neg-020",
+    "neg-035",
+    "neg-030",
+    "neg-039",
+    "neg-027",
+    "neg-037",
+    "neg-012",
+    "neg-024",
+    "neg-013",
+    "neg-028",
+    "neg-038",
+    "neg-015",
+    "neg-036",
+    "neg-018",
+    "neg-019",
+    "neg-034",
+    "neg-011",
+    "neg-014",
+    "neg-031"
   ]
 }

@@ -24,7 +24,7 @@ RCA today is a local-first research knowledge system with:
 - configurable backend parity for local Ollama or OpenAI-compatible chat and embedding APIs
 - a FastAPI bridge matching the React frontend API contract for status, sources, ingest, chat, agent calls, model selection, and PDF fetch
 - a deployment-ready AWS demo package with baked data, ECS templates, and short-lived task scripts
-- a 100-question evaluation corpus and a local CI baseline of Ruff plus pytest
+- a 129-question evaluation corpus (39 typed negatives) and a local CI baseline of Ruff plus pytest
 
 The current implementation now has two orchestration paths: direct `RetrieveFlow`/`GenerateFlow` for grounded chat, and a separate agent loop for multi-turn tool use.
 
@@ -42,7 +42,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 
 | Metric | Value |
 |---|---|
-| Eval corpus | `100` questions (`90` answerable, `10` negative) |
+| Eval corpus | `129` questions (`90` answerable, `39` negative) |
 | Retrieval, full pipeline | `93.3%` hit@5 / `96.7%` hit@10 |
 | Citation precision | `90.8%` over `87` answerable, non-abstained cases |
 | Negative abstention recall | `3/10` (`30.0%`) |
@@ -52,7 +52,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Average latency | `9.7 s` |
 | Tests | `110` passing |
 
-These numbers come from the 2026-04-21 `gemma3:12b` run, before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
+These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
 
 Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/EVAL.md). System structure lives in [ARCHITECTURE.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/ARCHITECTURE.md). The user-facing overview stays in [README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/README.md).
 
@@ -70,7 +70,7 @@ Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/D
 These are the highest-priority milestones for reliability and correctness.
 
 - **Keyword-hit improvement via rewrite prompt tuning** — Improve the rewrite prompt and retrieval-term alignment for the robotics corpus. Rationale: keyword hit rate (`20.5%`) is the clearest current retrieval weakness.
-- **Confidence-calibrated abstention** — Replace the current threshold heuristic with a better-calibrated abstention policy; if a larger negative set is collected, evaluate a lightweight classifier over retrieval features such as max score, score spread, query length, and hits above threshold. Rationale: abstention still trades off against answerable coverage and needs calibration.
+- **Confidence-calibrated abstention** — Replace the current threshold heuristic with a better-calibrated abstention policy; with the expanded 39-question negative set, evaluate a lightweight classifier over retrieval features such as max score, score spread, query length, and hits above threshold. Rationale: abstention still trades off against answerable coverage and needs calibration.
 - **Human-authored external eval subset** — Add a small independently written subset to the golden set. Rationale: it reduces self-bias in external reporting better than adding more self-authored questions.
 - **Retrieval auditability in eval** — Expose retrieved hit lists and per-chunk provenance in harness output, then add a compact failure taxonomy. Rationale: it will make ranking-versus-generation errors easier to explain and defend.
 - **React API verification** — Keep the new FastAPI bridge covered by contract tests while Streamlit remains the supported local demo surface. Rationale: the React frontend is now technically usable, but product polish should follow correctness work.
@@ -175,6 +175,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 ### Evaluation and observability
 
 - [x] 100-question golden set with `90/10` answerable-negative split
+- [x] Negative set expanded to `39` typed unanswerable questions
 - [x] Stratified dev/test splits
 - [x] Retrieval ablations and coefficient sweep
 - [x] QueryTrace stage timings, token usage, and retrieval provenance

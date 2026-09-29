@@ -4,7 +4,7 @@ RCA is evaluated at two layers:
 - retrieval quality: does the correct paper surface in the top-k bundle?
 - generation quality: does the final answer cite the correct source, use retrieved evidence, and abstain when the corpus does not support the question?
 
-This document reflects the current **100-question** evaluation corpus and the current eval scripts in the repo.
+This document reflects the current **129-question** evaluation corpus and the current eval scripts in the repo.
 
 ---
 
@@ -12,10 +12,10 @@ This document reflects the current **100-question** evaluation corpus and the cu
 
 The active golden set is [eval/golden.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/golden.json).
 
-- Total questions: `100`
+- Total questions: `129`
 - Answerable: `90`
-- Negative / unanswerable: `10`
-- Difficulties: `9 easy`, `48 medium`, `43 hard`
+- Negative / unanswerable: `39`
+- Difficulties: `15 easy`, `62 medium`, `52 hard`
 
 Coverage includes:
 - single-paper factual lookup
@@ -24,6 +24,18 @@ Coverage includes:
 - cross-paper comparison
 - multi-chunk synthesis
 - explicit negative / unsupported queries
+
+Negative questions `neg-011`–`neg-039` carry a `negative_type` field so abstention can be reported per failure mode:
+
+| `negative_type` | Count | Meaning |
+|---|---|---|
+| `unreported` | `10` | paper is in the corpus, the asked detail is not |
+| `false_premise` | `7` | question assumes a method, setting, or result the paper does not have |
+| `out_of_corpus` | `4` | real system or benchmark that is not in the corpus |
+| `fabricated` | `4` | invented paper or system name |
+| `off_domain` | `4` | topic unrelated to the corpus |
+
+Each new negative was checked by pattern search over all chunk text; candidates the corpus answers even partially were dropped (for example AutoBag's 500 g YuMi payload). The original `neg-001`–`neg-010` are untyped.
 
 Metric definitions:
 - `citation_precision`: fraction of answerable, non-abstained cases where every expected source appears in the returned citation IDs
@@ -46,7 +58,7 @@ Optional model override for direct A/B runs:
 uv run python eval/harness.py --model llama3.1:8b
 ```
 
-The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py) over all `100` questions and records:
+The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py) over all `129` questions and records:
 - `grounded`
 - `abstained`
 - `citations`
@@ -141,7 +153,7 @@ Current split behavior:
 - split files live in [eval/splits/dev.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/splits/dev.json) and [eval/splits/test.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/splits/test.json)
 - the split is stratified by category with `random.seed(42)`
 - the script now scales the held-out size with the corpus instead of hardcoding the original `45 / 20`
-- for the current 100-question corpus, the checked-in split is `69` dev / `31` test
+- for the original 100-question corpus, the split was `69` dev / `31` test; the 29 negatives added later were appended with the same seed and ratio (`20` dev / `9` test) so existing assignments stay stable, giving `89` dev / `40` test. Rerunning the sweep regenerates the full stratified split.
 
 As with the other eval scripts, rerun locally when the corpus or retrieval backend changes.
 
@@ -268,7 +280,7 @@ Suggested automation split:
 ## Current Status
 
 What is true today, independent of any single artifact:
-- the golden corpus is now `100` questions
+- the golden corpus is now `129` questions (`39` negative)
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
 - abstention remains heuristic and is still one of the main open weaknesses

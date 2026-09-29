@@ -1,7 +1,7 @@
 {
   "split": "test",
   "seed": 42,
-  "count": 31,
+  "count": 40,
   "ids": [
     "stablebinpacking-005",
     "retail-001",
@@ -33,6 +33,15 @@
     "sgvl-003",
     "pic2-009",
     "synth-003",
-    "synth-004"
+    "synth-004",
+    "neg-029",
+    "neg-025",
+    "neg-021",
+    "neg-033",
+    "neg-032",
+    "neg-017",
+    "neg-016",
+    "neg-023",
+    "neg-022"
   ]
 }

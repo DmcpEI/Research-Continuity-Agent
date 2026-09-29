@@ -845,5 +845,295 @@
     "expected_source": "src:pdf/restockandstraighteningsystemforretailautomationusingcompliantandmobilemanipulation",
     "difficulty": "medium",
     "category": "contribution"
+  },
+  {
+    "id": "neg-011",
+    "question": "What is the total hardware cost in US dollars of the JamPacker system?",
+    "expected_keywords": ["not reported", "cannot answer", "cost"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-012",
+    "question": "What license is the JSONSchemaBench dataset released under?",
+    "expected_keywords": ["not reported", "cannot answer", "license"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-013",
+    "question": "How much energy in kWh does the dense robotic packing system consume per packed bin?",
+    "expected_keywords": ["not reported", "cannot answer", "energy"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-014",
+    "question": "What inference latency on an NVIDIA Jetson Orin does LLM-Pack report?",
+    "expected_keywords": ["not reported", "cannot answer", "Jetson"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-015",
+    "question": "How many human annotators labeled the scene graphs used to train SGVL?",
+    "expected_keywords": ["not reported", "cannot answer", "annotators"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-016",
+    "question": "What success rate does Bag All You Need report on paper bags as opposed to plastic bags?",
+    "expected_keywords": ["not reported", "cannot answer", "paper bags"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-017",
+    "question": "Which cloud provider hosted the experiments in the automata-based constraints paper?",
+    "expected_keywords": ["not reported", "cannot answer", "cloud"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-018",
+    "question": "How many commercial robotic packing systems deployed in Japan does the robotized freight packing review catalog?",
+    "expected_keywords": ["not reported", "cannot answer", "Japan"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-019",
+    "question": "What shelf-restocking throughput in items per hour does the AI-powered retail robotics paper report?",
+    "expected_keywords": ["not reported", "cannot answer", "throughput"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-020",
+    "question": "How many reusable plastic crates per pallet does the RPC paper recommend for strawberries?",
+    "expected_keywords": ["not reported", "cannot answer", "strawberries"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "unreported"
+  },
+  {
+    "id": "neg-021",
+    "question": "What reward function does SayPlan use for its reinforcement learning fine-tuning stage?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "reinforcement learning"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-022",
+    "question": "Which hyperparameters were used to fine-tune GPT-4 into a robot language model in the scene-graph reasoning paper?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "GPT-4"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-023",
+    "question": "Which suction cup diameter does JamPacker use to open plastic bags?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "plastic bags"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-024",
+    "question": "How does Grammar-Aligned Decoding perform on image captioning benchmarks such as COCO?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "COCO"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-025",
+    "question": "What real-world Franka Panda experiments does ViLaIn report?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "Franka"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-026",
+    "question": "How does SayPlan perform when planning in outdoor urban environments spanning several city blocks?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "outdoor"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-027",
+    "question": "What accuracy does JSONSchemaBench report for XML schema validation?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "XML"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "false_premise"
+  },
+  {
+    "id": "neg-028",
+    "question": "What success rate does Diffusion Policy report on the Push-T task?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "Push-T"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "out_of_corpus"
+  },
+  {
+    "id": "neg-029",
+    "question": "What grasp success rate does Dex-Net 4.0 report for bin picking?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "Dex-Net"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "out_of_corpus"
+  },
+  {
+    "id": "neg-030",
+    "question": "How does the Amazon Sparrow robot pick items from warehouse totes?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "Sparrow"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "out_of_corpus"
+  },
+  {
+    "id": "neg-031",
+    "question": "Which paper in the corpus reports 6D pose results on the YCB-Video benchmark?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "YCB-Video"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "out_of_corpus"
+  },
+  {
+    "id": "neg-032",
+    "question": "What does the paper 'ShelfGraph: Hierarchical Scene Graphs for Supermarket Auditing' propose?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "ShelfGraph"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "fabricated"
+  },
+  {
+    "id": "neg-033",
+    "question": "Which baseline does BagFormer outperform on the grocery bagging benchmark?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "BagFormer"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "fabricated"
+  },
+  {
+    "id": "neg-034",
+    "question": "According to the CrateNet paper, how accurate is fill-level estimation for reusable plastic crates?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "CrateNet"],
+    "expected_source": null,
+    "difficulty": "medium",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "fabricated"
+  },
+  {
+    "id": "neg-035",
+    "question": "What is the main contribution of the PackLLM-2 system for irregular object packing?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "PackLLM-2"],
+    "expected_source": null,
+    "difficulty": "hard",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "fabricated"
+  },
+  {
+    "id": "neg-036",
+    "question": "What learning-rate schedule was used to train Stable Diffusion XL?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "Stable Diffusion"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "off_domain"
+  },
+  {
+    "id": "neg-037",
+    "question": "Which antibody complexes did AlphaFold 3 predict with high confidence?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "AlphaFold"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "off_domain"
+  },
+  {
+    "id": "neg-038",
+    "question": "What does the corpus say about error correction in superconducting qubits?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "qubits"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "off_domain"
+  },
+  {
+    "id": "neg-039",
+    "question": "How does whole-word masking change BERT pretraining?",
+    "expected_keywords": ["cannot answer", "not in the corpus", "BERT"],
+    "expected_source": null,
+    "difficulty": "easy",
+    "category": "negative",
+    "answerable": false,
+    "negative_type": "off_domain"
   }
 ]
