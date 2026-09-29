@@ -61,7 +61,7 @@ The system composes FTS5/BM25 lexical search, dense vector retrieval, source gra
 uv run python eval/run_ablations.py
 
 # Run generation harness on the same golden set
-uv run python eval/harness.py --model qwen2.5:14b
+uv run python eval/harness.py --model gemma3:12b
 ```
 
 The checked-in golden set currently contains `100` questions: `90` answerable and `10` explicit negative / unanswerable queries. Refresh `eval/results/` locally after any corpus or backend change.
@@ -168,6 +168,8 @@ Current generation results on the 100-question corpus (production baseline `gemm
 | Average latency | `9.7 s` |
 | Grounded rate | `94.0%` |
 
+These numbers come from the 2026-04-21 `gemma3:12b` run, before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
+
 Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
 | Configuration | hit@5 | hit@10 |
@@ -264,6 +266,7 @@ Key environment variables:
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
 | `RCA_LLM_BACKEND` | `ollama` | Backend selector for chat, tool use, and embeddings (`ollama` or `openai_compatible`) |
 | `RCA_GENERATION_MODEL` | `gemma3:12b` | Ollama model used for answer generation and query rewriting |
+| `RCA_AGENT_MODEL` | `qwen2.5:14b` | Ollama model for the tool-using agent loop (must support tool calling) |
 | `RCA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model used for vector embeddings |
 | `RCA_LLM_BASE_URL` | `http://localhost:11434` | Base URL for the local Ollama generation/chat API |
 | `RCA_LLM_API_KEY` | `ollama` | API key for the configured LLM endpoint; ignored by default local Ollama |

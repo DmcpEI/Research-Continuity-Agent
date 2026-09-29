@@ -2336,7 +2336,7 @@ wheels = [
 
 [[package]]
 name = "research-continuity-agent"
-version = "1.2.0"
+version = "1.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "chromadb" },

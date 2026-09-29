@@ -13,7 +13,7 @@ Target audience: AI/ML, orchestration, and agent-systems roles in robotics-adjac
 
 ---
 
-## Current state (v1.4.0 — 2026-03-18)
+## Current state (v1.5.0 — 2026-09-29)
 
 RCA today is a local-first research knowledge system with:
 - dual-store ingest into SQLite graph data plus ChromaDB embeddings, with document revisions and idempotent re-ingest
@@ -51,6 +51,8 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Grounded rate | `94.0%` |
 | Average latency | `9.7 s` |
 | Tests | `110` passing |
+
+These numbers come from the 2026-04-21 `gemma3:12b` run, before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
 
 Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/EVAL.md). System structure lives in [ARCHITECTURE.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/ARCHITECTURE.md). The user-facing overview stays in [README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/README.md).
 

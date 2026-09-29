@@ -37,7 +37,7 @@ Metric definitions:
 ## Generation Harness
 
 ```bash
-uv run python eval/harness.py --model qwen2.5:14b
+uv run python eval/harness.py --model gemma3:12b
 ```
 
 Optional model override for direct A/B runs:
@@ -74,7 +74,7 @@ Human-authored external eval subsets use the same JSON schema as `eval/golden.js
 Run an external subset separately:
 
 ```bash
-uv run python eval/harness.py --external-golden-path path/to/external_golden.json --model qwen2.5:14b
+uv run python eval/harness.py --external-golden-path path/to/external_golden.json --model gemma3:12b
 ```
 
 Artifacts are labeled with `dataset_kind: "external"` so they can be reported separately from the self-authored golden set.
