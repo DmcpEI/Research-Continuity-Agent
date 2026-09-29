@@ -17,9 +17,29 @@ CREATE TABLE IF NOT EXISTS edges (
     PRIMARY KEY (source, target, kind)
 );
 
+CREATE TABLE IF NOT EXISTS source_revisions (
+    revision_id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    revision_number INTEGER NOT NULL,
+    ingest_status TEXT NOT NULL,
+    path TEXT NOT NULL,
+    ingest_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    file_sha256 TEXT,
+    content_sha256 TEXT NOT NULL,
+    metadata TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (source_id, revision_number)
+);
+
 CREATE INDEX IF NOT EXISTS idx_nodes_kind ON nodes(kind);
 CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source);
 CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target);
+CREATE INDEX IF NOT EXISTS idx_source_revisions_source_id ON source_revisions(source_id);
+CREATE INDEX IF NOT EXISTS idx_source_revisions_file_sha256 ON source_revisions(file_sha256);
+CREATE INDEX IF NOT EXISTS idx_source_revisions_content_sha256 ON source_revisions(content_sha256);
+CREATE INDEX IF NOT EXISTS idx_source_revisions_ingest_name ON source_revisions(ingest_name);
+CREATE INDEX IF NOT EXISTS idx_source_revisions_path ON source_revisions(path);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
     title,

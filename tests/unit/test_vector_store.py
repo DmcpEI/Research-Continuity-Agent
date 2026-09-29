@@ -51,3 +51,45 @@ def test_configurable_embedding_function_uses_client_embed_dimensions() -> None:
 
     assert vectors == [[0.1, 0.2], [0.3, 0.4]]
     assert client.calls == [(["alpha", "beta"], 768)]
+
+
+def test_vector_store_delete_texts_removes_json_fallback_records(tmp_path) -> None:
+    store = object.__new__(VectorStore)
+    store.persist_dir = tmp_path
+    store.collection_name = "test"
+    store._fallback_path = Path(tmp_path / "test.json")
+    store._documents = {
+        "doc-1": {"document": "alpha", "metadata": {"source_id": "src:note/demo"}},
+        "doc-2": {"document": "beta", "metadata": {"source_id": "src:note/demo"}},
+    }
+    store._collection = None
+    store._chroma_error = None
+
+    store.delete_texts(["doc-2"])
+
+    assert "doc-1" in store._documents
+    assert "doc-2" not in store._documents
+
+
+def test_vector_store_delete_texts_fail_closed_on_chroma_error(tmp_path) -> None:
+    class BrokenDeleteCollection:
+        def delete(self, **kwargs):
+            raise RuntimeError("simulated delete failure")
+
+    store = object.__new__(VectorStore)
+    store.persist_dir = tmp_path
+    store.collection_name = "test"
+    store._fallback_path = Path(tmp_path / "test.json")
+    store._documents = {
+        "doc-1": {"document": "alpha", "metadata": {"source_id": "src:note/demo"}},
+    }
+    store._collection = BrokenDeleteCollection()
+    store._chroma_error = None
+
+    try:
+        store.delete_texts(["doc-1"])
+        assert False, "delete_texts should raise when Chroma delete fails"
+    except RuntimeError as exc:
+        assert "simulated delete failure" in str(exc)
+
+    assert "doc-1" in store._documents

@@ -120,6 +120,17 @@ class VectorStore:
 
         return self._query_fallback(query_text, limit)
 
+    def delete_texts(self, ids: list[str]) -> None:
+        if not ids:
+            return
+
+        if self._collection is not None:
+            # Fail closed on Chroma delete failures to avoid serving stale vectors.
+            self._collection.delete(ids=ids)
+            return
+
+        self._delete_fallback(ids)
+
     def _load_fallback_documents(self) -> dict[str, dict[str, Any]]:
         if not self._fallback_path.exists():
             return {}
@@ -136,6 +147,17 @@ class VectorStore:
         self._fallback_path.write_text(
             json.dumps(self._documents, indent=2, sort_keys=True), encoding="utf-8"
         )
+
+    def _delete_fallback(self, ids: list[str]) -> None:
+        removed = False
+        for record_id in ids:
+            if record_id in self._documents:
+                removed = True
+                del self._documents[record_id]
+        if removed or self._fallback_path.exists():
+            self._fallback_path.write_text(
+                json.dumps(self._documents, indent=2, sort_keys=True), encoding="utf-8"
+            )
 
     def _query_fallback(self, query_text: str, limit: int) -> list[VectorQueryResult]:
         query_counter = Counter(self._tokenize(query_text))
