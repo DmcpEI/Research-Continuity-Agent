@@ -28,7 +28,7 @@ GenerateFlow
     ├── query rewrite (inside GenerateFlow, optional)
     ├── retrieval via RetrieveFlow
     ├── prompt assembly (system + context chunks + query)
-    ├── LLM generation (qwen2.5:14b locally or OpenAI-compatible in deployment)
+    ├── LLM generation (gemma4:e4b locally or OpenAI-compatible in deployment)
     ├── citation extraction (_extract_citations)
     ├── source-ID resolution (chunk ID → parent src: node)
     ├── abstention check (hedge phrases + retrieval confidence)
@@ -56,6 +56,14 @@ Entry point for adding documents to the knowledge base. Accepts a PDF path or fo
 
 Node IDs follow the scheme defined in `rca/contracts/ids.py` — see [DATA_MODEL.md](DATA_MODEL.md).
 
+**Revisions and idempotent re-ingest.** Before writing, `IngestFlow` computes `file_sha256` and `content_sha256` (normalized extracted text) and resolves the logical source in this order: file hash → content hash → prior path → prior normalized ingest name → legacy source ID → new source. The result is one of three `IngestStatus` values:
+
+- `unchanged` — same content; no chunk or vector writes. A renamed same-content file still records a revision row so alias lookups keep working.
+- `updated` — same logical `source_id`, new content; `GraphStore.replace_source_chunks_atomic()` swaps the chunk set in one transaction, then stale vectors are deleted and new ones upserted.
+- `created` — new logical source.
+
+Every non-`unchanged` ingest appends a row to `source_revisions`. Retrieval, citations, and eval still operate only on logical `src:` IDs and the latest active chunks. Vector deletes fail closed on Chroma errors so stale vectors are never silently served.
+
 ### RetrieveFlow (`rca/flows/retrieve_flow.py`)
 
 Hybrid retrieval over the dual-store. Called with a query string, returns a `RetrievalBundle`.
@@ -76,9 +84,9 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 | vector-only (dense baseline) | 76.7% | 88.9% |
 | vector + keyword (FTS5) | 76.7% | 88.9% |
 | vector + keyword + expansion | 94.4% | 96.7% |
-| full + query rewrite | 96.7% | 98.9% |
+| full + query rewrite | 93.3% | 96.7% |
 
-The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. On the current 100-question corpus, the full rewrite pipeline edges past the pure BM25 baseline at hit@5 and matches it at hit@10, while the raw expansion pipeline still trails slightly on both metrics.
+The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. On the current 100-question corpus snapshot, the pure BM25 baseline remains stronger than the full rewrite variant, while expansion still provides most of the hybrid lift over dense retrieval alone.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 
@@ -166,7 +174,7 @@ Key settings:
 | `RCA_LLM_BACKEND` | ollama | Backend selector for chat, tool use, and embeddings |
 | `RCA_ENABLE_FILESYSTEM_TOOLS` | true | Enable or disable filesystem MCP tools in the agent loop |
 | `RCA_EMBEDDING_MODEL` | nomic-embed-text | Ollama embedding model |
-| `RCA_GENERATION_MODEL` | qwen2.5:14b | Ollama generation model |
+| `RCA_GENERATION_MODEL` | gemma4:e4b | Ollama generation model |
 | `RCA_EMBEDDING_BASE_URL` | http://localhost:11434 | Ollama embedding base URL |
 | `RCA_LLM_BASE_URL` | http://localhost:11434 | Ollama chat base URL |
 | `RCA_OPENAI_BASE_URL` | https://api.openai.com/v1 | OpenAI-compatible base URL |

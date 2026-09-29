@@ -34,7 +34,7 @@ flowchart TD
         RERANK["Cross-encoder rerank<br/>ms-marco-MiniLM-L-6-v2"]
         GF["GenerateFlow"]
         CTX["Context assembly<br/>top-k hits"]
-        LLM["LLM generation<br/>qwen2.5:14b via configured backend"]
+        LLM["LLM generation<br/>gemma3:12b via configured backend"]
         ABS["Abstention detection<br/>two-gate"]
         CITE["Citation extraction"]
         OUT["GeneratedAnswer<br/>text + citations + QueryTrace"]
@@ -61,7 +61,7 @@ The system composes FTS5/BM25 lexical search, dense vector retrieval, source gra
 uv run python eval/run_ablations.py
 
 # Run generation harness on the same golden set
-uv run python eval/harness.py
+uv run python eval/harness.py --model qwen2.5:14b
 ```
 
 The checked-in golden set currently contains `100` questions: `90` answerable and `10` explicit negative / unanswerable queries. Refresh `eval/results/` locally after any corpus or backend change.
@@ -102,7 +102,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **MCP servers.** Two MCP servers expose tools over stdio. The filesystem server sandboxes all path resolution to a configured root directory and delegates text search to ripgrep. The experiments server provides full CRUD for experiment runs (record, list, update, get) with a status lifecycle of `pending → running → complete / failed`, backed by a separate SQLite database. The agent loop currently uses these servers in read-only mode for `list/read/search` on the filesystem and `list/get` for experiment runs.
 
-**Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call.
+**Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call. Re-ingest is idempotent: file and content hashes resolve the same logical `source_id`, unchanged content skips writes, changed content atomically replaces the active chunk/vector set, and every revision is recorded in `source_revisions`.
 
 **Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search over SQLite FTS5/BM25. The earlier token-wise `LIKE` path is still available as `GraphStore.search_nodes_like()` for reference/testing, but it is no longer the production retrieval backbone because explicit evaluation showed BM25 was materially stronger. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID, promotes parent source nodes from chunk hits via `_expand_to_sources`, and now applies a final cross-encoder rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`) over the merged candidate set before returning the top bundle.
 
@@ -111,11 +111,11 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
 3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
 
-**LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `qwen2.5:14b` for generation and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
+**LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `gemma3:12b` for generation and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
 
 **Contracts layer.** `rca/contracts/` defines the identifier rules, node/edge models, and other shared DTOs that every other layer imports. No layer other than `store` performs persistence; no persistence layer makes model calls.
 
-**Streamlit UI.** `app.py` provides a browser interface with three modes. *Research Chat* accepts natural-language questions and streams grounded answers with inline citation cards and a `✓ grounded` / `⚠ unverified` badge. *Research Agent* runs a multi-turn tool-using loop with a full agent trace, using the knowledge base via a native adapter and the filesystem/experiments tools via MCP stdio. *Research Workspace* has three tabs: Ingest (drag-and-drop PDF upload, single or batch), Knowledge Map (interactive Plotly/NetworkX graph of source nodes and edges), and Store (searchable list of all ingested items). The sidebar shows live paper/chunk counts and supports dark/light theme toggling.
+**UI surfaces.** `app.py` remains the local evaluation and development interface. The production UI migration now targets a Vite + React frontend backed by FastAPI. The information architecture is being consolidated so Chat is the primary landing surface, Agent is a secondary mode, and Workspace responsibilities move into a Library/Settings view plus a collapsible knowledge-map panel. Sidebar counters are being replaced by a status bar for papers, chunks, backend, and model state.
 
 ---
 
@@ -134,10 +134,10 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 | Layer | Choice | Reason |
 |---|---|---|
 | Embeddings | nomic-embed-text (Ollama) | Local, fast, strong retrieval quality |
-| Generation | qwen2.5:14b (Ollama) | Best local model for structured grounded generation |
+| Generation | gemma3:12b (Ollama) | Default local open-source model for grounded generation |
 | Vector DB | ChromaDB | Persistent, zero-infrastructure prototype |
 | Graph/metadata | SQLite | Zero-dependency, portable, easy to audit |
-| UI | Streamlit | Prototype interface — FastAPI migration planned |
+| UI | React (Vite) + FastAPI | Production frontend path; Streamlit retained for local dev/eval only |
 | Orchestration | Mixed | Grounded chat uses direct flow composition; agent mode uses a separate multi-turn tool loop |
 
 ---
@@ -154,18 +154,19 @@ The checked-in eval assets now include:
 - `eval/run_coefficient_sweep.py` for held-out lexical-reranker tuning on the current split
 
 Latest local artifacts:
-- `eval/results/run_20260317T173540Z.json`
+- `eval/results/run_20260420T112737Z.json`
 - `eval/results/ablations.json`
 
-Current generation results on the 100-question corpus:
+Current generation results on the 100-question corpus (production baseline `gemma3:12b`):
 
 | Metric | Value |
 |---|---|
-| Citation precision (answerable, non-abstained) | `92.1%` over `89` cases |
-| Negative abstention recall | `2/10` (`20.0%`) |
-| Answerable abstentions | `1` |
-| Average keyword hit rate | `0.259` |
-| Average latency | `11.0 s` |
+| Citation precision (answerable, non-abstained) | `90.8%` over `87` cases |
+| Negative abstention recall | `3/10` (`30.0%`) |
+| Answerable abstentions | `3` |
+| Average keyword hit rate | `0.205` |
+| Average latency | `9.7 s` |
+| Grounded rate | `94.0%` |
 
 Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
@@ -175,14 +176,17 @@ Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 | 1. vector-only (dense baseline) | `76.7%` | `88.9%` |
 | 2. vector + keyword (FTS5) | `76.7%` | `88.9%` |
 | 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ query rewrite) | `96.7%` | `98.9%` |
+| 4. full pipeline (+ query rewrite) | `93.3%` | `96.7%` |
 
 The most important current evaluation takeaways are:
 - FTS5/BM25 remains the strongest single-method retrieval baseline on this corpus.
 - Source expansion is still the biggest lift over dense retrieval alone.
-- Query rewriting now helps when treated as a small append-only retrieval expansion rather than a full query replacement.
-- Abstention is still heuristic and remains one of the main correctness limitations.
+- Keyword hit rate remains the primary weakness (`20.5%`) and appears more sensitive to rewrite prompt quality than model choice.
+- Split-model rewriting was evaluated and rejected for production: it added 10s+ latency for marginal quality gain.
 - Agent mode is intentionally separated from grounded chat so tool-use experimentation does not affect the measured QA path.
+
+Gemma 4 note:
+- `gemma4:e4b` was re-evaluated and showed stronger citation precision (`93.5%`) and abstention recall (`50%`), but it is currently not the production default because latency (`30.1 s`) and answerable abstentions (`13`) are too high for daily use.
 
 Live metrics depend on the local Ollama/Chroma environment, so the right way to refresh results is to rerun the eval scripts on the target machine rather than trusting stale checked-in numbers after a corpus change. The detailed evaluation notes live in `docs/EVAL.md`.
 
@@ -196,7 +200,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] Hybrid retrieval (vector + keyword search + graph expansion)
 - [x] Query rewriting before retrieval
 - [x] Grounded answer generation with citation enforcement
-- [x] Streamlit UI (chat + ingest + knowledge map + store)
+- [x] Streamlit local dev/eval UI (legacy chat/agent/workspace surface)
 - [x] MCP agent loop — native knowledge-base adapter plus MCP stdio tools for filesystem and experiments
 - [x] Integration tests
 - [x] Evaluation harness with golden Q&A pairs
@@ -208,6 +212,8 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] Docker + one-command local boot
 - [x] GitHub Actions CI — Ruff + pytest on push / PR
 - [x] AWS deployment-ready package — baked demo image, ECS task templates, one-off demo script
+- [ ] FastAPI backend surface for `IngestFlow`, `RetrieveFlow`, and `GenerateFlow` HTTP endpoints
+- [ ] React (Vite) frontend migration — Chat primary surface, Agent secondary mode, Library view for ingest/store, collapsible knowledge-map panel, status bar
 - [ ] **Confidence-calibrated abstention** — improve negative handling without destabilizing grounded answers
 - [ ] **Add a human-authored external eval subset** — reduce self-bias for external reporting
 - [ ] arxiv MCP server
@@ -216,14 +222,13 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 
 ### v2 — Production-shaped deployment
 
-- FastAPI backend (replace Streamlit)
-- Next.js frontend
 - Background ingest worker (async)
 - Object storage for raw PDFs (S3 or equivalent)
 - Postgres + pgvector (replace ChromaDB in cloud deployment)
 - Structured logs + metrics dashboard
 - Cloud deploy automation / smoke deploy
 - Optional auth / multi-user namespaces
+- Optional SSR frontend (for multi-user/cloud scenarios; Next.js remains deferred)
 
 ---
 
@@ -231,12 +236,14 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 
 **Requirements:** Python 3.11+, [uv](https://docs.astral.sh/uv/), [ripgrep](https://github.com/BurntSushi/ripgrep). [Ollama](https://ollama.com) is required only for the default local backend.
 
+If you run `phi4:14b` locally, close heavy applications (VS Code, browsers with many tabs) to avoid swap pressure. For daily use, `gemma3:12b` is the recommended default.
+
 ```bash
 brew install ripgrep
 
 # Pull models for the default local backend
 ollama pull nomic-embed-text   # embeddings (768-dim)
-ollama pull qwen2.5:14b        # answer generation and query rewriting
+ollama pull gemma3:12b         # answer generation and query rewriting
 
 # Install dependencies
 uv sync
@@ -256,7 +263,7 @@ Key environment variables:
 | `RCA_CHUNK_SIZE` | `1200` | Target chunk size in characters |
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
 | `RCA_LLM_BACKEND` | `ollama` | Backend selector for chat, tool use, and embeddings (`ollama` or `openai_compatible`) |
-| `RCA_GENERATION_MODEL` | `qwen2.5:14b` | Ollama model used for answer generation and query rewriting |
+| `RCA_GENERATION_MODEL` | `gemma3:12b` | Ollama model used for answer generation and query rewriting |
 | `RCA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model used for vector embeddings |
 | `RCA_LLM_BASE_URL` | `http://localhost:11434` | Base URL for the local Ollama generation/chat API |
 | `RCA_LLM_API_KEY` | `ollama` | API key for the configured LLM endpoint; ignored by default local Ollama |
@@ -264,6 +271,9 @@ Key environment variables:
 | `RCA_OPENAI_API_KEY` | empty | API key for the OpenAI-compatible backend |
 | `RCA_OPENAI_CHAT_MODEL` | `gpt-4o-mini` | Chat model used when `RCA_LLM_BACKEND=openai_compatible` |
 | `RCA_OPENAI_EMBED_MODEL` | `text-embedding-3-small` | Embedding model used when `RCA_LLM_BACKEND=openai_compatible` |
+| `RCA_MODEL_RECOMMEND_INCLUDE` | empty list | Force-include model names in the picker recommendations |
+| `RCA_MODEL_RECOMMEND_EXCLUDE` | empty list | Force-exclude model names from the picker |
+| `RCA_MODEL_RECOMMEND_PREFERRED` | empty list | Optional preferred model names to boost in recommendation ranking |
 | `ANONYMIZED_TELEMETRY` | `False` | Disable ChromaDB telemetry |
 
 Runtime directories under `.rca/` are created automatically on first use.
@@ -271,6 +281,24 @@ Runtime directories under `.rca/` are created automatically on first use.
 To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA_LLM_BACKEND=openai_compatible`, provide `RCA_OPENAI_API_KEY`, and override `RCA_OPENAI_BASE_URL` / model names as needed. The currently selected embedding model must match the embeddings used to build the active vector collection; switching providers for an existing corpus may require re-ingest.
 
 For a production-shaped demo container, use `.env.production.example` as the starting point instead of `.env`. The deployment image defaults to `RCA_LLM_BACKEND=openai_compatible` and disables filesystem MCP tools unless you explicitly re-enable them.
+
+### Model picker recommendation policy
+
+Model discovery is dynamic: RCA reads available models from the active backend (`/api/tags` for Ollama) and computes recommendations from that live list. This is not a static list tied to one machine.
+
+Current policy:
+
+- Exclude obvious embedding-only models by name pattern (for example `embed`, `bge`, `e5`, `gte`, `nomic-embed`)
+- Rank remaining models for text retrieval + synthesis (instruction-tuned and text-family boosts)
+- Keep multimodal models as compatible candidates (some can still be strong for text workflows)
+- Apply optional explicit overrides from `RCA_MODEL_RECOMMEND_INCLUDE`, `RCA_MODEL_RECOMMEND_EXCLUDE`, and `RCA_MODEL_RECOMMEND_PREFERRED`
+
+The picker UI groups models into:
+
+- `Recommended for RCA`
+- `Other compatible`
+
+This means different users with different local Ollama catalogs will naturally see different recommendations.
 
 > **Always use `uv run python`.** Never bare `python` — the system Python lacks ChromaDB and silently falls back to the JSON backend, returning 0 documents.
 
@@ -301,7 +329,18 @@ This is deliberately a deployment-ready package, not a promise that RCA should s
 uv run streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Use *Research Chat* for grounded QA, *Research Agent* for multi-turn tool use, and *Workspace → Ingest* to drag-and-drop PDFs directly from Finder.
+This Streamlit surface is now the local dev/eval interface. It is not the long-term production UI target.
+
+Opens at `http://localhost:8501`. This remains the local dev/eval surface while production UX moves to Chat-first React + FastAPI information architecture.
+
+**Launch the React/FastAPI bridge**
+
+```bash
+uv run uvicorn rca.api.main:app --reload --port 8000
+cd frontend && npm run dev
+```
+
+The Vite app proxies `/api/*` to `http://localhost:8000/*` (the `/api` prefix is stripped). The API covers health/status, sources (with revision history), ingest, grounded chat, agent calls, model selection with tool-capability probing, and inline PDF fetch.
 
 **Ingest documents**
 
@@ -372,7 +411,7 @@ uv run python eval/run_ablations.py
 
 ```
 .
-├── app.py                      # Streamlit UI — Research Chat, Agent, and Workspace
+├── app.py                      # Streamlit local dev/eval UI (legacy chat/agent/workspace surface)
 ├── .streamlit/
 │   └── config.toml             # Theme configuration (base: dark)
 ├── rca/                        # Main package
@@ -408,3 +447,33 @@ uv run python eval/run_ablations.py
 ## Project context
 
 Built around research on *Structured Perception for Packing-Relevant Inventory Generation* — a system that generates machine-readable grocery inventories from RGB images for robotic bagging. RCA serves as the research memory layer: ingesting related papers, tracking design decisions, and enabling grounded retrieval over the full literature corpus.
+
+Frontend redesign is now in progress: production UI work is moving to a Vite + React frontend backed by FastAPI, with Streamlit retained for local development and evaluation workflows.
+
+---
+
+## v2 implementation plan
+
+Planned implementation order for the next UI/UX cycle:
+
+1. Library multi-select + bulk actions (`open`, `tag`, `re-ingest`, `export metadata`)
+2. Model picker memory (`pin favorites`, `recently used`)
+3. Query Trace upgrades (stage bars, latency share, richer diagnostics)
+4. Library quality indicators (metadata completeness, duplicate/near-duplicate hints, ingest status flags)
+5. Lightweight in-app eval mode (compare model runs side-by-side on a small prompt set)
+6. Session timeline (conversation/model/source activity trail)
+7. Response-structure conformance checks (citation-shape validation, markdown/bullet rendering consistency)
+
+This sequence prioritizes operational workflow wins first, then observability and evaluation surfaces.
+
+## v2 release prep checklist
+
+Before tagging `v2`:
+
+1. Freeze scope for the seven items above and merge only bug fixes after code-complete.
+2. Update user-facing docs (`README`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/EVAL.md`) to reflect final behavior.
+3. Refresh eval artifacts and include one fresh benchmark snapshot under `eval/results/`.
+4. Run full quality gate (`ruff`, `pytest`, frontend build, basic API smoke checks).
+5. Draft release notes with migration notes and known limitations.
+6. Create release commit and annotate tag (`v2.0.0`).
+7. Validate response-shape compatibility for the default profile (`gemma3:12b`) against chat UI citation rendering.

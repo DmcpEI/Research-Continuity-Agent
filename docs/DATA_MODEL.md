@@ -106,7 +106,7 @@ class Edge(BaseModel):
 
 ### SQLite schema (graph.sqlite3)
 
-Two tables plus indices:
+Three tables plus indices:
 
 ```sql
 CREATE TABLE nodes (
@@ -128,6 +128,21 @@ CREATE TABLE edges (
     PRIMARY KEY (source, target, kind)
 );
 
+CREATE TABLE source_revisions (              -- append-only revision history
+    revision_id     TEXT PRIMARY KEY,
+    source_id       TEXT NOT NULL,           -- stable logical src: ID
+    revision_number INTEGER NOT NULL,
+    ingest_status   TEXT NOT NULL,           -- created | updated | unchanged
+    path            TEXT NOT NULL,
+    ingest_name     TEXT NOT NULL,           -- normalized file name
+    title           TEXT NOT NULL,
+    file_sha256     TEXT,
+    content_sha256  TEXT NOT NULL,           -- hash of normalized extracted text
+    metadata        TEXT NOT NULL DEFAULT '{}',
+    created_at      TEXT NOT NULL,
+    UNIQUE (source_id, revision_number)
+);
+
 CREATE INDEX idx_nodes_kind    ON nodes(kind);
 CREATE INDEX idx_edges_source  ON edges(source);
 CREATE INDEX idx_edges_target  ON edges(target);
@@ -144,6 +159,8 @@ CREATE TRIGGER nodes_ai AFTER INSERT ON nodes ...;
 CREATE TRIGGER nodes_ad AFTER DELETE ON nodes ...;
 CREATE TRIGGER nodes_au AFTER UPDATE ON nodes ...;
 ```
+
+`source_revisions` is additive: existing `nodes`/`edges` are untouched, and it is indexed on `source_id`, `file_sha256`, `content_sha256`, `ingest_name`, and `path` for identity resolution during re-ingest. Source nodes carry `latest_path` and `content_sha256` in metadata.
 
 The production lexical path now uses the FTS5 virtual table (`nodes_fts`) with BM25 ranking. The original token-wise `LIKE` query across `lower(title)` and `lower(coalesce(text, ''))` is still retained in `GraphStore.search_nodes_like()` for reference and regression testing because it documents the earlier production implementation. `RetrieveFlow` still applies exact word-token reranking on the returned lexical candidates to avoid partial-word false positives.
 
