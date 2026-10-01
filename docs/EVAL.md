@@ -277,13 +277,34 @@ Suggested automation split:
 
 ---
 
+## Abstention Calibration (retrieval features)
+
+Retrieval-only study, no answer generation. Run on 2026-10-01 over all `129` questions with the production retrieval path (`gemma3:12b` query rewrite, `nomic-embed-text`, cross-encoder rerank, `limit=5`).
+
+```bash
+uv run python eval/collect_retrieval_features.py          # -> eval/results/retrieval_features_<ts>.json
+uv run python eval/calibrate_abstention.py eval/results/retrieval_features_<ts>.json
+```
+
+`collect_retrieval_features.py` mirrors the retrieval half of `GenerateFlow.generate_answer()` and records per-question signals: fused hit scores, raw cross-encoder `rerank_score`s, score gap/spread, source concentration, and per-stage maxima. `calibrate_abstention.py` picks a single-feature threshold on the dev split that maximizes negative recall with at most `5%` answerable false abstentions, then reports it once on test. Pairwise rules were tried and dropped: they overfit the `27` dev negatives.
+
+Findings:
+- The current retrieval gate (`max_score < 0.50`) abstains on `0/39` negatives. Fused scores are capped at `0.95` and rarely fall below `0.50`, so earlier abstention came entirely from the LLM hedge-phrase gate.
+- The raw cross-encoder score is the strongest signal (dev AUROC: `rerank_mean` `0.85`, `rerank_max` `0.84`, `top_source_share` `0.75`, `unique_sources` `0.72`, fused `max_score` `0.63`).
+- Selected rule `rerank_max <= -3.618`: dev `12/27` negatives with `2/62` false abstentions; test `5/12` negatives with `1/28` false abstentions.
+- By type (all 39): `off_domain` `4/4`, `out_of_corpus` `3/4`, `unreported` `3/10`, `false_premise` `2/7`, `fabricated` `1/4`, untyped `4/10`. Retrieval signals catch questions whose topic is absent; they cannot catch questions about papers that are present (unreported details, false premises), which need the generation-side grounding check.
+
+Caveats: `12` test negatives is small, so test recall has a wide confidence interval; the rule is not yet wired into `GenerateFlow`, so harness abstention metrics are unchanged until a full rerun.
+
+---
+
 ## Current Status
 
 What is true today, independent of any single artifact:
 - the golden corpus is now `129` questions (`39` negative)
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
-- abstention remains heuristic and is still one of the main open weaknesses
+- abstention remains heuristic and is still one of the main open weaknesses; a retrieval-feature rule (`rerank_max <= -3.618`) is calibrated but not yet wired in
 - a human-authored external subset would still be stronger for bias reduction than self-authored or model-authored additions
 
 Known active failure themes:

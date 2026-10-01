@@ -50,7 +50,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Keyword hit rate | `20.5%` |
 | Grounded rate | `94.0%` |
 | Average latency | `9.7 s` |
-| Tests | `110` passing |
+| Tests | `111` passing |
 
 These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
 
@@ -70,7 +70,7 @@ Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/D
 These are the highest-priority milestones for reliability and correctness.
 
 - **Keyword-hit improvement via rewrite prompt tuning** — Improve the rewrite prompt and retrieval-term alignment for the robotics corpus. Rationale: keyword hit rate (`20.5%`) is the clearest current retrieval weakness.
-- **Confidence-calibrated abstention** — Replace the current threshold heuristic with a better-calibrated abstention policy; with the expanded 39-question negative set, evaluate a lightweight classifier over retrieval features such as max score, score spread, query length, and hits above threshold. Rationale: abstention still trades off against answerable coverage and needs calibration.
+- **Confidence-calibrated abstention** — Wire the calibrated retrieval gate (`rerank_max <= -3.618`, test `5/12` negatives at `1/28` false abstentions) into `GenerateFlow` alongside the hedge-phrase gate, then confirm with a full harness rerun. Retrieval features already separate off-domain and out-of-corpus questions; unreported-detail and false-premise questions still need a generation-side check. Rationale: the current `max_score < 0.50` gate abstains on `0/39` negatives. See [EVAL.md](EVAL.md#abstention-calibration-retrieval-features).
 - **Human-authored external eval subset** — Add a small independently written subset to the golden set. Rationale: it reduces self-bias in external reporting better than adding more self-authored questions.
 - **Retrieval auditability in eval** — Expose retrieved hit lists and per-chunk provenance in harness output, then add a compact failure taxonomy. Rationale: it will make ranking-versus-generation errors easier to explain and defend.
 - **React API verification** — Keep the new FastAPI bridge covered by contract tests while Streamlit remains the supported local demo surface. Rationale: the React frontend is now technically usable, but product polish should follow correctness work.
