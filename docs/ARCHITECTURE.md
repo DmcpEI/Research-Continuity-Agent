@@ -31,6 +31,7 @@ GenerateFlow
     ├── LLM generation (gemma3:12b locally or OpenAI-compatible in deployment)
     ├── citation extraction (_extract_citations)
     ├── source-ID resolution (chunk ID → parent src: node)
+    ├── rerank gate (max rerank_score <= -3.618 → abstain before LLM call)
     ├── abstention check (hedge phrases + retrieval confidence)
     └── grounding check → GenerateResult(answer, citations, grounded)
     │
@@ -99,7 +100,7 @@ Grounded answer generation with citation enforcement.
 5. **Generate** — calls the configured generation backend
 6. **Extract citations** — parses inline citation markers from generated text
 7. **Resolve source IDs** — strips `:NNNN` suffix and resolves chunk IDs to parent `src:` nodes unconditionally
-8. **Abstention gate** — unsupported answers can be suppressed using hedge phrases plus retrieval confidence
+8. **Abstention gates** — before generation, a calibrated cross-encoder score gate abstains when no hit is a strong match (label `low_rerank_score`); after generation, unsupported answers are suppressed using hedge phrases, citation validity, and retrieval confidence
 9. **Ground check** — `grounded=True` if at least one valid citation was resolved to a returned hit
 
 **QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the seven pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, `cross_encoder_rerank`, and `llm_generate`. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.

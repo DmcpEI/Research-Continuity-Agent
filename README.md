@@ -43,7 +43,7 @@ flowchart TD
         RF --> VQ --> MERGE
         RF --> FTS --> LEX --> MERGE
         MERGE --> EXPAND --> RERANK --> GF
-        GF --> CTX --> LLM --> ABS --> CITE --> OUT
+        GF --> CTX --> GATE["Rerank gate<br/>skip LLM if no strong match"] --> LLM --> ABS --> CITE --> OUT
     end
 
     Extract --> GS
@@ -52,7 +52,7 @@ flowchart TD
     VS -. "serves semantic search" .-> RF
 ```
 
-The system composes FTS5/BM25 lexical search, dense vector retrieval, source graph expansion, and a final cross-encoder rerank into a single ranked bundle. A two-gate abstention mechanism detects when the corpus lacks sufficient evidence. All query stages are traced with per-stage latency and retrieval provenance.
+The system composes FTS5/BM25 lexical search, dense vector retrieval, source graph expansion, and a final cross-encoder rerank into a single ranked bundle. A calibrated reranker-score gate skips generation when nothing in the corpus matches, and a post-generation check (hedge phrases, citation validity, retrieval confidence) catches unsupported answers. All query stages are traced with per-stage latency and retrieval provenance.
 
 ## Reproducing Results
 
@@ -109,7 +109,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query routing + rewriting** — a lightweight query classifier labels the question as `proper_noun`, `conceptual`, or `hybrid`. Proper-noun queries skip the LLM rewrite entirely; the other classes still produce a dense 8–12 keyword technical search query to improve vector recall over conversational phrasing.
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
-3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. A two-gate abstention check then detects unsupported answers using hedge phrases plus retrieval confidence.
+3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. Before generation, a reranker-score gate (`max rerank_score <= -3.618`, calibrated in `eval/calibrate_abstention.py`) abstains without calling the LLM when no retrieved chunk is a strong match. After generation, an abstention check combines hedge phrases, citation validity, and retrieval confidence.
 
 **LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `gemma3:12b` for generation and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
 

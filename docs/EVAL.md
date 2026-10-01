@@ -77,7 +77,7 @@ Important caveat:
 - if Ollama or another configured endpoint is unavailable, the run is not comparable to a normal local run
 - after changing the corpus, the right source of truth is a fresh local rerun, not an older checked-in artifact
 
-Failure labels are compact diagnostics emitted by the generation flow and carried into eval output. Current labels include `missing_citation`, `invalid_citation`, `unsupported_claim`, `low_retrieval_confidence`, `llm_abstained`, and runtime labels such as `empty_retrieval` or `error`.
+Failure labels are compact diagnostics emitted by the generation flow and carried into eval output. Current labels include `missing_citation`, `invalid_citation`, `unsupported_claim`, `low_retrieval_confidence`, `low_rerank_score` (pre-generation rerank gate), `llm_abstained`, and runtime labels such as `empty_retrieval` or `error`.
 
 ### External eval files
 
@@ -294,7 +294,7 @@ Findings:
 - Selected rule `rerank_max <= -3.618`: dev `12/27` negatives with `2/62` false abstentions; test `5/12` negatives with `1/28` false abstentions.
 - By type (all 39): `off_domain` `4/4`, `out_of_corpus` `3/4`, `unreported` `3/10`, `false_premise` `2/7`, `fabricated` `1/4`, untyped `4/10`. Retrieval signals catch questions whose topic is absent; they cannot catch questions about papers that are present (unreported details, false premises), which need the generation-side grounding check.
 
-Caveats: `12` test negatives is small, so test recall has a wide confidence interval; the rule is not yet wired into `GenerateFlow`, so harness abstention metrics are unchanged until a full rerun.
+Caveats: `12` test negatives is small, so test recall has a wide confidence interval; the rule is wired into `GenerateFlow` as a pre-generation gate (2026-10-01), but harness abstention metrics stay unchanged until a full rerun. The threshold is specific to `cross-encoder/ms-marco-MiniLM-L-6-v2` logits and must be recalibrated if the reranker changes.
 
 ---
 
@@ -304,7 +304,7 @@ What is true today, independent of any single artifact:
 - the golden corpus is now `129` questions (`39` negative)
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
-- abstention remains heuristic and is still one of the main open weaknesses; a retrieval-feature rule (`rerank_max <= -3.618`) is calibrated but not yet wired in
+- abstention remains heuristic and is still one of the main open weaknesses; a calibrated pre-generation rerank gate (`rerank_max <= -3.618`) is now wired in; generation-side checks remain needed for unreported-detail and false-premise questions
 - a human-authored external subset would still be stronger for bias reduction than self-authored or model-authored additions
 
 Known active failure themes:

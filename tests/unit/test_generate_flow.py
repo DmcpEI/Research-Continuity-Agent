@@ -36,8 +36,9 @@ class StubLLMClient(LLMClient):
 
 
 class StubRetrieveFlow:
-    def __init__(self, score: float = 0.92) -> None:
+    def __init__(self, score: float = 0.92, rerank_score: float | None = None) -> None:
         self.score = score
+        self.rerank_score = rerank_score
         self.queries: list[str] = []
         self.query_types: list[QueryType | None] = []
         self.graph_store = None
@@ -58,7 +59,9 @@ class StubRetrieveFlow:
                         "JamPacker uses planning and recovery modules for robotic bin packing "
                         "and placement heuristics."
                     ),
-                    metadata={},
+                    metadata={}
+                    if self.rerank_score is None
+                    else {"rerank_score": self.rerank_score},
                 )
             ],
             related_edges=[],
@@ -373,3 +376,34 @@ def test_generate_answer_resolves_chunk_citation_to_parent_source_without_source
     assert result.abstained is False
     assert result.grounded is True
     assert [citation.source_id for citation in result.citations] == ["src:pdf/jampacker"]
+
+
+def test_generate_answer_rerank_gate_abstains_without_llm_generation() -> None:
+    llm = StubLLMClient()
+    flow = GenerateFlow(
+        retrieve_flow=StubRetrieveFlow(rerank_score=-8.0),
+        llm_client=llm,
+    )
+
+    result = flow.generate_answer("Is JamPacker in the database?")
+
+    assert result.abstained is True
+    assert result.grounded is False
+    assert result.failure_labels == ["low_rerank_score", "low_retrieval_confidence"]
+    assert llm.calls == 0
+
+
+def test_generate_answer_rerank_gate_passes_strong_match() -> None:
+    llm = StubLLMClient(
+        responses=["JamPacker combines planning and recovery. [[src:pdf/jampacker]]"]
+    )
+    flow = GenerateFlow(
+        retrieve_flow=StubRetrieveFlow(rerank_score=5.0),
+        llm_client=llm,
+    )
+
+    result = flow.generate_answer("Is JamPacker in the database?")
+
+    assert result.abstained is False
+    assert "low_rerank_score" not in result.failure_labels
+    assert llm.calls == 1

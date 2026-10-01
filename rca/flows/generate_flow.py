@@ -77,6 +77,9 @@ Rules:
     )
     _CITATION_PATTERN = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
     _ABSTENTION_SCORE_THRESHOLD = 0.50
+    # Calibrated on eval dev split for cross-encoder/ms-marco-MiniLM-L-6-v2 logits
+    # (eval/calibrate_abstention.py); recalibrate if the reranker model changes.
+    _RERANK_ABSTENTION_THRESHOLD = -3.618
     _CONTENT_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+_.-]*")
     _LOOSE_CITATION_PATTERN = re.compile(r"(?<!\[)\[((?:src|chk):[^\]\s]+)\](?!\])")
     _REWRITE_PROMPT_TEMPLATE = (
@@ -204,6 +207,22 @@ Rules:
                 grounded=False,
                 abstained=True,
                 failure_labels=["empty_context", "low_retrieval_confidence"],
+                trace=trace,
+            )
+
+        # Step 2c: retrieval gate — skip generation when the reranker finds no strong match
+        rerank_scores = [
+            hit.metadata["rerank_score"] for hit in bundle.hits if "rerank_score" in hit.metadata
+        ]
+        if rerank_scores and max(rerank_scores) <= self._RERANK_ABSTENTION_THRESHOLD:
+            self._append_warning(trace, f"rerank gate: max rerank score {max(rerank_scores):.3f}")
+            trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
+            return GeneratedAnswer(
+                query=query,
+                answer="I couldn't find evidence for this in your knowledge base.",
+                grounded=False,
+                abstained=True,
+                failure_labels=["low_rerank_score", "low_retrieval_confidence"],
                 trace=trace,
             )
 
