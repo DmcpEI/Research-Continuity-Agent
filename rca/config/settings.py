@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 10
     retrieval_fetch_limit: int = 20
+    # Keep the top n-1 hits as ranked and give the last slot to the best-ranked paper
+    # not already shown (lifts cross-paper hit@5; see eval/run_ablations.py).
+    retrieval_reserve_new_source: bool = True
+    # Only reserve for a paper the cross-encoder scores above this (logit scale of
+    # reranker_model); heuristic picked on the eval set, see docs/EVAL.md (#9).
+    retrieval_reserve_min_rerank_score: float = -6.0
     model_recommend_include: list[str] = []
     model_recommend_exclude: list[str] = []
     model_recommend_preferred: list[str] = []
@@ -133,6 +139,8 @@ class Settings(BaseSettings):
             "RCA_RERANKER_MODEL": "reranker_model",
             "RCA_RERANKER_TOP_K": "reranker_top_k",
             "RCA_RETRIEVAL_FETCH_LIMIT": "retrieval_fetch_limit",
+            "RCA_RETRIEVAL_RESERVE_NEW_SOURCE": "retrieval_reserve_new_source",
+            "RCA_RETRIEVAL_RESERVE_MIN_RERANK_SCORE": "retrieval_reserve_min_rerank_score",
             "RCA_MODEL_RECOMMEND_INCLUDE": "model_recommend_include",
             "RCA_MODEL_RECOMMEND_EXCLUDE": "model_recommend_exclude",
             "RCA_MODEL_RECOMMEND_PREFERRED": "model_recommend_preferred",

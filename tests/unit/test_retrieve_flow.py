@@ -337,3 +337,154 @@ def test_retrieve_uses_reranker_and_records_stage() -> None:
 
     assert [hit.node_id for hit in bundle.hits] == ["chk:pdf/c:0000", "chk:pdf/b:0000"]
     assert "cross_encoder_rerank" in [stage.name for stage in trace.stages]
+
+
+def _hit(node_id: str, score: float = 0.5) -> RetrievalHit:
+    return RetrievalHit(node_id=node_id, score=score, title=node_id, excerpt="", metadata={})
+
+
+def test_reserve_new_source_keeps_head_and_reserves_last_slot_for_unseen_source() -> None:
+    from rca.flows.retrieve_flow import reserve_new_source
+
+    a = [_hit(f"chk:pdf/a:000{i}") for i in range(5)]
+    b = _hit("chk:pdf/b:0000")
+    src_a = _hit("src:pdf/a")
+
+    ids = lambda hits: [h.node_id for h in hits]  # noqa: E731
+    # one source fills the head: last slot goes to the best-ranked new source
+    assert ids(reserve_new_source([*a, b], 5)) == ids([*a[:4], b])
+    # a source node of a seen paper counts as the same source
+    assert ids(reserve_new_source([*a[:4], src_a, b], 5)) == ids([*a[:4], b])
+    # slot n already holds a new source, or no new source anywhere: plain truncation
+    assert ids(reserve_new_source([a[0], b, *a[1:]], 5)) == ids([a[0], b, *a[1:4]])
+    assert ids(reserve_new_source(a, 5)) == ids(a)
+    # head already has two papers but slot n repeats one: still reserved for a third
+    c = _hit("chk:pdf/c:0000")
+    assert ids(reserve_new_source([a[0], b, a[1], a[2], a[3], c], 5)) == ids(
+        [a[0], b, a[1], a[2], c]
+    )
+    # edge sizes
+    assert ids(reserve_new_source([*a, b], 1)) == ids(a[:1])
+    assert reserve_new_source([], 5) == []
+    assert ids(reserve_new_source(a[:3], 5)) == ids(a[:3])
+
+
+def test_retrieve_reserves_last_slot_for_new_source_after_rerank() -> None:
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            ids = [f"chk:pdf/a:000{i}" for i in range(5)] + ["chk:pdf/b:0000"]
+            return [
+                VectorQueryResult(id=node_id, score=0.9 - 0.01 * rank, document="x", metadata={})
+                for rank, node_id in enumerate(ids)
+            ]
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return []
+
+        def get_node(self, node_id: str) -> Node | None:
+            return None
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            return []
+
+    class ScoreOrderReranker:
+        def rerank(self, query, hits, top_k=None):
+            ordered = sorted(hits, key=lambda hit: hit.score, reverse=True)
+            return ordered if top_k is None else ordered[:top_k]
+
+    def run(reserve: bool) -> list[str]:
+        flow = object.__new__(RetrieveFlow)
+        flow.settings = SimpleNamespace(
+            retrieval_fetch_limit=20, reranker_top_k=10, retrieval_reserve_new_source=reserve
+        )
+        flow.graph_store = StubGraphStore()
+        flow.vector_store = StubVectorStore()
+        flow._reranker = ScoreOrderReranker()
+        return [hit.node_id for hit in flow.retrieve("demo", limit=5).hits]
+
+    assert run(reserve=True) == [f"chk:pdf/a:000{i}" for i in range(4)] + ["chk:pdf/b:0000"]
+    assert run(reserve=False) == [f"chk:pdf/a:000{i}" for i in range(5)]
+
+
+def test_reserve_new_source_skips_candidates_at_or_below_the_rerank_floor() -> None:
+    from rca.flows.retrieve_flow import reserve_new_source
+
+    def scored(node_id: str, rerank: float | None) -> RetrievalHit:
+        metadata = {} if rerank is None else {"rerank_score": rerank}
+        return RetrievalHit(
+            node_id=node_id, score=0.5, title=node_id, excerpt="", metadata=metadata
+        )
+
+    head = [scored(f"chk:pdf/a:000{i}", 3.0) for i in range(5)]
+    weak_b = scored("chk:pdf/b:0000", -7.0)
+    floor_c = scored("chk:pdf/c:0000", -6.0)
+    ok_d = scored("chk:pdf/d:0000", -4.3)
+    unscored_e = scored("chk:pdf/e:0000", None)
+
+    ids = lambda hits: [h.node_id for h in hits]  # noqa: E731
+    # weak and exactly-at-floor candidates are skipped; the next one above the floor wins
+    assert ids(reserve_new_source([*head, weak_b, floor_c, ok_d], 5, min_rerank_score=-6.0)) == ids(
+        [*head[:4], ok_d]
+    )
+    # nothing above the floor: plain truncation keeps the same-paper chunk
+    assert ids(reserve_new_source([*head, weak_b, floor_c], 5, min_rerank_score=-6.0)) == ids(head)
+    # no floor configured: best-ranked new source regardless of score
+    assert ids(reserve_new_source([*head, weak_b, ok_d], 5)) == ids([*head[:4], weak_b])
+    # hits without a rerank score (reranker off) are not filtered by the floor
+    assert ids(reserve_new_source([*head, unscored_e], 5, min_rerank_score=-6.0)) == ids(
+        [*head[:4], unscored_e]
+    )
+
+
+def test_retrieve_applies_configured_reserve_floor() -> None:
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            ids = [f"chk:pdf/a:000{i}" for i in range(5)] + ["chk:pdf/b:0000"]
+            return [
+                VectorQueryResult(id=node_id, score=0.9 - 0.01 * rank, document="x", metadata={})
+                for rank, node_id in enumerate(ids)
+            ]
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return []
+
+        def get_node(self, node_id: str) -> Node | None:
+            return None
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            return []
+
+    class ScoringReranker:
+        """Paper a scores high, paper b scores -7.0 (below the default floor)."""
+
+        def rerank(self, query, hits, top_k=None):
+            scored = [
+                hit.model_copy(
+                    update={"metadata": {"rerank_score": -7.0 if "/b:" in hit.node_id else 3.0}}
+                )
+                for hit in hits
+            ]
+            ordered = sorted(scored, key=lambda hit: hit.metadata["rerank_score"], reverse=True)
+            return ordered if top_k is None else ordered[:top_k]
+
+    def run(floor: float) -> list[str]:
+        flow = object.__new__(RetrieveFlow)
+        flow.settings = SimpleNamespace(
+            retrieval_fetch_limit=20,
+            reranker_top_k=10,
+            retrieval_reserve_new_source=True,
+            retrieval_reserve_min_rerank_score=floor,
+        )
+        flow.graph_store = StubGraphStore()
+        flow.vector_store = StubVectorStore()
+        flow._reranker = ScoringReranker()
+        return [hit.node_id for hit in flow.retrieve("demo", limit=5).hits]
+
+    assert run(-6.0) == [f"chk:pdf/a:000{i}" for i in range(5)]
+    assert run(-8.0) == [f"chk:pdf/a:000{i}" for i in range(4)] + ["chk:pdf/b:0000"]

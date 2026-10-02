@@ -146,17 +146,32 @@ Aggregate retrieval results:
 | 0. fts5-only (BM25 baseline) | `95.6%` | `98.9%` |
 | 1. vector-only (dense baseline) | `84.4%` | `91.1%` |
 | 2. vector + keyword (FTS5) | `84.4%` | `91.1%` |
-| 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `94.4%` | `98.9%` |
-| 5. production path (query-type aware) | `96.7%` | `98.9%` |
+| 3. vector + keyword + expansion | `95.6%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `95.6%` | `98.9%` |
+| 5. production path (query-type aware) | `98.9%` | `98.9%` |
 
-Run 2026-10-02 on the `129`-question set (`90` answerable retrieval cases; negatives are skipped), `gemma3:12b` rewrite. Config 5 mirrors `GenerateFlow`: rewrite is skipped for proper-noun queries and the query type is passed to `RetrieveFlow`; it reuses config 4's rewrite, so it adds no LLM calls. hit@k requires *all* expected sources in the top-k, so two-source cross-paper questions are the strictest cases: production misses at hit@5 are `cross-004`, `cross-008`, and `densepack-001` (the last two recovered by hit@10). Wilson 95% interval for `87/90`: `90.7%`–`98.9%`. Dense-only rose from `76.7%` (April run) to `84.4%`; the cause has not been isolated (index rebuilt since).
+Run 2026-10-02 on the `129`-question set (`90` answerable retrieval cases; negatives are skipped), `gemma3:12b` rewrite. Config 5 mirrors `GenerateFlow`: rewrite is skipped for proper-noun queries and the query type is passed to `RetrieveFlow`; it reuses config 4's rewrite, so it adds no LLM calls. hit@k requires *all* expected sources in the top-k, so two-source cross-paper questions are the strictest cases. Configs 3–5 take hit@5 from a `limit=5` call (as `GenerateFlow`) and hit@10 from `limit=10`, because truncation is limit-dependent. Table: reserved slot on with the default floor.
+
+Reserved new-source slot (#9). One paper's chunks often filled the whole top 5. Keeping the top 4 as ranked and giving slot 5 to the best-ranked unseen paper scoring above the floor:
+
+| hit@5 / hit@10 | reserve off | reserve, no floor | reserve, floor `-6.0` (default) |
+|---|---:|---:|---:|
+| 3. vector + keyword + expansion | `94.4%` / `96.7%` | `96.7%` / `97.8%` | `95.6%` / `96.7%` |
+| 4. full pipeline (+ rewrite) | `94.4%` / `98.9%` | `95.6%` / `98.9%` | `95.6%` / `98.9%` |
+| 5. production path | `96.7%` / `98.9%` | `98.9%` / `98.9%` | `98.9%` / `98.9%` |
+
+- Production misses at hit@5 go from `cross-004`, `cross-008`, `densepack-001` (`87/90`) to `cross-004` (`89/90`, Wilson 95% `94.0%`–`99.8%`); cross-paper bucket `75%` → `87.5%`. Reserve-off reproduces the earlier numbers exactly. All runs 2026-10-02, Chroma backend, no failed LLM calls.
+- What reaches the LLM: on captured candidate pools, every reserved hit also passes `GenerateFlow`'s context filter (`src:` node or fused score `> 0.55`), so context-level hit@5 equals bundle hit@5 and no context comes back empty.
+- Why a floor: without it, `55` of `83` single-source questions get an unrelated paper in slot 5 (median rerank score `-6.0`). The `-6.0` floor keeps both fixes (reserved hits at `-4.3` and `-1.0`) and cuts that to `25`; same-paper chunks in context average `3.82` (no reserve: `4.10`; no floor: `3.52`). The floor was picked on the same 90 questions with only two positives, so treat it as a heuristic. A floor at the abstention threshold (`-3.618`) loses `cross-008`.
+- Rejected alternatives: a per-paper cap of 2 on every query (same `89/90`, depth `2.48`); capping only "comparison" queries (a keyword detector had 7 false positives and 3 misses on the golden questions).
+- Remaining miss `cross-004` names "the VLM survey", whose first chunk ranks 17th of 27 candidates: an aliasing gap, not ranking.
+- Not yet measured: effect on answer quality. Compare with `RCA_RETRIEVAL_RESERVE_NEW_SOURCE=false` in a full harness run. Dense-only rose from `76.7%` (April run) to `84.4%`; the cause has not been isolated (index rebuilt since).
 
 Interpretation guidance:
 - FTS5/BM25 is the production lexical backbone and should be treated as the main sparse baseline
 - dense retrieval remains useful, but on this corpus the lexical signal is often very strong
 - source expansion and the cross-encoder reranker are the main reasons the composed pipeline improves on simpler hybrids
-- query rewrite is a small append-only expansion; applied to every query (config 4) it ties expansion-only at hit@5, but applied as in production (skipped for proper nouns, config 5) it is the best configuration at `96.7%` hit@5
+- query rewrite is a small append-only expansion; applied to every query (config 4) it ties expansion-only at hit@5, but applied as in production (skipped for proper nouns, config 5, with the reserved new-source slot) it is the best configuration at `98.9%` hit@5
 
 ---
 
@@ -312,6 +327,8 @@ Findings:
 - The raw cross-encoder score is the strongest signal (dev AUROC: `rerank_mean` `0.85`, `rerank_max` `0.84`, `top_source_share` `0.75`, `unique_sources` `0.72`, fused `max_score` `0.63`).
 - Selected rule `rerank_max <= -3.618`: dev `12/27` negatives with `2/62` false abstentions; test `5/12` negatives with `1/28` false abstentions.
 - By type (all 39): `off_domain` `4/4`, `out_of_corpus` `3/4`, `unreported` `3/10`, `false_premise` `2/7`, `fabricated` `1/4`, untyped `4/10`. Retrieval signals catch questions whose topic is absent; they cannot catch questions about papers that are present (unreported details, false premises), which need the generation-side grounding check.
+
+Features were collected before the reserved new-source slot (#9); `rerank_max` and the selected rule are unaffected (the top hit is never replaced), but `unique_sources` / `top_source_share` AUROCs would shift on a rerun.
 
 Caveats: `12` test negatives is small, so test recall has a wide confidence interval; the rule is wired into `GenerateFlow` as a pre-generation gate (2026-10-01), but harness abstention metrics stay unchanged until a full rerun. The threshold is specific to `cross-encoder/ms-marco-MiniLM-L-6-v2` logits and must be recalibrated if the reranker changes.
 

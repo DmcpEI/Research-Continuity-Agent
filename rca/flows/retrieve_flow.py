@@ -54,6 +54,40 @@ STOPWORDS = {
 }
 
 
+def _source_of(node_id: str) -> str:
+    """Logical paper for a hit: chunk IDs resolve to their parent src: ID."""
+    if node_id.startswith("chk:"):
+        return "src:" + node_id[len("chk:") :].rsplit(":", 1)[0]
+    return node_id
+
+
+def reserve_new_source(
+    hits: list[RetrievalHit], n: int, min_rerank_score: float | None = None
+) -> list[RetrievalHit]:
+    """Top n hits, where the last slot goes to the best-ranked paper not in the first n-1.
+
+    Applies whenever hit n would repeat a paper already in the first n-1, even if those
+    already span several papers. Candidates whose rerank_score is at or below
+    min_rerank_score are skipped (hits without a rerank score are not filtered). Falls
+    back to plain truncation when hit n is already a new paper or no candidate qualifies.
+    """
+    if n <= 1 or len(hits) <= n:
+        return hits[:n]
+    head = hits[: n - 1]
+    seen = {_source_of(hit.node_id) for hit in head}
+    if _source_of(hits[n - 1].node_id) not in seen:
+        return hits[:n]
+
+    def qualifies(hit: RetrievalHit) -> bool:
+        if _source_of(hit.node_id) in seen:
+            return False
+        score = hit.metadata.get("rerank_score")
+        return min_rerank_score is None or score is None or score > min_rerank_score
+
+    fresh = next((hit for hit in hits[n - 1 :] if qualifies(hit)), None)
+    return [*head, hits[n - 1] if fresh is None else fresh]
+
+
 class RetrievalHit(BaseModel):
     node_id: str
     score: float
@@ -191,16 +225,28 @@ class RetrieveFlow:
             hit_stages[hit.node_id] = "expansion"
 
         rerank_started = perf_counter() if trace is not None else None
+        reserve = getattr(settings, "retrieval_reserve_new_source", True)
+        reserve_floor = getattr(
+            settings,
+            "retrieval_reserve_min_rerank_score",
+            Settings.model_fields["retrieval_reserve_min_rerank_score"].default,
+        )
+
+        def truncate(hits: list[RetrievalHit], n: int) -> list[RetrievalHit]:
+            return reserve_new_source(hits, n, reserve_floor) if reserve else hits[:n]
+
         if reranker is not None:
             try:
-                final_hits = reranker.rerank(query, final_hits, top_k=rerank_limit)
+                # Rerank the whole pool so the reserved slot can come from below the cut.
+                ranked = reranker.rerank(query, final_hits, top_k=None)
             except Exception as exc:
-                final_hits = final_hits[:rerank_limit]
+                ranked = final_hits
                 if trace is not None:
                     self._append_warning(
                         trace,
                         f"cross-encoder reranker unavailable: {type(exc).__name__}: {exc}",
                     )
+            final_hits = truncate(ranked, rerank_limit)
             if trace is not None:
                 self._append_stage(
                     trace,
@@ -210,7 +256,7 @@ class RetrieveFlow:
                     query=query,
                 )
         else:
-            final_hits = final_hits[:limit]
+            final_hits = truncate(final_hits, limit)
 
         seen_edge_keys: set[tuple[str, str, str]] = set()
         for hit in final_hits:

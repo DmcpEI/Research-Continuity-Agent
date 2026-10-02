@@ -21,7 +21,8 @@ RetrieveFlow
     ├── like fallback  ← token-wise LIKE kept for reference/testing
     ├── exact-word lexical rerank + dedup → ranked RetrievalBundle
     └── source expansion ← chunk → parent src: nodes
-    └── cross-encoder rerank ← top-k reorder over merged candidates
+    ├── cross-encoder rerank ← reorder full merged candidate pool
+    └── reserve new-source slot ← last of top-k goes to an unseen paper
     │
     ▼
 GenerateFlow
@@ -75,6 +76,7 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 4. **Merge** — deduplicates by node ID, scores merged by max, sorted descending
 5. **Source expansion** — follows chunk → source edges and appends parent `src:` nodes
 6. **Cross-encoder rerank** — reranks the merged candidate set with `cross-encoder/ms-marco-MiniLM-L-6-v2`, preserving the original retrieval score scale for downstream context selection
+6b. **Reserved new-source slot** — truncation to `limit` keeps the top `limit-1` hits as ranked and, when hit `limit` would repeat a paper already shown, gives the last slot to the best-ranked unseen paper with rerank score above `retrieval_reserve_min_rerank_score` (`-6.0`); otherwise plain truncation (`reserve_new_source()`, setting `retrieval_reserve_new_source`). The top hit is never replaced, so the rerank gate's `max rerank_score` is unchanged; the post-generation fused-score check can move up or down if the swapped-in or swapped-out hit holds the fused-score maximum (rare). With the reranker off or failing, hits carry no rerank score, so the floor does not apply, and the candidate pool is small enough that the slot rarely changes anything.
 7. **Edge collection** — gathers related edges for the returned nodes
 
 **Ablation results** (hit@5 / hit@10, n=90 answerable pairs):
@@ -84,9 +86,9 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 | fts5-only (BM25 baseline) | 95.6% | 98.9% |
 | vector-only (dense baseline) | 84.4% | 91.1% |
 | vector + keyword (FTS5) | 84.4% | 91.1% |
-| vector + keyword + expansion | 94.4% | 96.7% |
-| full + query rewrite | 94.4% | 98.9% |
-| production path (query-type aware) | 96.7% | 98.9% |
+| vector + keyword + expansion | 95.6% | 96.7% |
+| full + query rewrite | 95.6% | 98.9% |
+| production path (query-type aware) | 98.9% | 98.9% |
 
 The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. On the 2026-10-02 run, the production path (rewrite skipped for proper nouns, query type passed to retrieval) is the best configuration; expansion still provides most of the hybrid lift over dense retrieval alone.
 

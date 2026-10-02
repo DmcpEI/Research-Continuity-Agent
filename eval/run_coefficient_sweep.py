@@ -187,7 +187,10 @@ def evaluate_subset(
         if answerable:
             retrieval_cases += 1
             bundle = flow.retrieve(pair["question"], limit=FETCH_K)
-            case_hit5 = hit_at_k(bundle.hits, expected, k=5)
+            # Truncation reserves the last slot per limit, so hit@5 needs its own
+            # limit=5 call to match what GenerateFlow sees (see run_ablations.py).
+            bundle_at5 = flow.retrieve(pair["question"], limit=5)
+            case_hit5 = hit_at_k(bundle_at5.hits, expected, k=5)
             case_hit10 = hit_at_k(bundle.hits, expected, k=10)
             hits5 += int(case_hit5)
             hits10 += int(case_hit10)

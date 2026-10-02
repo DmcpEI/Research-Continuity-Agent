@@ -104,7 +104,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **Ingest flow.** `IngestFlow.ingest_path` dispatches on file type: `.pdf` → `PDFExtractor`, `.md`/`.txt` → `NoteExtractor`, `.json`/`.yaml` → `ExperimentExtractor`, directory → `GitExtractor`. Extracted text is split into boundary-aware chunks (default 1200 characters, 150 overlap) that prefer paragraph breaks, then newlines, then word boundaries before hard-cutting. Each chunk becomes a graph node linked to its source via a `contains` edge, and all chunks are upserted into the vector store in a single batch call. Re-ingest is idempotent: file and content hashes resolve the same logical `source_id`, unchanged content skips writes, changed content atomically replaces the active chunk/vector set, and every revision is recorded in `source_revisions`.
 
-**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search over SQLite FTS5/BM25. The earlier token-wise `LIKE` path is still available as `GraphStore.search_nodes_like()` for reference/testing, but it is no longer the production retrieval backbone because explicit evaluation showed BM25 was materially stronger. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID, promotes parent source nodes from chunk hits via `_expand_to_sources`, and now applies a final cross-encoder rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`) over the merged candidate set before returning the top bundle.
+**Retrieve flow.** `RetrieveFlow.retrieve` composes vector similarity search with lexical graph search over SQLite FTS5/BM25. The earlier token-wise `LIKE` path is still available as `GraphStore.search_nodes_like()` for reference/testing, but it is no longer the production retrieval backbone because explicit evaluation showed BM25 was materially stronger. RetrieveFlow reranks lexical candidates with exact word-token overlap over title and text before merging by node ID, promotes parent source nodes from chunk hits via `_expand_to_sources`, and now applies a final cross-encoder rerank (`cross-encoder/ms-marco-MiniLM-L-6-v2`) over the merged candidate set. When truncating to the top `k`, the first `k-1` hits keep their rank and the last slot goes to the best-ranked paper not already shown whose rerank score is above `-6.0` (`RCA_RETRIEVAL_RESERVE_NEW_SOURCE`, `RCA_RETRIEVAL_RESERVE_MIN_RERANK_SCORE`), so one paper's chunks are less likely to crowd a second relevant paper out of the context (set the floor to `-inf` to disable it).
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query routing + rewriting** — a lightweight query classifier labels the question as `proper_noun`, `conceptual`, or `hybrid`. Proper-noun queries skip the LLM rewrite entirely; the other classes still produce a dense 8–12 keyword technical search query to improve vector recall over conversational phrasing.
@@ -177,12 +177,12 @@ Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 | 0. fts5-only (BM25 baseline) | `95.6%` | `98.9%` |
 | 1. vector-only (dense baseline) | `84.4%` | `91.1%` |
 | 2. vector + keyword (FTS5) | `84.4%` | `91.1%` |
-| 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ query rewrite) | `94.4%` | `98.9%` |
-| 5. production path (query-type aware) | `96.7%` | `98.9%` |
+| 3. vector + keyword + expansion | `95.6%` | `96.7%` |
+| 4. full pipeline (+ query rewrite) | `95.6%` | `98.9%` |
+| 5. production path (query-type aware) | `98.9%` | `98.9%` |
 
 The most important current evaluation takeaways are:
-- The production path (query-type-aware rewrite + hybrid retrieval + rerank) is the best configuration at `96.7%` hit@5 (2026-10-02); FTS5/BM25 remains the strongest single method.
+- The production path (query-type-aware rewrite + hybrid retrieval + rerank + a reserved new-source slot) is the best configuration at `98.9%` hit@5 (2026-10-02); FTS5/BM25 remains the strongest single method.
 - Source expansion is still the biggest lift over dense retrieval alone.
 - Keyword hit rate remains the primary weakness (`20.5%`) and appears more sensitive to rewrite prompt quality than model choice.
 - Split-model rewriting was evaluated and rejected for production: it added 10s+ latency for marginal quality gain.

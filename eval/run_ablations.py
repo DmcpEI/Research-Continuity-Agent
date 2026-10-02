@@ -10,6 +10,9 @@ Configs
 5. production path      : as GenerateFlow — rewrite skipped for proper nouns,
                           query type passed to RetrieveFlow.retrieve()
 
+Configs 3-5 take hit@5 from a limit=5 call (as GenerateFlow) and hit@10 from a
+limit=10 call, because RetrieveFlow truncation reserves the last slot per limit.
+
 Metrics:
   hit@5  — all expected sources in top-5 resolved source IDs
   hit@10 — all expected sources in top-10 resolved source IDs
@@ -367,6 +370,11 @@ def main() -> None:
         query_type = classify_query(question)
         production_query = question if query_type is QueryType.proper_noun else rewritten
         bundle5 = retrieve_flow.retrieve(production_query, query_type=query_type)
+        # Truncation is limit-dependent (reserved new-source slot), and GenerateFlow
+        # retrieves with limit=5, so every RetrieveFlow config takes hit@5 from a limit=5 call.
+        bundle3_at5 = retrieve_flow.retrieve(question, limit=5)
+        bundle4_at5 = retrieve_flow.retrieve(rewritten, limit=5)
+        bundle5_at5 = retrieve_flow.retrieve(production_query, limit=5, query_type=query_type)
 
         # flag jampacker-001 specifically
         if pair["id"] == "jampacker-001":
@@ -376,6 +384,12 @@ def main() -> None:
         for key, hit_list in zip(config_keys, all_hits):
             hits5[key].append(hit_at_k(hit_list, expected, k=5))
             hits10[key].append(hit_at_k(hit_list, expected, k=10))
+        for key, bundle_at5 in (
+            ("3_vector_keyword_expand", bundle3_at5),
+            ("4_full_rewrite", bundle4_at5),
+            ("5_production_path", bundle5_at5),
+        ):
+            hits5[key][-1] = hit_at_k(bundle_at5.hits, expected, k=5)
 
         per_case.append(
             {

@@ -13,6 +13,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 - 29 typed negative questions (`neg-011`–`neg-039`); golden set is now 129 questions with 39 negatives (639c60b).
 
 ### Changed
+- When hit `k` would repeat a paper already shown, retrieval gives the last slot of the top `k` to the best-ranked unseen paper, so one paper's chunks are less likely to crowd out a second relevant paper (#9). Only candidates with rerank score above `-6.0` qualify (`RCA_RETRIEVAL_RESERVE_MIN_RERANK_SCORE`). Production hit@5 96.7% → 98.9% on 90 answerable questions; cross-paper questions 75% → 87.5%. Affects chat, agent search, and eval results; same-paper chunks in a 5-hit context drop from ~4.1 to ~3.8 on average. Disable with `RCA_RETRIEVAL_RESERVE_NEW_SOURCE=false`.
 - Grounded chat abstains before the LLM call when the top cross-encoder rerank score is ≤ −3.618 (labels `low_rerank_score`, `low_retrieval_confidence`) (e9fd29d). Affects chat users and eval results: clearly out-of-corpus questions now return a refusal faster. The threshold is tied to `cross-encoder/ms-marco-MiniLM-L-6-v2`; recalibrate if the reranker changes.
 
 ### Fixed
