@@ -14,6 +14,9 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 ### Changed
 - Grounded chat abstains before the LLM call when the top cross-encoder rerank score is ≤ −3.618 (label `low_rerank_score`) (e9fd29d). Affects chat users and eval results: clearly out-of-corpus questions now return a refusal faster. The threshold is tied to `cross-encoder/ms-marco-MiniLM-L-6-v2`; recalibrate if the reranker changes.
 
+### Fixed
+- Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
+
 ## [1.5.0] - 2026-09-29
 
 ### Added

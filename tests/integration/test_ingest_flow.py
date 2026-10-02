@@ -22,6 +22,9 @@ def _settings_for(tmp_path: Path) -> Settings:
         telemetry_log_path=runtime_dir / "telemetry.jsonl",
         experiment_db_path=runtime_dir / "experiments.sqlite3",
         tool_policy_path=Path("rca/config/tool_policies.yaml"),
+        # Real cross-encoder loads hit the Hugging Face Hub (slow, network-dependent);
+        # reranking is covered with a stub in tests/unit/test_retrieve_flow.py.
+        enable_reranker=False,
     )
 
 
