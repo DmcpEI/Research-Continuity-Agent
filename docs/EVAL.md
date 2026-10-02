@@ -67,7 +67,23 @@ The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Univer
 - `max_retrieval_score`
 - `unique_sources_top5`
 - `failure_labels`
+- `retrieved_sources` / `context_sources` (ordered source IDs retrieved, and those passed to the LLM)
+- `failure_stage`
 - `latency_ms`
+
+`failure_stage` attributes each case to the first pipeline stage that lost the expected evidence, so ranking errors and generation errors are reported separately:
+
+| Stage | Applies to | Meaning |
+|---|---|---|
+| `ok` | all | answerable: all expected sources cited; negative: abstained |
+| `retrieval_miss` | answerable | an expected source was never retrieved |
+| `context_miss` | answerable | retrieved, but filtered out before the prompt (context score threshold) |
+| `false_abstention` | answerable | expected evidence reached the LLM, but the system abstained |
+| `citation_miss` | answerable | expected evidence reached the LLM, answer did not cite it |
+| `false_answer` | negative | the system answered instead of abstaining |
+| `error` | all | runtime failure |
+
+The summary adds `failure_stage_counts` and `abstention_by_negative_type`.
 
 It writes a run artifact to `eval/results/run_<timestamp>.json` and per-question traces to `eval/results/traces/<run_id>/`.
 

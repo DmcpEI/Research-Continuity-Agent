@@ -50,7 +50,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Keyword hit rate | `20.5%` |
 | Grounded rate | `94.0%` |
 | Average latency | `9.7 s` |
-| Tests | `113` passing |
+| Tests | `115` passing |
 
 These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
 
@@ -72,7 +72,6 @@ These are the highest-priority milestones for reliability and correctness.
 - **Keyword-hit improvement via rewrite prompt tuning** — Improve the rewrite prompt and retrieval-term alignment for the robotics corpus. Rationale: keyword hit rate (`20.5%`) is the clearest current retrieval weakness.
 - **Confidence-calibrated abstention** — The calibrated pre-generation rerank gate (`rerank_max <= -3.618`, test `5/12` negatives at `1/28` false abstentions) is wired into `GenerateFlow`; confirm with a full harness rerun. Remaining gap: unreported-detail and false-premise questions about papers that are in the corpus, which retrieval signals cannot catch and need a generation-side check. See [EVAL.md](EVAL.md#abstention-calibration-retrieval-features).
 - **Human-authored external eval subset** — Add a small independently written subset to the golden set. Rationale: it reduces self-bias in external reporting better than adding more self-authored questions.
-- **Retrieval auditability in eval** — Expose retrieved hit lists and per-chunk provenance in harness output, then add a compact failure taxonomy. Rationale: it will make ranking-versus-generation errors easier to explain and defend.
 - **React API verification** — Keep the new FastAPI bridge covered by contract tests while Streamlit remains the supported local demo surface. Rationale: the React frontend is now technically usable, but product polish should follow correctness work.
 - **Response-structure conformance checks** — Add model-response shape checks (citation tuple style, markdown bullet noise, citation parsing reliability) to model onboarding and release gates. Rationale: multi-model support now introduces output-format variability that can degrade UI rendering and citation UX.
 - **Conversation request isolation** — Proper per-conversation request isolation requires backend session management; the current UI uses a global lock to avoid cross-conversation races.
@@ -180,6 +179,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 - [x] Retrieval ablations and coefficient sweep
 - [x] QueryTrace stage timings, token usage, and retrieval provenance
 - [x] Per-query trace export under `eval/results/traces/`
+- [x] Retrieval auditability: per-case retrieved/context sources and `failure_stage` taxonomy in harness output
 
 ### Tooling and delivery
 

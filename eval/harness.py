@@ -31,6 +31,7 @@ class GoldenPair(BaseModel):
     difficulty: Literal["easy", "medium", "hard"]
     category: str | None = None
     answerable: bool = True
+    negative_type: str | None = None
     notes: str | None = None
 
     model_config = {"extra": "ignore"}
@@ -49,6 +50,7 @@ class EvaluationCaseResult(BaseModel):
     difficulty: str
     category: str | None = None
     answerable: bool = True
+    negative_type: str | None = None
     expected_source: str | None = None
     expected_sources: list[str] = Field(default_factory=list)
     expected_keywords: list[str] = Field(default_factory=list)
@@ -63,6 +65,9 @@ class EvaluationCaseResult(BaseModel):
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     failure_labels: list[str] = Field(default_factory=list)
+    retrieved_sources: list[str] = Field(default_factory=list)
+    context_sources: list[str] = Field(default_factory=list)
+    failure_stage: str = "ok"
     latency_ms: float
     trace_path: str | None = None
     error: str | None = None
@@ -136,6 +141,7 @@ def evaluate_pair(
         )
         keyword_hits = calculate_keyword_hit_rate(matched_keywords, pair.expected_keywords)
         max_retrieval_score, unique_sources_top5 = trace_retrieval_features(generated.trace)
+        retrieved_sources, context_sources = trace_sources(generated.trace)
         if not pair.answerable:
             source_correct = generated.abstained
         elif expected_sources:
@@ -152,6 +158,7 @@ def evaluate_pair(
                 difficulty=pair.difficulty,
                 category=pair.category,
                 answerable=pair.answerable,
+                negative_type=pair.negative_type,
                 expected_source=pair.expected_source,
                 expected_sources=expected_sources,
                 expected_keywords=pair.expected_keywords,
@@ -166,6 +173,15 @@ def evaluate_pair(
                 matched_keywords=matched_keywords,
                 missing_keywords=missing_keywords,
                 failure_labels=generated.failure_labels,
+                retrieved_sources=retrieved_sources,
+                context_sources=context_sources,
+                failure_stage=classify_failure_stage(
+                    pair,
+                    abstained=generated.abstained,
+                    source_correct=source_correct,
+                    retrieved_sources=retrieved_sources,
+                    context_sources=context_sources,
+                ),
                 latency_ms=latency_ms,
             ),
             generated.trace.model_dump(mode="json") if generated.trace is not None else None,
@@ -179,6 +195,7 @@ def evaluate_pair(
                 difficulty=pair.difficulty,
                 category=pair.category,
                 answerable=pair.answerable,
+                negative_type=pair.negative_type,
                 expected_source=pair.expected_source,
                 expected_sources=expected_sources,
                 expected_keywords=pair.expected_keywords,
@@ -193,6 +210,7 @@ def evaluate_pair(
                 matched_keywords=[],
                 missing_keywords=pair.expected_keywords,
                 failure_labels=["error"],
+                failure_stage="error",
                 latency_ms=latency_ms,
                 error=f"{type(exc).__name__}: {exc}",
             ),
@@ -228,6 +246,54 @@ def trace_retrieval_features(trace: Any | None) -> tuple[float, int]:
     )
 
 
+def trace_sources(trace: Any | None) -> tuple[list[str], list[str]]:
+    """Ordered unique source IDs retrieved, and those passed to the LLM as context."""
+    if trace is None:
+        return [], []
+    resolve = GenerateFlow._resolve_source_id
+    retrieved = [resolve(item.node_id) for item in getattr(trace, "provenance", None) or []]
+    context = [resolve(node_id) for node_id in getattr(trace, "context_node_ids", None) or []]
+    return list(dict.fromkeys(retrieved)), list(dict.fromkeys(context))
+
+
+def classify_failure_stage(
+    pair: GoldenPair,
+    *,
+    abstained: bool,
+    source_correct: bool,
+    retrieved_sources: list[str],
+    context_sources: list[str],
+) -> str:
+    """Attribute a case to the first pipeline stage that lost the expected evidence."""
+    if not pair.answerable:
+        return "ok" if abstained else "false_answer"
+    if source_correct:
+        return "ok"
+    expected = pair.expected_source_ids()
+    if not all(source in retrieved_sources for source in expected):
+        return "retrieval_miss"
+    if not all(source in context_sources for source in expected):
+        return "context_miss"
+    if abstained:
+        return "false_abstention"
+    return "citation_miss"
+
+
+def count_failure_stages(results: list[EvaluationCaseResult]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for result in results:
+        counts[result.failure_stage] = counts.get(result.failure_stage, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def abstention_by_negative_type(results: list[EvaluationCaseResult]) -> dict[str, str]:
+    groups: dict[str, list[bool]] = {}
+    for result in results:
+        if not result.answerable:
+            groups.setdefault(result.negative_type or "untyped", []).append(result.abstained)
+    return {key: f"{sum(values)}/{len(values)}" for key, values in sorted(groups.items())}
+
+
 def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
     total = len(results)
     if total == 0:
@@ -241,6 +307,8 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
             "average_keyword_hit_rate": 0.0,
             "average_latency_ms": 0.0,
             "failure_label_counts": {},
+            "failure_stage_counts": {},
+            "abstention_by_negative_type": {},
             "by_difficulty": {},
             "top_failures": [],
         }
@@ -273,6 +341,8 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
         "average_keyword_hit_rate": sum(result.keyword_hits for result in results) / total,
         "average_latency_ms": sum(result.latency_ms for result in results) / total,
         "failure_label_counts": count_failure_labels(results),
+        "failure_stage_counts": count_failure_stages(results),
+        "abstention_by_negative_type": abstention_by_negative_type(results),
         "by_difficulty": by_difficulty,
         "top_failures": [
             {
@@ -341,6 +411,16 @@ def print_summary(summary: dict[str, Any], total_cases: int) -> None:
             f"{label}={count}" for label, count in summary["failure_label_counts"].items()
         )
         print(f"Failure labels: {labels}")
+    if summary.get("failure_stage_counts"):
+        stages = ", ".join(
+            f"{stage}={count}" for stage, count in summary["failure_stage_counts"].items()
+        )
+        print(f"Failure stages: {stages}")
+    if summary.get("abstention_by_negative_type"):
+        by_type = ", ".join(
+            f"{kind}={rate}" for kind, rate in summary["abstention_by_negative_type"].items()
+        )
+        print(f"Abstention by negative type: {by_type}")
     print("")
     print("Breakdown by difficulty:")
     for difficulty in ("easy", "medium", "hard"):
