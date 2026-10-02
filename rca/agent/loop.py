@@ -10,6 +10,7 @@ from typing import Any
 from rca.agent.contracts import AgentResult, AgentTrace, ToolCallTrace
 from rca.agent.tools import ToolRegistry
 from rca.config.settings import Settings, get_settings
+from rca.flows.retrieve_flow import RetrieveFlow
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
 from rca.llm.factory import get_llm_client
 
@@ -45,9 +46,12 @@ class AgentLoop:
         settings: Settings | None = None,
         registry: ToolRegistry | None = None,
         llm_client: LLMClient | None = None,
+        retrieve_flow: RetrieveFlow | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.registry = registry or ToolRegistry(self.settings)
+        if registry is not None and retrieve_flow is not None:
+            raise ValueError("Pass registry or retrieve_flow, not both")
+        self.registry = registry or ToolRegistry(self.settings, retrieve_flow=retrieve_flow)
 
         if llm_client is not None:
             self.llm = llm_client

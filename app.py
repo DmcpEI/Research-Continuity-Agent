@@ -543,7 +543,8 @@ def get_agent_loop():
 
     from rca.agent.loop import AgentLoop
 
-    loop = AgentLoop()
+    # Share chat's retrieve flow so agent search uses the same vector store.
+    loop = AgentLoop(retrieve_flow=get_flows()["generate"].retrieve_flow)
     atexit.register(loop.close)
     return loop
 
@@ -1018,6 +1019,7 @@ else:
                                 unsafe_allow_html=True,
                             )
                             get_flows.clear()
+                            get_agent_loop.clear()  # agent shares chat's retrieve flow
                         except Exception as e:
                             st.markdown(
                                 f'<div class="ingest-error">✗ {uploaded.name}: {e}</div>',
@@ -1049,6 +1051,7 @@ else:
                         progress.progress((i + 1) / len(uploaded_files))
                     st.markdown(results_html, unsafe_allow_html=True)
                     get_flows.clear()
+                    get_agent_loop.clear()  # agent shares chat's retrieve flow
                     st.success(f"Done. Ingested {len(uploaded_files)} files.")
                 finally:
                     shutil.rmtree(tmp_dir, ignore_errors=True)

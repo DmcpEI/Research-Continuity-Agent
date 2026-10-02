@@ -371,6 +371,30 @@ def test_status_endpoint_reports_fallback_of_injected_retrieve_flow_store(tmp_pa
     assert any("chroma down" in warning for warning in payload["warnings"])
 
 
+def test_create_app_shares_retrieve_flow_with_default_agent(tmp_path: Path, monkeypatch) -> None:
+    import rca.api.main as api_main
+
+    captured: dict = {}
+
+    class CapturingAgentLoop:
+        def __init__(self, **kwargs) -> None:
+            captured.update(kwargs)
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(api_main, "AgentLoop", CapturingAgentLoop)
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    retrieve = RetrieveFlow(settings=settings, graph_store=store, vector_store=vectors)
+
+    create_app(settings=settings, graph_store=store, vector_store=vectors, retrieve_flow=retrieve)
+
+    # Agent knowledge-base search must hit the same store /status reports on.
+    assert captured["retrieve_flow"] is retrieve
+
+
 def test_agent_models_filters_out_non_tool_calling_models(tmp_path: Path, monkeypatch) -> None:
     settings = _settings_for(tmp_path)
     settings.llm_backend = "ollama"

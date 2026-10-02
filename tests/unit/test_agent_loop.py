@@ -402,3 +402,66 @@ def test_read_text_file_on_pdf_returns_helpful_guidance() -> None:
     assert trace.status == ToolCallStatus.success
     assert "Use `search_knowledge_base`" in trace.output
     assert manager.calls == []
+
+
+class _RecordingRetrieveFlow:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def retrieve(self, query: str, limit: int = 10, **kwargs):
+        from rca.flows.retrieve_flow import RetrievalBundle
+
+        self.queries.append(query)
+        return RetrievalBundle(query=query, hits=[])
+
+
+class _NoToolsMCPManager:
+    def list_tools(self, server_name: str) -> list[mcp_types.Tool]:
+        return []
+
+    def call_tool(self, tool_name: str, arguments: dict) -> str:
+        raise AssertionError("no MCP tools expected")
+
+    def close(self) -> None:
+        return None
+
+
+def test_tool_registry_knowledge_base_search_uses_injected_retrieve_flow() -> None:
+    retrieve_flow = _RecordingRetrieveFlow()
+    registry = ToolRegistry(retrieve_flow=retrieve_flow, mcp_manager=_NoToolsMCPManager())
+
+    trace = registry.call("search_knowledge_base", {"query": "bin packing", "limit": 3})
+
+    assert trace.status == ToolCallStatus.success
+    assert trace.output == "No relevant documents found."
+    assert retrieve_flow.queries == ["bin packing"]
+
+
+def test_agent_loop_passes_retrieve_flow_to_default_registry(monkeypatch) -> None:
+    import rca.agent.tools as tools_module
+
+    # Keep the default registry from starting real MCP stdio servers.
+    monkeypatch.setattr(tools_module, "MCPClientManager", lambda settings: _NoToolsMCPManager())
+    retrieve_flow = _RecordingRetrieveFlow()
+    loop = AgentLoop(retrieve_flow=retrieve_flow, llm_client=FakeLLM([]))
+    try:
+        trace = loop.registry.call("search_knowledge_base", {"query": "scene graphs"})
+    finally:
+        loop.close()
+
+    assert trace.status == ToolCallStatus.success
+    assert retrieve_flow.queries == ["scene graphs"]
+
+
+def test_retrieve_flow_conflicting_with_explicit_search_or_registry_is_rejected() -> None:
+    import pytest
+
+    retrieve_flow = _RecordingRetrieveFlow()
+    with pytest.raises(ValueError, match="retrieve_flow"):
+        ToolRegistry(
+            knowledge_base_search=lambda query, limit=5: "KB",
+            retrieve_flow=retrieve_flow,
+            mcp_manager=_NoToolsMCPManager(),
+        )
+    with pytest.raises(ValueError, match="retrieve_flow"):
+        AgentLoop(registry=FakeRegistry(), retrieve_flow=retrieve_flow, llm_client=FakeLLM([]))

@@ -73,10 +73,16 @@ class ToolRegistry:
         settings: Settings | None = None,
         knowledge_base_search: Callable[[str, int], str] | None = None,
         mcp_manager: MCPClientManager | None = None,
+        retrieve_flow: RetrieveFlow | None = None,
     ) -> None:
         self.settings = settings or get_settings()
+        if knowledge_base_search is not None and retrieve_flow is not None:
+            raise ValueError("Pass knowledge_base_search or retrieve_flow, not both")
         if knowledge_base_search is None:
-            self._knowledge_base_search = KnowledgeBaseAdapter(self.settings).search
+            # Pass the caller's retrieve flow so agent search shares its vector store.
+            self._knowledge_base_search = KnowledgeBaseAdapter(
+                self.settings, retrieve_flow=retrieve_flow
+            ).search
         else:
             self._knowledge_base_search = knowledge_base_search
         self._mcp_manager = mcp_manager or MCPClientManager(self.settings)

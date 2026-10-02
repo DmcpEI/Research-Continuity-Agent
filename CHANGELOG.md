@@ -16,6 +16,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 
 ### Fixed
 - A Chroma → JSON vector-store fallback is now visible: `/status` returns `vector_backend` and `warnings`, the React status bar shows a "Vector search degraded" badge (status refreshes every 30 s), and the Streamlit sidebar shows a warning. Previously it was only logged, so retrieval could silently degrade (#17, #2). API consumers: two new additive fields, no migration.
+- Agent knowledge-base search now uses the same retrieve flow and vector store as chat (API and Streamlit), so a vector fallback hit by the agent shows up in `/status` and the UI. Previously the agent built its own store. `ToolRegistry` and `AgentLoop` accept an optional `retrieve_flow` (passing it together with `knowledge_base_search` or `registry` raises `ValueError`); Streamlit clears the cached agent loop whenever it rebuilds the chat flows after an ingest. Existing callers are unaffected.
 - Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
 
 ## [1.5.0] - 2026-09-29 (tag `v1.5.0`)

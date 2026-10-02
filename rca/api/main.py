@@ -429,7 +429,7 @@ def create_app(
         graph_store=store,
         vector_store=vectors,
     )
-    agent = agent_loop or AgentLoop(settings=cfg)
+    agent = agent_loop or AgentLoop(settings=cfg, retrieve_flow=retrieve)
 
     app = FastAPI(title="Research Continuity Agent API")
     app.state.agent_tool_capability_cache = {}
