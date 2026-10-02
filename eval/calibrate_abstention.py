@@ -13,6 +13,8 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from rca.telemetry.provenance import git_state
+
 # (feature, direction): "low" abstains when value <= t, "high" when value >= t
 FEATURES = [
     ("max_score", "low"),
@@ -96,9 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", default="eval/results/abstention_calibration.json")
     args = parser.parse_args(argv)
 
-    rows = [
-        r for r in json.loads(Path(args.features_path).read_text())["rows"] if "skipped" not in r
-    ]
+    features = json.loads(Path(args.features_path).read_text())
+    rows = [r for r in features["rows"] if "skipped" not in r]
     split_ids = {
         name: set(json.loads((Path(args.splits_dir) / f"{name}.json").read_text())["ids"])
         for name in ("dev", "test")
@@ -119,6 +120,9 @@ def main(argv: list[str] | None = None) -> int:
     _, name, rule, dev_score = picked
     report = {
         "features_path": args.features_path,
+        # Provenance of the retrieval run the features came from (None if older artifact).
+        "features_provenance": features.get("provenance"),
+        "calibration_code": git_state(),
         "budget": args.budget,
         "dev_n": len(dev),
         "test_n": len(test),

@@ -32,6 +32,7 @@ from rca.llm.client import ChatMessage, OllamaLLMClient
 from rca.retrieval.query_classifier import QueryType, classify_query
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
+from rca.telemetry.provenance import collect_provenance, finish_provenance
 
 CHUNK_SUFFIX = re.compile(r":\d+$")
 FETCH_K = 10  # how many results to retrieve per config
@@ -313,6 +314,7 @@ def main() -> None:
         base_url=settings.embedding_base_url,
         model=settings.generation_model,
     )
+    provenance = collect_provenance(settings, graph_store, vector_store)
 
     raw = json.loads(Path("eval/golden.json").read_text(encoding="utf-8"))
     golden_pairs = raw.get("pairs", raw) if isinstance(raw, dict) else raw
@@ -472,6 +474,7 @@ def main() -> None:
         "summary_by_category": category_summary,
         "summary_by_difficulty": difficulty_summary,
         "per_case": per_case,
+        "provenance": finish_provenance(provenance, vector_store),
     }
     out_path = Path("eval/results/ablations.json")
     out_path.write_text(json.dumps(output, indent=2), encoding="utf-8")

@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from rca.contracts.trace import QueryTrace  # noqa: E402
 from rca.flows.generate_flow import GenerateFlow  # noqa: E402
 from rca.retrieval.query_classifier import QueryType, classify_query  # noqa: E402
+from rca.telemetry.provenance import collect_provenance, finish_provenance  # noqa: E402
 
 LIMIT = 5  # GenerateFlow.generate_answer default
 
@@ -98,6 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     payload = json.loads(Path(args.golden_path).read_text(encoding="utf-8"))
     pairs = payload["pairs"] if isinstance(payload, dict) else payload
     flow = GenerateFlow()
+    provenance = collect_provenance(
+        flow.settings, flow.retrieve_flow.graph_store, flow.retrieve_flow.vector_store
+    )
 
     rows = []
     for index, pair in enumerate(pairs, 1):
@@ -114,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
                 "rewrite_model": getattr(flow.rewrite_llm, "model", ""),
                 "embedding_model": flow.settings.embedding_model,
                 "limit": LIMIT,
+                "provenance": finish_provenance(provenance, flow.retrieve_flow.vector_store),
                 "rows": rows,
             },
             indent=2,

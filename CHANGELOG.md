@@ -5,6 +5,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 ## [Unreleased]
 
 ### Added
+- Run provenance in every eval artifact: corpus fingerprint, exact Ollama model digests and server version, reranker revision, result-affecting settings, git commit, and vector-backend state at start and end with an `index_degraded_during_run` flag (#10). Harness traces now fill `corpus_version`. Affects eval artifacts only.
 - CI job for the frontend on Node 24: type-check of app and tests (`tsconfig.test.json`, tests were previously excluded from type-checking), production build, and vitest; the pre-push hook runs the same commands (`npm run typecheck`, `npm run build`, `npm test`) and stops with a clear message if `frontend/node_modules` is missing. Node version lives in `frontend/.nvmrc`. Contributors: run `npm ci` in `frontend/` once.
 - Git hooks via the `pre-commit` framework: ruff check + format check on commit, the CI pytest command on push. Contributors: run `uv run pre-commit install` once per clone.
 - Harness failure-stage taxonomy (`retrieval_miss`, `context_miss`, `false_abstention`, `citation_miss`, `false_answer`) with per-case retrieved/context sources and abstention per `negative_type` (4e87a4f). Affects eval artifacts only.

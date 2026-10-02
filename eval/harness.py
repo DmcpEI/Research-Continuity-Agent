@@ -18,6 +18,7 @@ from rca.config.settings import Settings
 from rca.flows.generate_flow import GenerateFlow
 from rca.llm.client import ChatMessage
 from rca.llm.factory import get_llm_client
+from rca.telemetry.provenance import collect_provenance, finish_provenance
 
 
 class GoldenPair(BaseModel):
@@ -550,6 +551,14 @@ def main(argv: list[str] | None = None) -> int:
         print(str(exc))
         return 2
     run_config = build_run_config(settings, flow, dataset_kind)
+    retrieve_flow = getattr(flow, "retrieve_flow", None)
+    graph_store = getattr(retrieve_flow, "graph_store", None)
+    vector_store = getattr(retrieve_flow, "vector_store", None)
+    rewrite_model = getattr(getattr(flow, "rewrite_llm", None), "model", None)
+    provenance = collect_provenance(
+        settings, graph_store, vector_store, extra_models=[rewrite_model] if rewrite_model else None
+    )
+    corpus_version = (provenance.get("corpus") or {}).get("corpus_version", "")
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     trace_dir = output_dir / "traces" / timestamp
     trace_dir.mkdir(parents=True, exist_ok=True)
@@ -558,6 +567,7 @@ def main(argv: list[str] | None = None) -> int:
     for pair in golden_pairs:
         result, trace_payload = evaluate_pair(flow, pair)
         if trace_payload is not None:
+            trace_payload["corpus_version"] = corpus_version
             trace_path = trace_dir / f"{pair.id}.json"
             trace_path.write_text(json.dumps(trace_payload, indent=2), encoding="utf-8")
             result.trace_path = str(trace_path)
@@ -573,6 +583,7 @@ def main(argv: list[str] | None = None) -> int:
         "golden_path": str(golden_path),
         "cases": len(golden_pairs),
         "run_config": run_config,
+        "provenance": finish_provenance(provenance, vector_store),
         "trace_dir": str(trace_dir),
         "summary": summary,
         "results": [result.model_dump(mode="json") for result in results],

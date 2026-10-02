@@ -13,6 +13,7 @@ from rca.config.settings import get_settings
 from rca.flows.retrieve_flow import LEXICAL_BASE_SCORE, TITLE_WORD_PATTERN, RetrieveFlow
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
+from rca.telemetry.provenance import collect_provenance, finish_provenance
 
 TITLE_WEIGHTS = [0.08, 0.12, 0.16, 0.20, 0.24]
 TEXT_WEIGHTS = [0.01, 0.02, 0.03, 0.04, 0.05]
@@ -272,6 +273,7 @@ def main() -> None:
     settings = get_settings()
     graph_store = GraphStore(settings.graph_db_path)
     vector_store = VectorStore(settings.vector_dir, settings.default_collection)
+    provenance = collect_provenance(settings, graph_store, vector_store)
 
     sweep_results: dict[tuple[float, float], dict[str, Any]] = {}
 
@@ -360,6 +362,7 @@ def main() -> None:
     )
 
     payload = {
+        "provenance": finish_provenance(provenance, vector_store),
         "seed": SEED,
         "split_strategy": "stratified_by_category_largest_remainder",
         "base_score": BASE_SCORE,

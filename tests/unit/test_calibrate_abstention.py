@@ -32,3 +32,27 @@ def test_pick_finds_threshold_within_false_abstention_budget() -> None:
     assert dev_score["negatives_abstained"] == "2/3"
     assert dev_score["answerables_abstained"] == "0/4"
     assert calib.by_type(rows, rule) == {"fabricated": "2/3"}
+
+
+def test_calibration_report_carries_feature_run_provenance(tmp_path) -> None:
+    import json
+
+    calib = _load_module()
+    rows = [{"id": f"a{i}", "answerable": True, "rerank_max": 3.0 + i} for i in range(4)] + [
+        {"id": f"n{i}", "answerable": False, "rerank_max": -8.0 - i} for i in range(4)
+    ]
+    features = tmp_path / "features.json"
+    features.write_text(
+        json.dumps({"provenance": {"corpus": {"corpus_version": "abc123"}}, "rows": rows})
+    )
+    splits = tmp_path / "splits"
+    splits.mkdir()
+    (splits / "dev.json").write_text(json.dumps({"ids": ["a0", "a1", "n0", "n1"]}))
+    (splits / "test.json").write_text(json.dumps({"ids": ["a2", "a3", "n2", "n3"]}))
+    output = tmp_path / "report.json"
+
+    assert calib.main([str(features), "--splits-dir", str(splits), "--output", str(output)]) == 0
+
+    report = json.loads(output.read_text())
+    assert report["features_provenance"] == {"corpus": {"corpus_version": "abc123"}}
+    assert report["calibration_code"]["commit"]

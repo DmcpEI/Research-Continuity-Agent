@@ -119,3 +119,58 @@ def test_trace_sources_resolves_chunks_and_dedupes() -> None:
 
     assert harness.trace_sources(trace) == (["src:pdf/a", "src:pdf/b"], ["src:pdf/a"])
     assert harness.trace_sources(None) == ([], [])
+
+
+def test_harness_records_provenance_and_stamps_corpus_version_on_traces(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from rca.config.settings import Settings
+    from rca.contracts.nodes import Node, NodeKind
+    from rca.contracts.trace import QueryTrace
+    from rca.flows.generate_flow import GeneratedAnswer
+    from rca.store.graph_store import GraphStore
+
+    harness = _load_harness_module()
+    graph = GraphStore(tmp_path / "graph.sqlite3")
+    graph.upsert_node(Node(id="src:pdf/a", kind=NodeKind.paper, title="A", text="abstract"))
+    vectors = SimpleNamespace(
+        backend="chroma", backend_warning=None, _collection=None, _documents={}
+    )
+
+    class FakeFlow:
+        # harness helpers resolve chunk IDs through the GenerateFlow name this test replaces
+        _resolve_source_id = harness.GenerateFlow._resolve_source_id
+
+        def __init__(self, settings) -> None:
+            self.settings = settings
+            self.llm = SimpleNamespace(model="fake-gen")
+            self.rewrite_llm = self.llm
+            self.retrieve_flow = SimpleNamespace(graph_store=graph, vector_store=vectors)
+
+        def generate_answer(self, query: str) -> GeneratedAnswer:
+            return GeneratedAnswer(
+                query=query, answer="answer", grounded=False, trace=QueryTrace(query=query)
+            )
+
+    golden = tmp_path / "golden.json"
+    golden.write_text(
+        json.dumps([{"id": "q1", "question": "What is A?", "difficulty": "easy"}]),
+        encoding="utf-8",
+    )
+    harness.GenerateFlow = FakeFlow
+    harness.validate_eval_llm = lambda flow: None
+    harness.fetch_available_ollama_models = lambda base_url: set()
+    harness.build_settings = lambda model: Settings(llm_backend="openai_compatible")
+    harness.print_summary = lambda summary, total: None
+
+    assert harness.main(["--golden-path", str(golden), "--output-dir", str(tmp_path / "out")]) == 0
+
+    payload = json.loads(next((tmp_path / "out").glob("run_*.json")).read_text(encoding="utf-8"))
+    provenance = payload["provenance"]
+    version = provenance["corpus"]["corpus_version"]
+    assert version and provenance["corpus"]["sources"] == 1
+    assert provenance["index_degraded_during_run"] is False
+    assert provenance["code"]["commit"]
+    assert payload["results"][0]["error"] is None, payload["results"][0]["error"]
+    trace = json.loads(Path(payload["results"][0]["trace_path"]).read_text(encoding="utf-8"))
+    assert trace["corpus_version"] == version

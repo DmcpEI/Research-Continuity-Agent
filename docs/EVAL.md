@@ -311,6 +311,22 @@ Suggested automation split:
 
 ---
 
+## Run Provenance and Comparing Runs
+
+Every eval artifact (harness `run_*.json`, `ablations.json`, `retrieval_features_*.json`, `coefficient_sweep.json`) carries a `provenance` block from `rca/telemetry/provenance.py`; the calibration report copies the provenance of the feature file it read (`features_provenance`). Harness traces get `corpus_version`.
+
+| Field | What it pins down |
+|---|---|
+| `corpus.corpus_version` | 16-hex SHA-256 prefix over every indexed source and chunk (ID, title, text, metadata) and every edge, plus counts |
+| `models` | Ollama server version and the exact digest of each model used (`null` = not installed) |
+| `reranker` | cross-encoder name and the cached Hugging Face revision |
+| `settings` | retrieval/generation settings that change results (reranker, limits, reserve slot, chunking) |
+| `code` | git commit, whether the tree was dirty, and a hash of the uncommitted diff |
+| `index_start` / `index_end` | vector backend and record count at run start and end |
+| `index_degraded_during_run` | `true` if the backend or its warning changed between start and end (a run that started on the JSON fallback shows that in `index_start` instead) |
+
+Compare two runs only when `corpus_version`, the model digests, the reranker revision, and `settings` match; treat any run with `index_degraded_during_run: true`, or `index_start.backend` other than `chroma`, as invalid. The fingerprint hashes node content instead of `source_revisions` because sources ingested before revision tracking have no revision rows (24 of the current 25).
+
 ## Abstention Calibration (retrieval features)
 
 Retrieval-only study, no answer generation. Run on 2026-10-01 over all `129` questions with the production retrieval path (`gemma3:12b` query rewrite, `nomic-embed-text`, cross-encoder rerank, `limit=5`).
