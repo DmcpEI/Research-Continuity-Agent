@@ -398,6 +398,7 @@ for hit in bundle.hits:
 **Run tests**
 
 ```bash
+uv sync --extra dev   # pytest, ruff, pre-commit
 uv run pytest -v
 uv run pytest tests/integration/test_ingest_flow.py
 uv run pytest tests/unit/test_retrieve_flow.py
@@ -409,6 +410,8 @@ uv run pytest tests/unit/test_retrieve_flow.py
 uv sync --extra dev
 uv run pre-commit install   # pre-commit: ruff check + format check; pre-push: CI pytest command
 ```
+
+Hooks check the working tree (including untracked, non-ignored files), not the exact commit being pushed, so CI on the pushed commit stays the authoritative gate.
 
 **Run evaluation harness**
 

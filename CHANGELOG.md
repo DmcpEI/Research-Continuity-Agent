@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to RCA. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow `pyproject.toml`. Entries before 1.5.0 live in git history.
+All notable changes to RCA. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow `pyproject.toml` (versions after 1.0.0 are not git-tagged). Entries before 1.5.0 live in git history.
 
 ## [Unreleased]
 
@@ -12,7 +12,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 - 29 typed negative questions (`neg-011`–`neg-039`); golden set is now 129 questions with 39 negatives (639c60b).
 
 ### Changed
-- Grounded chat abstains before the LLM call when the top cross-encoder rerank score is ≤ −3.618 (label `low_rerank_score`) (e9fd29d). Affects chat users and eval results: clearly out-of-corpus questions now return a refusal faster. The threshold is tied to `cross-encoder/ms-marco-MiniLM-L-6-v2`; recalibrate if the reranker changes.
+- Grounded chat abstains before the LLM call when the top cross-encoder rerank score is ≤ −3.618 (labels `low_rerank_score`, `low_retrieval_confidence`) (e9fd29d). Affects chat users and eval results: clearly out-of-corpus questions now return a refusal faster. The threshold is tied to `cross-encoder/ms-marco-MiniLM-L-6-v2`; recalibrate if the reranker changes.
 
 ### Fixed
 - Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
@@ -23,6 +23,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 - Document revisions and idempotent re-ingest keyed on file and content hashes; additive `source_revisions` table, no migration needed for existing databases (446f9d5).
 - FastAPI backend for the React frontend: sources with revisions, ingest, chat, agent, model selection with tool-capability probing, inline PDF (07be586).
 - Generation failure labels and grounding check; harness `--model`, `--rewrite-model`, `--strict-model-check`, `--external-golden-path` (68716b5).
+- Conversational queries (chit-chat) skip retrieval, and chat prompts include prior conversation turns (68716b5).
 
 ### Changed
 - Uncited answers are no longer marked grounded by injecting the top source as a citation (68716b5).

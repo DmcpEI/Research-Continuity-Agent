@@ -19,4 +19,4 @@ eval/results/traces/
 .agent_handoff/
 docs/RCA Research Assistant.html
 frontend/*.tsbuildinfo
-CLAUDE.md
+/CLAUDE.md
