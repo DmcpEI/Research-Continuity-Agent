@@ -1,4 +1,4 @@
-"""Retrieval ablation study — 5 configurations, hit@5 and hit@10 on golden pairs.
+"""Retrieval ablation study — 6 configurations, hit@5 and hit@10 on golden pairs.
 
 Configs
 -------
@@ -7,6 +7,8 @@ Configs
 2. vector + keyword     : vector + GraphStore.search_nodes(), no expansion
 3. vector + keyword + expand: full RetrieveFlow.retrieve(), no query rewrite
 4. full pipeline        : LLM query rewrite + full RetrieveFlow.retrieve()
+5. production path      : as GenerateFlow — rewrite skipped for proper nouns,
+                          query type passed to RetrieveFlow.retrieve()
 
 Metrics:
   hit@5  — all expected sources in top-5 resolved source IDs
@@ -24,6 +26,7 @@ from rca.config.settings import get_settings
 from rca.flows.generate_flow import GenerateFlow
 from rca.flows.retrieve_flow import RetrievalHit, RetrieveFlow
 from rca.llm.client import ChatMessage, OllamaLLMClient
+from rca.retrieval.query_classifier import QueryType, classify_query
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
 
@@ -320,6 +323,7 @@ def main() -> None:
         "2_vector_keyword",
         "3_vector_keyword_expand",
         "4_full_rewrite",
+        "5_production_path",
     ]
     # track hits at both k=5 and k=10
     hits5: dict[str, list[bool]] = {k: [] for k in config_keys}
@@ -360,12 +364,15 @@ def main() -> None:
         bundle3 = retrieve_flow.retrieve(question)
         rewritten = rewrite_query(llm, question)
         bundle4 = retrieve_flow.retrieve(rewritten)
+        query_type = classify_query(question)
+        production_query = question if query_type is QueryType.proper_noun else rewritten
+        bundle5 = retrieve_flow.retrieve(production_query, query_type=query_type)
 
         # flag jampacker-001 specifically
         if pair["id"] == "jampacker-001":
             print(f"  [jampacker-001 rewrite] → {rewritten!r}")
 
-        all_hits = [hits0, hits1, hits2, bundle3.hits, bundle4.hits]
+        all_hits = [hits0, hits1, hits2, bundle3.hits, bundle4.hits, bundle5.hits]
         for key, hit_list in zip(config_keys, all_hits):
             hits5[key].append(hit_at_k(hit_list, expected, k=5))
             hits10[key].append(hit_at_k(hit_list, expected, k=10))
@@ -387,10 +394,10 @@ def main() -> None:
         h5 = [int(hits5[k][-1]) for k in config_keys]
         h10 = [int(hits10[k][-1]) for k in config_keys]
         print(
-            f"  @5  fts5={h5[0]}  dense={h5[1]}  +fts5={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}"
+            f"  @5  fts5={h5[0]}  dense={h5[1]}  +fts5={h5[2]}  +expand={h5[3]}  +rewrite={h5[4]}  prod={h5[5]}"
         )
         print(
-            f"  @10 fts5={h10[0]}  dense={h10[1]}  +fts5={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}"
+            f"  @10 fts5={h10[0]}  dense={h10[1]}  +fts5={h10[2]}  +expand={h10[3]}  +rewrite={h10[4]}  prod={h10[5]}"
         )
 
     n = evaluated_cases
@@ -407,6 +414,7 @@ def main() -> None:
         ("2. vector + keyword (FTS5)", "2_vector_keyword"),
         ("3. vector + keyword + expansion", "3_vector_keyword_expand"),
         ("4. full pipeline (+ rewrite)", "4_full_rewrite"),
+        ("5. production path (query-type aware)", "5_production_path"),
     ]
     category_summary = build_bucket_summary(per_case, config_keys, "category")
     difficulty_summary = build_bucket_summary(

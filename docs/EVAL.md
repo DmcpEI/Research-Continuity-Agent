@@ -128,16 +128,19 @@ Aggregate retrieval results:
 | Configuration | hit@5 | hit@10 |
 |---|---:|---:|
 | 0. fts5-only (BM25 baseline) | `95.6%` | `98.9%` |
-| 1. vector-only (dense baseline) | `76.7%` | `88.9%` |
-| 2. vector + keyword (FTS5) | `76.7%` | `88.9%` |
+| 1. vector-only (dense baseline) | `84.4%` | `91.1%` |
+| 2. vector + keyword (FTS5) | `84.4%` | `91.1%` |
 | 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ rewrite) | `93.3%` | `96.7%` |
+| 4. full pipeline (+ rewrite) | `94.4%` | `98.9%` |
+| 5. production path (query-type aware) | `96.7%` | `98.9%` |
+
+Run 2026-10-02 on the `129`-question set (`90` answerable retrieval cases; negatives are skipped), `gemma3:12b` rewrite. Config 5 mirrors `GenerateFlow`: rewrite is skipped for proper-noun queries and the query type is passed to `RetrieveFlow`; it reuses config 4's rewrite, so it adds no LLM calls. hit@k requires *all* expected sources in the top-k, so two-source cross-paper questions are the strictest cases: production misses at hit@5 are `cross-004`, `cross-008`, and `densepack-001` (the last two recovered by hit@10). Wilson 95% interval for `87/90`: `90.7%`–`98.9%`. Dense-only rose from `76.7%` (April run) to `84.4%`; the cause has not been isolated (index rebuilt since).
 
 Interpretation guidance:
 - FTS5/BM25 is the production lexical backbone and should be treated as the main sparse baseline
 - dense retrieval remains useful, but on this corpus the lexical signal is often very strong
 - source expansion and the cross-encoder reranker are the main reasons the composed pipeline improves on simpler hybrids
-- query rewrite is now implemented as a small append-only expansion; on the latest Gemma-linked run it trails the FTS5 baseline on this corpus and requires further tuning
+- query rewrite is a small append-only expansion; applied to every query (config 4) it ties expansion-only at hit@5, but applied as in production (skipped for proper nouns, config 5) it is the best configuration at `96.7%` hit@5
 
 ---
 

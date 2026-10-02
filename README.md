@@ -175,13 +175,14 @@ Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 | Configuration | hit@5 | hit@10 |
 |---|---:|---:|
 | 0. fts5-only (BM25 baseline) | `95.6%` | `98.9%` |
-| 1. vector-only (dense baseline) | `76.7%` | `88.9%` |
-| 2. vector + keyword (FTS5) | `76.7%` | `88.9%` |
+| 1. vector-only (dense baseline) | `84.4%` | `91.1%` |
+| 2. vector + keyword (FTS5) | `84.4%` | `91.1%` |
 | 3. vector + keyword + expansion | `94.4%` | `96.7%` |
-| 4. full pipeline (+ query rewrite) | `93.3%` | `96.7%` |
+| 4. full pipeline (+ query rewrite) | `94.4%` | `98.9%` |
+| 5. production path (query-type aware) | `96.7%` | `98.9%` |
 
 The most important current evaluation takeaways are:
-- FTS5/BM25 remains the strongest single-method retrieval baseline on this corpus.
+- The production path (query-type-aware rewrite + hybrid retrieval + rerank) is the best configuration at `96.7%` hit@5 (2026-10-02); FTS5/BM25 remains the strongest single method.
 - Source expansion is still the biggest lift over dense retrieval alone.
 - Keyword hit rate remains the primary weakness (`20.5%`) and appears more sensitive to rewrite prompt quality than model choice.
 - Split-model rewriting was evaluated and rejected for production: it added 10s+ latency for marginal quality gain.

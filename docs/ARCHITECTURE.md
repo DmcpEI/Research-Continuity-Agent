@@ -82,12 +82,13 @@ Hybrid retrieval over the dual-store. Called with a query string, returns a `Ret
 | Config | hit@5 | hit@10 |
 |---|---|---|
 | fts5-only (BM25 baseline) | 95.6% | 98.9% |
-| vector-only (dense baseline) | 76.7% | 88.9% |
-| vector + keyword (FTS5) | 76.7% | 88.9% |
+| vector-only (dense baseline) | 84.4% | 91.1% |
+| vector + keyword (FTS5) | 84.4% | 91.1% |
 | vector + keyword + expansion | 94.4% | 96.7% |
-| full + query rewrite | 93.3% | 96.7% |
+| full + query rewrite | 94.4% | 98.9% |
+| production path (query-type aware) | 96.7% | 98.9% |
 
-The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. On the current 100-question corpus snapshot, the pure BM25 baseline remains stronger than the full rewrite variant, while expansion still provides most of the hybrid lift over dense retrieval alone.
+The important current result is that FTS5/BM25 outperformed the original production `LIKE` lexical path strongly enough that the lexical backbone was migrated. On the 2026-10-02 run, the production path (rewrite skipped for proper nouns, query type passed to retrieval) is the best configuration; expansion still provides most of the hybrid lift over dense retrieval alone.
 
 ### GenerateFlow (`rca/flows/generate_flow.py`)
 

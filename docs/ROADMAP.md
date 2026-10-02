@@ -43,7 +43,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Metric | Value |
 |---|---|
 | Eval corpus | `129` questions (`90` answerable, `39` negative) |
-| Retrieval, full pipeline | `93.3%` hit@5 / `96.7%` hit@10 |
+| Retrieval, production path | `96.7%` hit@5 / `98.9%` hit@10 (2026-10-02, `n=90`) |
 | Citation precision | `90.8%` over `87` answerable, non-abstained cases |
 | Negative abstention recall | `3/10` (`30.0%`) |
 | Answerable abstentions | `3` |
