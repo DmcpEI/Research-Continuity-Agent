@@ -1,0 +1,9 @@
+pipeline: yolo_vlm
+detector:
+  model: yolov8n
+  confidence_threshold: 0.35
+vlm:
+  model: gemma3:4b
+  max_tokens: 512
+batch_size: 16
+seed: 7

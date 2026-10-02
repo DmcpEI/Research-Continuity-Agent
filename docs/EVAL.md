@@ -311,9 +311,39 @@ Suggested automation split:
 
 ---
 
+## Agent Evaluation
+
+```bash
+uv run python eval/run_agent_eval.py --model qwen3.5:9b   # -> eval/results/agent_eval_<ts>.json
+```
+
+`eval/run_agent_eval.py` runs the multi-turn agent on the 20 tasks in `eval/agent_tasks.json` (knowledge base 6, filesystem 4, experiments 4, multi-step 4, refusal 2). Each run is sandboxed: filesystem tools see a temporary copy of `eval/agent_fixture/`, experiment tools see a freshly seeded DB (`SEED_RUNS`), and knowledge-base search uses the live corpus read-only. A task succeeds when the required tools were called, no forbidden tool was used, the model (not the automatic fallback) produced the final answer, the answer passes case-insensitive substring checks, and the run stayed within the step budget. Results are written even if a run is interrupted (`complete: false`), and provenance includes a `benchmark_sha256` over the task file, fixture, and seed data.
+
+Metrics: success rate; tool-selection accuracy (tasks with required tools only); tool precision (share of calls that were required); unrequested tool calls; invalid tool calls (error status or an `Error:` result, since MCP servers report path escapes and missing files as text); malformed calls; stop reasons; latency.
+
+First run, 2026-10-02, `qwen3.5:9b` (the configured agent model `qwen2.5:14b` is not installed), Ollama `0.35.1`, Chroma backend throughout:
+
+| Category | Tasks | Success | Tool selection | Tool precision | Mean steps |
+|---|---:|---:|---:|---:|---:|
+| knowledge base | 6 | `2/6` | `5/6` | `0.61` | `5.8` |
+| filesystem | 4 | `4/4` | `4/4` | `1.00` | `2.0` |
+| experiments | 4 | `2/4` | `3/4` | `0.94` | `2.8` |
+| multi-step | 4 | `2/4` | `4/4` | `0.79` | `4.8` |
+| refusal | 2 | `2/2` | n/a | n/a | `1.5` |
+| **overall** | **20** | **`12/20` (60%)** | **`16/18` (89%)** | **`0.81`** | **`3.8`** |
+
+Invalid tool calls: `9`; answer accuracy `80%`; mean latency `24 s`; stop reasons: `19` final answer, `1` max iterations.
+
+Failure analysis:
+- Empty final answers (`exp-003`, `exp-004`, `multi-001`): the agent fetched the right data (the CUDA error, accuracy `0.89`) but its final turn had no text, so the loop returned the canned "I could not produce an answer from the available evidence." Likely cause (not yet verified): `qwen3.5:9b` is a thinking model and its final text lands in the reasoning field, which the client does not read.
+- Source IDs used as file paths: on knowledge-base tasks the agent passed `src:pdf/...` IDs from search results to `read_text_file` (`4` calls), then explored with `list_directory`; this is most of the invalid calls and why knowledge-base tasks run over the 4-step budget.
+- One wrong answer (`kb-003`): did not name the VLM-only vs YOLO+VLM pipelines.
+
+Limits: substring checks confirm that facts were reported, not reasoning quality (e.g. `exp-004` cannot tell which run the answer calls higher); 20 tasks and a single model run, so treat the numbers as a baseline, not a model ranking.
+
 ## Run Provenance and Comparing Runs
 
-Every eval artifact (harness `run_*.json`, `ablations.json`, `retrieval_features_*.json`, `coefficient_sweep.json`) carries a `provenance` block from `rca/telemetry/provenance.py`; the calibration report copies the provenance of the feature file it read (`features_provenance`). Harness traces get `corpus_version`.
+Every eval artifact (harness `run_*.json`, `ablations.json`, `retrieval_features_*.json`, `coefficient_sweep.json`, `agent_eval_*.json`) carries a `provenance` block from `rca/telemetry/provenance.py`; the calibration report copies the provenance of the feature file it read (`features_provenance`). Harness traces get `corpus_version`.
 
 | Field | What it pins down |
 |---|---|

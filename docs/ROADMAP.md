@@ -50,7 +50,8 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Keyword hit rate | `20.5%` |
 | Grounded rate | `94.0%` |
 | Average latency | `9.7 s` |
-| Tests | `115` passing |
+| Agent eval (`qwen3.5:9b`) | `12/20` tasks, tool selection `16/18`, tool precision `0.81` (2026-10-02) |
+| Tests | `146` passing |
 
 These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
 
@@ -180,6 +181,8 @@ These are worthwhile, but they should follow the correctness and workflow milest
 - [x] QueryTrace stage timings, token usage, and retrieval provenance
 - [x] Per-query trace export under `eval/results/traces/`
 - [x] Retrieval auditability: per-case retrieved/context sources and `failure_stage` taxonomy in harness output
+- [x] Agent benchmark: 20 sandboxed tasks scoring tool selection, precision, steps, and success (`eval/run_agent_eval.py`)
+- [x] Run provenance in every eval artifact (corpus fingerprint, model digests, code state, mid-run degradation flag)
 
 ### Tooling and delivery
 

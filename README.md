@@ -150,6 +150,7 @@ The checked-in eval assets now include:
 - `eval/golden.json` with the full 129-question corpus
 - `eval/splits/dev.json` and `eval/splits/test.json` with a stratified `69 / 31` split
 - `eval/harness.py` for answer-level evaluation over all `129` questions
+- `eval/run_agent_eval.py` for a 20-task sandboxed agent benchmark (tool selection, precision, steps, success; first run `12/20` with `qwen3.5:9b`)
 - `eval/run_ablations.py` for retrieval-only evaluation over the `90` answerable questions
 - `eval/run_coefficient_sweep.py` for held-out lexical-reranker tuning on the current split
 
