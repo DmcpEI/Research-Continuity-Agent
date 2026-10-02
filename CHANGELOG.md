@@ -4,6 +4,9 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Security
+- The filesystem MCP server's `search_text` passed the model-supplied pattern to ripgrep as a positional argument, so a pattern such as `--pre=CMD` became an rg flag and ran `CMD` on every file in the sandbox. A prompt-injected document could therefore trigger command execution through the agent. The pattern now follows `-e` and the path follows `--`. Upgrade recommended for anyone running agent mode.
+
 ### Added
 - Run provenance in every eval artifact: corpus fingerprint, exact Ollama model digests and server version, reranker revision, result-affecting settings, git commit, and vector-backend state at start and end with an `index_degraded_during_run` flag (#10). Harness traces now fill `corpus_version`. Affects eval artifacts only.
 - CI job for the frontend on Node 24: type-check of app and tests (`tsconfig.test.json`, tests were previously excluded from type-checking), production build, and vitest; the pre-push hook runs the same commands (`npm run typecheck`, `npm run build`, `npm test`) and stops with a clear message if `frontend/node_modules` is missing. Node version lives in `frontend/.nvmrc`. Contributors: run `npm ci` in `frontend/` once.

@@ -51,7 +51,9 @@ class FilesystemServer:
         """ripgrep search — returns matching lines with file:line:content format."""
         target = self._resolve(path)
         result = subprocess.run(
-            ["rg", "--line-number", "--with-filename", pattern, str(target)],
+            # -e and -- keep a model-supplied pattern or path from being parsed as rg flags
+            # (e.g. "--pre=CMD" would run CMD on every file).
+            ["rg", "--line-number", "--with-filename", "-e", pattern, "--", str(target)],
             capture_output=True,
             text=True,
         )
