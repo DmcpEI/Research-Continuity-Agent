@@ -24,7 +24,7 @@ RCA today is a local-first research knowledge system with:
 - configurable backend parity for local Ollama or OpenAI-compatible chat and embedding APIs
 - a FastAPI bridge matching the React frontend API contract for status, sources, ingest, chat, agent calls, model selection, and PDF fetch
 - a deployment-ready AWS demo package with baked data, ECS templates, and short-lived task scripts
-- a 129-question evaluation corpus (39 typed negatives) and a local CI baseline of Ruff plus pytest
+- a 129-question evaluation corpus (39 typed negatives) and CI covering Ruff, pytest, and the frontend (type-check, build, vitest)
 
 The current implementation now has two orchestration paths: direct `RetrieveFlow`/`GenerateFlow` for grounded chat, and a separate agent loop for multi-turn tool use.
 
@@ -187,6 +187,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 - [x] Configurable backend parity for chat, agent tool use, and embeddings across Ollama and OpenAI-compatible APIs
 - [x] AWS deployment-ready demo package with baked image defaults, ECS templates, and demo/teardown scripts
 - [x] GitHub Actions CI workflow added; local Ruff and pytest baseline verified
+- [x] Frontend CI job: type-check of app and tests, production build, vitest on Node 24
 
 ### UI and API migration
 

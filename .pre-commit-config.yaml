@@ -25,3 +25,11 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+      - id: frontend-checks
+        name: frontend type-check + build + vitest (CI commands)
+        entry: >-
+          bash -c 'cd frontend && { [ -d node_modules ] || { echo "frontend/node_modules missing; run npm ci in frontend/" >&2; exit 1; }; } && npm run typecheck && npm run build && npm test'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

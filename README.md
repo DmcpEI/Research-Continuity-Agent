@@ -214,7 +214,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] **Expand negative set** — 10 → 39 typed unanswerable questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
-- [x] GitHub Actions CI — Ruff + pytest on push / PR
+- [x] GitHub Actions CI — Ruff + pytest, and frontend type-check (app and tests) + build + vitest on Node 24, on push / PR
 - [x] AWS deployment-ready package — baked demo image, ECS task templates, one-off demo script
 - [ ] FastAPI backend surface for `IngestFlow`, `RetrieveFlow`, and `GenerateFlow` HTTP endpoints
 - [ ] React (Vite) frontend migration — Chat primary surface, Agent secondary mode, Library view for ingest/store, collapsible knowledge-map panel, status bar
@@ -408,10 +408,10 @@ uv run pytest tests/unit/test_retrieve_flow.py
 
 ```bash
 uv sync --extra dev
-uv run pre-commit install   # pre-commit: ruff check + format check; pre-push: CI pytest command
+uv run pre-commit install   # pre-commit: ruff check + format check; pre-push: CI pytest + frontend checks
 ```
 
-Hooks check the working tree (including untracked, non-ignored files), not the exact commit being pushed, so CI on the pushed commit stays the authoritative gate.
+Hooks check staged and untracked files (unstaged edits are stashed while they run), not the exact commit being pushed, so CI on the pushed commit stays the authoritative gate. The frontend part needs `npm ci` in `frontend/` once. If the committed `frontend/dist` is stale, its build step rewrites it and the push is blocked; commit the rebuilt dist and push again.
 
 **Run evaluation harness**
 

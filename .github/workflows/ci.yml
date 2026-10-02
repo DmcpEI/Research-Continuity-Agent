@@ -34,3 +34,33 @@ jobs:
 
       - name: Test - pytest
         run: uv run pytest -v --tb=short
+
+  frontend:
+    name: Frontend (Node 24)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type-check tests
+        run: npm run typecheck
+
+      - name: Build (type-check app + bundle)
+        run: npm run build
+
+      - name: Test - vitest
+        run: npm test
