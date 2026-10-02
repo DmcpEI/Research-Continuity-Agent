@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to RCA. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow `pyproject.toml` (versions after 1.0.0 are not git-tagged). Entries before 1.5.0 live in git history.
+All notable changes to RCA. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow `pyproject.toml` and are tagged `vX.Y.Z` (1.1–1.4 were never tagged). Entries before 1.5.0 live in git history.
 
 ## [Unreleased]
 
@@ -17,7 +17,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 ### Fixed
 - Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
 
-## [1.5.0] - 2026-09-29
+## [1.5.0] - 2026-09-29 (tag `v1.5.0`)
 
 ### Added
 - Document revisions and idempotent re-ingest keyed on file and content hashes; additive `source_revisions` table, no migration needed for existing databases (446f9d5).
