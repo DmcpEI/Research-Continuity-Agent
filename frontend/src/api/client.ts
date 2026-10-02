@@ -99,6 +99,9 @@ export type ApiStatus = {
   backend: string;
   model: string;
   ollama_connected: boolean;
+  // Optional so the UI keeps working against an older API without these fields.
+  vector_backend?: string;
+  warnings?: string[];
 };
 
 export type ApiModelsResponse = {

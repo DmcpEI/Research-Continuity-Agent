@@ -15,6 +15,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 - Grounded chat abstains before the LLM call when the top cross-encoder rerank score is ≤ −3.618 (labels `low_rerank_score`, `low_retrieval_confidence`) (e9fd29d). Affects chat users and eval results: clearly out-of-corpus questions now return a refusal faster. The threshold is tied to `cross-encoder/ms-marco-MiniLM-L-6-v2`; recalibrate if the reranker changes.
 
 ### Fixed
+- A Chroma → JSON vector-store fallback is now visible: `/status` returns `vector_backend` and `warnings`, the React status bar shows a "Vector search degraded" badge (status refreshes every 30 s), and the Streamlit sidebar shows a warning. Previously it was only logged, so retrieval could silently degrade (#17, #2). API consumers: two new additive fields, no migration.
 - Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
 
 ## [1.5.0] - 2026-09-29 (tag `v1.5.0`)

@@ -14,6 +14,7 @@ from rca.contracts.nodes import Edge, EdgeKind, Node, NodeKind
 from rca.contracts.revisions import IngestStatus, SourceRevision
 from rca.flows.generate_flow import Citation, GeneratedAnswer
 from rca.flows.ingest_flow import IngestResult
+from rca.flows.retrieve_flow import RetrieveFlow
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
 
@@ -323,6 +324,51 @@ def test_status_endpoint_returns_counts_and_backend_fields(tmp_path: Path) -> No
     assert payload["backend"] == "openai_compatible"
     assert payload["model"] == "gpt-4o-mini"
     assert payload["ollama_connected"] is False
+
+
+def test_status_endpoint_reports_vector_fallback_after_chroma_failure(tmp_path: Path) -> None:
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    client = TestClient(create_app(settings=settings, graph_store=store, vector_store=vectors))
+
+    healthy = client.get("/status").json()
+    assert healthy["vector_backend"] == "chroma"
+    assert healthy["warnings"] == []
+
+    class BrokenCollection:
+        def query(self, **kwargs):
+            raise RuntimeError("chroma down")
+
+    vectors._collection = BrokenCollection()
+    vectors.query("anything", limit=3)  # real failure path: Chroma error -> JSON fallback
+
+    degraded = client.get("/status").json()
+    assert degraded["vector_backend"] == "json"
+    assert len(degraded["warnings"]) == 1
+    assert "JSON fallback" in degraded["warnings"][0]
+    assert "chroma down" in degraded["warnings"][0]
+    assert degraded["papers"] == 0  # existing fields unchanged
+
+
+def test_status_endpoint_reports_fallback_of_injected_retrieve_flow_store(tmp_path: Path) -> None:
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    retrieval_vectors = VectorStore(tmp_path / "retrieval-vectors", settings.default_collection)
+    retrieve = RetrieveFlow(settings=settings, graph_store=store, vector_store=retrieval_vectors)
+    # No vector_store passed: /status must still describe the store retrieval actually uses.
+    client = TestClient(create_app(settings=settings, graph_store=store, retrieve_flow=retrieve))
+
+    class BrokenCollection:
+        def query(self, **kwargs):
+            raise RuntimeError("chroma down")
+
+    retrieval_vectors._collection = BrokenCollection()
+    retrieval_vectors.query("anything", limit=3)
+
+    payload = client.get("/status").json()
+    assert payload["vector_backend"] == "json"
+    assert any("chroma down" in warning for warning in payload["warnings"])
 
 
 def test_agent_models_filters_out_non_tool_calling_models(tmp_path: Path, monkeypatch) -> None:

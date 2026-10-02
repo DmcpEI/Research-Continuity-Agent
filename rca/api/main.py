@@ -24,7 +24,7 @@ from rca.flows.ingest_flow import IngestFlow
 from rca.flows.retrieve_flow import RetrieveFlow
 from rca.llm.factory import get_llm_client
 from rca.store.graph_store import GraphStore
-from rca.store.vector_store import VectorStore
+from rca.store.vector_store import VectorStore, backend_status
 
 logger = logging.getLogger(__name__)
 
@@ -825,12 +825,24 @@ def create_app(
         if cfg.llm_backend == "openai_compatible":
             model = cfg.openai_chat_model
 
+        # Describe the stores the flows actually use; injected flows may hold their own.
+        vector_backend, warnings = backend_status(
+            [
+                vectors,
+                getattr(retrieve, "vector_store", None),
+                getattr(getattr(generator, "retrieve_flow", None), "vector_store", None),
+                getattr(ingester, "vector_store", None),
+            ]
+        )
+
         return {
             "papers": papers,
             "chunks": chunks,
             "backend": cfg.llm_backend,
             "model": model,
             "ollama_connected": _is_ollama_connected(cfg),
+            "vector_backend": vector_backend,
+            "warnings": warnings,
         }
 
     app.include_router(router)

@@ -7,6 +7,7 @@ import logging
 import math
 import re
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,22 @@ except ImportError:
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 LOGGER = logging.getLogger(__name__)
+
+
+def backend_status(stores: Iterable[Any]) -> tuple[str, list[str]]:
+    """Summarize distinct vector stores as (backend, unique warnings).
+
+    Backend is "json" if any store has fallen back, "chroma" if all are healthy,
+    "unknown" if there are none. Each warning is read before its backend: a store only
+    ever moves chroma -> json, so a warning read first can never pair with "chroma".
+    """
+    unique = list({id(store): store for store in stores if store is not None}.values())
+    warnings = [store.backend_warning for store in unique]
+    backends = [store.backend for store in unique]
+    if not backends:
+        return "unknown", []
+    backend = "json" if "json" in backends else "chroma"
+    return backend, list(dict.fromkeys(warning for warning in warnings if warning))
 
 
 @dataclass(slots=True)

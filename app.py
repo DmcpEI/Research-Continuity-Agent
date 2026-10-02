@@ -785,6 +785,14 @@ with st.sidebar:
             f"</div>",
             unsafe_allow_html=True,
         )
+        # Chat and ingest each own a VectorStore; surface a fallback in either, once.
+        from rca.store.vector_store import backend_status
+
+        _, vector_warnings = backend_status(
+            [flows["generate"].retrieve_flow.vector_store, flows["ingest"].vector_store]
+        )
+        for warning in vector_warnings:
+            st.warning(f"Vector search degraded: {warning}")
     except Exception as e:
         st.caption(f"Store not ready: {e}")
 

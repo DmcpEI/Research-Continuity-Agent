@@ -93,3 +93,23 @@ def test_vector_store_delete_texts_fail_closed_on_chroma_error(tmp_path) -> None
         assert "simulated delete failure" in str(exc)
 
     assert "doc-1" in store._documents
+
+
+def test_backend_status_summarizes_distinct_stores_and_dedupes_warnings() -> None:
+    from types import SimpleNamespace
+
+    from rca.store.vector_store import backend_status
+
+    healthy = SimpleNamespace(backend="chroma", backend_warning=None)
+    fallen = SimpleNamespace(
+        backend="json", backend_warning="VectorStore using JSON fallback backend."
+    )
+    fallen_twin = SimpleNamespace(backend="json", backend_warning=fallen.backend_warning)
+
+    assert backend_status([healthy, healthy, None]) == ("chroma", [])
+    # same instance twice and two stores with the same message -> one warning
+    assert backend_status([healthy, fallen, fallen, fallen_twin]) == (
+        "json",
+        ["VectorStore using JSON fallback backend."],
+    )
+    assert backend_status([]) == ("unknown", [])

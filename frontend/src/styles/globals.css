@@ -290,6 +290,39 @@ body,
   white-space: nowrap;
 }
 
+.status-warning-region {
+  margin-left: auto;
+}
+
+.status-warning {
+  position: relative;
+  color: var(--amber);
+}
+
+.status-warning summary {
+  cursor: pointer;
+  white-space: nowrap;
+  list-style: none;
+}
+
+.status-warning summary::-webkit-details-marker {
+  display: none;
+}
+
+.status-warning-detail {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: min(28rem, 80vw);
+  padding: 8px 10px;
+  background: #1a1a24;
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  z-index: 20;
+}
+
 .status-left {
   position: relative;
   display: inline-flex;

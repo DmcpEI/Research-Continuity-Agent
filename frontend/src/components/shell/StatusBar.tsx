@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { getAgentModels, getAgentStatus, getModels, selectAgentModel, selectModel } from '../../api/client';
 import { useStatus } from '../../hooks/useStatus';
+import { statusWarning } from './statusWarning';
 
 const CONVERSATIONS_STORAGE_KEY = 'rca-conversations';
 const CHAT_MODEL_STORAGE_KEY = 'rca-current-chat-model';
@@ -114,6 +115,7 @@ export function StatusBar() {
   const model = isLoading ? '--' : (data?.model ?? '--');
   const backend = isLoading ? '--' : (data?.backend ?? '--');
   const ollamaConnected = isLoading ? null : Boolean(data?.ollama_connected);
+  const warning = statusWarning(data);
   const capableSet = new Set(agentModelsQuery.data?.models ?? []);
   const recommended = isAgentRoute
     ? (modelsQuery.data?.recommended ?? []).filter((option) => capableSet.has(option.name))
@@ -288,6 +290,15 @@ export function StatusBar() {
           </div>
         ) : null}
       </div>
+      {/* Live region is always mounted so a warning that appears later is announced. */}
+      <span className="status-warning-region" role="status">
+        {warning ? (
+          <details className="status-warning">
+            <summary>{warning.label}</summary>
+            <div className="status-warning-detail">{warning.detail}</div>
+          </details>
+        ) : null}
+      </span>
       <span
         className={`status-right ${
           ollamaConnected === null
