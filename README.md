@@ -403,6 +403,13 @@ uv run pytest tests/integration/test_ingest_flow.py
 uv run pytest tests/unit/test_retrieve_flow.py
 ```
 
+**Git hooks**
+
+```bash
+uv sync --extra dev
+uv run pre-commit install   # pre-commit: ruff check + format check; pre-push: CI pytest command
+```
+
 **Run evaluation harness**
 
 ```bash

@@ -1,0 +1,27 @@
+# Same commands as .github/workflows/ci.yml, run through uv so tool versions match uv.lock.
+# Install once per clone: uv run pre-commit install
+default_install_hook_types: [pre-commit, pre-push]
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: ruff-format
+        name: ruff format --check
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: pytest
+        name: pytest (CI command)
+        entry: uv run pytest -v --tb=short
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

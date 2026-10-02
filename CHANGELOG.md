@@ -5,6 +5,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 ## [Unreleased]
 
 ### Added
+- Git hooks via the `pre-commit` framework: ruff check + format check on commit, the CI pytest command on push. Contributors: run `uv run pre-commit install` once per clone.
 - Harness failure-stage taxonomy (`retrieval_miss`, `context_miss`, `false_abstention`, `citation_miss`, `false_answer`) with per-case retrieved/context sources and abstention per `negative_type` (4e87a4f). Affects eval artifacts only.
 - Production-path retrieval ablation (config 5) mirroring `GenerateFlow`; refreshed metrics: 96.7% hit@5 / 98.9% hit@10 on 90 answerable questions (d609169).
 - Retrieval-feature abstention calibration scripts `eval/collect_retrieval_features.py` and `eval/calibrate_abstention.py` (0058f36).
