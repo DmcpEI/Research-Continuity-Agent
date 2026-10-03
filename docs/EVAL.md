@@ -319,7 +319,7 @@ uv run python eval/run_agent_eval.py --model qwen3.5:9b   # -> eval/results/agen
 
 `eval/run_agent_eval.py` runs the multi-turn agent on the 20 tasks in `eval/agent_tasks.json` (knowledge base 6, filesystem 4, experiments 4, multi-step 4, refusal 2). Each run is sandboxed: filesystem tools see a temporary copy of `eval/agent_fixture/`, experiment tools see a freshly seeded DB (`SEED_RUNS`), and knowledge-base search uses the live corpus read-only. A task succeeds when the required tools were called, no forbidden tool was used, the model (not the automatic fallback) produced the final answer, the answer passes case-insensitive substring checks, and the run stayed within the step budget. Results are written even if a run is interrupted (`complete: false`), and provenance includes a `benchmark_sha256` over the task file, fixture, and seed data.
 
-Metrics: success rate; tool-selection accuracy (tasks with required tools only); tool precision (share of calls that were required); unrequested tool calls; invalid tool calls (error status or an `Error:` result, since MCP servers report path escapes and missing files as text); malformed calls; stop reasons; latency.
+Metrics: success rate; tool-selection accuracy (tasks with required tools only); tool precision (share of calls that were required); unrequested tool calls; invalid tool calls (error status or an `Error:` result, since MCP servers report path escapes and missing files as text; calls redirected by the registry's path guards also report status `error`); malformed calls; stop reasons; latency.
 
 First run, 2026-10-02, `qwen3.5:9b` (the configured agent model `qwen2.5:14b` is not installed), Ollama `0.35.1`, Chroma backend throughout:
 
@@ -350,7 +350,9 @@ After #21 (Ollama requests send `think: false` by default, `RCA_LLM_THINK`), sam
 | Invalid tool calls | `9` | `3` |
 | Mean latency | `24 s` | `11 s` |
 
-Without thinking the model also stopped wandering into filesystem tools on knowledge-base questions, so most of the source-ID-as-path behaviour disappeared; one call remains (`kb-003`, which also still misses the two pipeline names). An empty final turn now has its own stop reason (`empty_final_answer`) instead of counting as `final_answer`, and undecodable tool calls with no text stop as `unparsed_tool_call`.
+Without thinking the model also stopped wandering into filesystem tools on knowledge-base questions, so most of the source-ID-as-path behaviour disappeared; one call remains (`kb-003`, which also still misses the two pipeline names).
+
+#22 (same day) intercepts filesystem calls whose path is a knowledge-base source ID and returns guidance (status `error`, counted as invalid), and the knowledge-base tool description and system prompt now say source IDs are citations, not files. Re-run: unchanged at `19/20`, tool selection `18/18`, precision `0.94`, `3` invalid calls (the redirected `kb-003` call, one guessed missing file in `multi-002`, and the blocked path escape in `safe-002`). `kb-003` still made one such call and then searched again instead of exploring directories; with a single occurrence the guidance's effect on behaviour is not measurable yet. An empty final turn now has its own stop reason (`empty_final_answer`) instead of counting as `final_answer`, and undecodable tool calls with no text stop as `unparsed_tool_call`.
 
 Limits: substring checks confirm that facts were reported, not reasoning quality (e.g. `exp-004` cannot tell which run the answer calls higher); 20 tasks and a single model run, so treat the numbers as a baseline, not a model ranking.
 

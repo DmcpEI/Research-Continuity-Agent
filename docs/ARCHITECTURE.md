@@ -127,6 +127,12 @@ In v2, this will be replaced by `pgvector` in Postgres for a unified store with 
 
 ---
 
+### Agent loop (`rca/agent/loop.py`, `rca/agent/tools.py`)
+
+`AgentLoop` runs a multi-turn tool-calling conversation (up to 10 LLM turns). `ToolRegistry` exposes a native `search_knowledge_base` adapter, which shares chat's `RetrieveFlow` and vector store, plus read-only MCP tools: filesystem (`list_directory`, `read_text_file`, `search_text`) sandboxed to `RCA_FILESYSTEM_ROOT`, and experiments (`list_runs`, `get_run`).
+
+Path guards in `ToolRegistry.call` redirect filesystem calls that cannot work without touching the MCP server: a knowledge-base source ID used as a path (`src:...`/`chk:...`, also in `[[...]]` form) gets guidance to answer from the search excerpts and cite the source, and a `.pdf` path is pointed at `search_knowledge_base`. Both report status `error`, so the agent benchmark counts them as invalid calls; the model only sees the guidance text. Stop reasons: `final_answer`, `empty_final_answer`, `unparsed_tool_call`, `clarification_needed`, `max_iterations`, `fallback_no_tools`, `error`.
+
 ## Why two stores?
 
 | Store | Role | Why not the other |

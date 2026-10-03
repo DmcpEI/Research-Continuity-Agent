@@ -28,6 +28,7 @@ Rules:
 - Use filesystem tools for local file inspection and text search
 - Use experiment tools only for existing run inspection in this v1
 - When using knowledge-base evidence, cite source IDs exactly as they appear, using [[source_id]]
+- Source IDs (src:..., chk:...) are citations, not files; never pass them to filesystem tools
 - If tools do not provide enough evidence, say so clearly instead of guessing
 - Be concise, useful, and grounded in the retrieved evidence
 - Do not answer with only a tool call string; execute tools, then provide a final answer
@@ -215,6 +216,11 @@ class AgentLoop:
                     arguments = json.loads(arguments_payload)
                 except Exception:
                     trace.warnings.append(f"tool call arguments for {tool_name} were malformed")
+                    continue
+                if not isinstance(arguments, dict):
+                    trace.warnings.append(
+                        f"tool call arguments for {tool_name} were malformed: not a JSON object"
+                    )
                     continue
             elif isinstance(arguments_payload, dict):
                 arguments = arguments_payload

@@ -399,7 +399,7 @@ def test_read_text_file_on_pdf_returns_helpful_guidance() -> None:
 
     trace = registry.call("read_text_file", {"path": "/tmp/paper.pdf"})
 
-    assert trace.status == ToolCallStatus.success
+    assert trace.status == ToolCallStatus.error  # redirected, so it counts as an invalid call
     assert "Use `search_knowledge_base`" in trace.output
     assert manager.calls == []
 
@@ -508,3 +508,119 @@ def test_empty_answer_with_reasoning_is_flagged_in_the_trace() -> None:
 
     assert result.trace.stopped_reason == "empty_final_answer"
     assert any("reasoning but no answer text" in w for w in result.trace.warnings)
+
+
+def test_filesystem_tools_redirect_knowledge_base_source_ids() -> None:
+    class RecordingMCPManager:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, dict]] = []
+
+        def list_tools(self, server_name: str) -> list[mcp_types.Tool]:
+            if server_name != "filesystem":
+                return []
+            schema = {"type": "object", "properties": {"path": {"type": "string"}}}
+            return [
+                mcp_types.Tool(name=name, description=name, inputSchema=schema)
+                for name in ("read_text_file", "list_directory", "search_text")
+            ]
+
+        def call_tool(self, tool_name: str, arguments: dict) -> str:
+            self.calls.append((tool_name, arguments))
+            return "filesystem result"
+
+        def close(self) -> None:
+            return None
+
+    manager = RecordingMCPManager()
+    registry = ToolRegistry(knowledge_base_search=lambda query, limit=5: "KB", mcp_manager=manager)
+
+    for tool_name, path in (
+        ("read_text_file", "src:pdf/robotic_grocery_bagging"),
+        ("list_directory", "chk:pdf/robotic_grocery_bagging:0003"),
+        ("search_text", " src:pdf/sayplan"),
+    ):
+        trace = registry.call(tool_name, {"path": path, "pattern": "x"})
+        assert trace.status == ToolCallStatus.error  # counted as an invalid call by the eval
+        assert "knowledge-base source ID, not a file path" in trace.output
+        assert "search_knowledge_base" in trace.output
+    assert manager.calls == []
+
+    # ordinary paths still reach the filesystem server
+    registry.call("read_text_file", {"path": "notes/meeting.md"})
+    assert manager.calls == [("read_text_file", {"path": "notes/meeting.md"})]
+
+
+def test_agent_is_told_source_ids_are_citations_not_files() -> None:
+    from rca.agent.loop import SYSTEM_PROMPT
+
+    registry = ToolRegistry(
+        knowledge_base_search=lambda query, limit=5: "KB", mcp_manager=_NoToolsMCPManager()
+    )
+    kb_tool = next(
+        tool
+        for tool in registry.ollama_tool_definitions()
+        if tool["function"]["name"] == "search_knowledge_base"
+    )
+    assert "not file paths" in kb_tool["function"]["description"]
+    assert "never pass them to filesystem tools" in SYSTEM_PROMPT
+
+
+def test_source_id_guard_hint_cites_the_source_and_respects_disabled_tools() -> None:
+    schema = {"type": "object", "properties": {"path": {"type": "string"}}}
+
+    class FsMCPManager(_NoToolsMCPManager):
+        def list_tools(self, server_name: str) -> list[mcp_types.Tool]:
+            if server_name != "filesystem":
+                return []
+            return [mcp_types.Tool(name="read_text_file", description="r", inputSchema=schema)]
+
+    registry = ToolRegistry(
+        knowledge_base_search=lambda q, limit=5: "KB", mcp_manager=FsMCPManager()
+    )
+    chunk = registry.call("read_text_file", {"path": "chk:pdf/sayplan:0003"})
+    assert "[[src:pdf/sayplan]]" in chunk.output and "[[chk:" not in chunk.output
+    cited = registry.call("read_text_file", {"path": "[[src:pdf/sayplan]]"})
+    assert "knowledge-base source ID" in cited.output
+    huge = registry.call("read_text_file", {"path": "src:" + "x" * 5000})
+    assert len(huge.output) < 1000
+
+    disabled = ToolRegistry(
+        knowledge_base_search=lambda q, limit=5: "KB", mcp_manager=_NoToolsMCPManager()
+    )
+    assert disabled.call("read_text_file", {"path": "src:pdf/x"}).output.startswith("Unknown tool")
+
+
+def test_redirected_calls_count_as_invalid_in_the_agent_eval() -> None:
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "eval" / "run_agent_eval.py"
+    spec = importlib.util.spec_from_file_location("run_agent_eval_guard", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    registry = ToolRegistry(
+        knowledge_base_search=lambda q, limit=5: "KB", mcp_manager=_NoToolsMCPManager()
+    )
+    registry._handlers["read_text_file"] = lambda **kwargs: "unused"
+    trace = registry.call("read_text_file", {"path": "src:pdf/x"}).model_dump(mode="json")
+    assert module.is_invalid_call(trace) is True
+
+
+def test_non_object_tool_arguments_are_rejected_not_crashing() -> None:
+    import json
+
+    bad = ToolChatResponse(
+        text="",
+        tool_calls=[
+            {"function": {"name": "search_knowledge_base", "arguments": json.dumps(["src:pdf/x"])}}
+        ],
+        raw={},
+    )
+    final = ToolChatResponse(text="Done.", tool_calls=[], raw={})
+    result = AgentLoop(registry=FakeRegistry(), llm_client=FakeLLM([bad, final])).run("hi")
+
+    assert result.trace.tool_calls == []
+    assert any("not a JSON object" in warning for warning in result.trace.warnings)

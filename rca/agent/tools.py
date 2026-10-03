@@ -65,6 +65,22 @@ class KnowledgeBaseAdapter:
         return node_id
 
 
+# Search results expose these IDs; models sometimes treat them as file paths.
+KNOWLEDGE_BASE_ID_PREFIXES = ("src:", "chk:")
+FILESYSTEM_PATH_TOOLS = frozenset({"read_text_file", "list_directory", "search_text"})
+MAX_ECHOED_ID = 200
+
+
+def _as_knowledge_base_id(path: Any) -> str | None:
+    """The source/chunk ID a path argument really is, also in [[citation]] form, else None."""
+    if not isinstance(path, str):
+        return None
+    candidate = path.strip().removeprefix("[[").removesuffix("]]").strip()
+    if not candidate.startswith(KNOWLEDGE_BASE_ID_PREFIXES):
+        return None
+    return candidate[:MAX_ECHOED_ID]
+
+
 class ToolRegistry:
     """Unified tool registry: native knowledge base + MCP tools."""
 
@@ -99,9 +115,29 @@ class ToolRegistry:
         self._ensure_mcp_tools_loaded()
         started = perf_counter()
 
-        if tool_name == "read_text_file":
-            raw_path = arguments.get("path")
-            if isinstance(raw_path, str) and raw_path.strip().lower().endswith(".pdf"):
+        # Path guards: redirect calls that cannot work. They report status error so the
+        # agent eval counts them as invalid; the model only sees the guidance text.
+        raw_path = arguments.get("path")
+        if tool_name in FILESYSTEM_PATH_TOOLS and tool_name in self._handlers:
+            source_id = _as_knowledge_base_id(raw_path)
+            if source_id is not None:
+                cite = KnowledgeBaseAdapter._to_source_id(source_id)
+                return ToolCallTrace(
+                    tool_name=tool_name,
+                    input=arguments,
+                    output=(
+                        f"'{source_id}' is a knowledge-base source ID, not a file path. "
+                        "Answer from the `search_knowledge_base` excerpts and cite it as "
+                        f"[[{cite}]]; run another `search_knowledge_base` query for more detail."
+                    ),
+                    status=ToolCallStatus.error,
+                    duration_ms=(perf_counter() - started) * 1000.0,
+                )
+            if (
+                tool_name == "read_text_file"
+                and isinstance(raw_path, str)
+                and raw_path.strip().lower().endswith(".pdf")
+            ):
                 return ToolCallTrace(
                     tool_name=tool_name,
                     input=arguments,
@@ -109,7 +145,7 @@ class ToolRegistry:
                         "This is a PDF file. Use `search_knowledge_base` to query its content "
                         "instead of reading it directly."
                     ),
-                    status=ToolCallStatus.success,
+                    status=ToolCallStatus.error,
                     duration_ms=(perf_counter() - started) * 1000.0,
                 )
 
@@ -149,7 +185,9 @@ class ToolRegistry:
                 "name": "search_knowledge_base",
                 "description": (
                     "Search the RCA research knowledge base for relevant papers and excerpts. "
-                    "Use this before answering research questions."
+                    "Use this before answering research questions. Results carry source_id "
+                    "values (src:...) that are citation IDs, not file paths: answer from the "
+                    "excerpts and cite them as [[source_id]]."
                 ),
                 "parameters": {
                     "type": "object",
