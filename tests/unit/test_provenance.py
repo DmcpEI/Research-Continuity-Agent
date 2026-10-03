@@ -98,6 +98,7 @@ def test_collect_provenance_tolerates_missing_stores() -> None:
     assert result["index_end"] is None and result["index_degraded_during_run"] is None
     assert result["models"]["models"] == {"gpt": None, "emb": None}
     assert result["settings"]["reranker_model"] == "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    assert "llm_think" in result["settings"]  # changes generation and agent output
 
 
 def test_corpus_fingerprint_covers_titles_and_edges_and_never_raises(tmp_path) -> None:

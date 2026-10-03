@@ -270,6 +270,7 @@ Key environment variables:
 | `RCA_LLM_BACKEND` | `ollama` | Backend selector for chat, tool use, and embeddings (`ollama` or `openai_compatible`) |
 | `RCA_GENERATION_MODEL` | `gemma3:12b` | Ollama model used for answer generation and query rewriting |
 | `RCA_AGENT_MODEL` | `qwen2.5:14b` | Ollama model for the tool-using agent loop (must support tool calling) |
+| `RCA_LLM_THINK` | `false` | Ollama `think` flag; `true` only for thinking-capable models |
 | `RCA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model used for vector embeddings |
 | `RCA_LLM_BASE_URL` | `http://localhost:11434` | Base URL for the local Ollama generation/chat API |
 | `RCA_LLM_API_KEY` | `ollama` | API key for the configured LLM endpoint; ignored by default local Ollama |

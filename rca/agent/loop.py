@@ -95,7 +95,10 @@ class AgentLoop:
                         trace.warnings.append("parsed textual tool call from model output")
 
                 if not tool_calls and not decoded_calls:
-                    trace.stopped_reason = "final_answer"
+                    # An empty final turn is a model failure, not an answer.
+                    trace.stopped_reason = "final_answer" if content else "empty_final_answer"
+                    if not content:
+                        self._note_empty_answer(response.raw, trace)
                     trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
                     answer = content or "I could not produce an answer from the available evidence."
                     return AgentResult(query=query, answer=answer, trace=trace)
@@ -108,7 +111,7 @@ class AgentLoop:
                 messages.append(assistant_message)
 
                 if not decoded_calls:
-                    trace.stopped_reason = "final_answer"
+                    trace.stopped_reason = "final_answer" if content else "unparsed_tool_call"
                     trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
                     fallback = (
                         content or "I could not parse the tool request produced by the model."
@@ -280,9 +283,21 @@ class AgentLoop:
         trace.completion_tokens += completion_tokens
 
     @staticmethod
+    def _note_empty_answer(raw: Any, trace: AgentTrace) -> None:
+        """Say why the final turn was empty when the response shows it."""
+        message = raw.get("message", {}) if isinstance(raw, dict) else {}
+        if isinstance(message, dict) and message.get("thinking"):
+            trace.warnings.append(
+                "model returned reasoning but no answer text (thinking enabled or unsupported)"
+            )
+        if isinstance(raw, dict) and raw.get("done_reason") == "length":
+            trace.warnings.append("model output hit the token limit before answering")
+
+    @staticmethod
     def _is_tool_calling_unsupported(exc: Exception) -> bool:
         text = str(exc)
-        return "400" in text and "Bad Request" in text
+        # A 400 for an unsupported "think" flag is a config problem, not missing tool support.
+        return "400" in text and "Bad Request" in text and "support thinking" not in text
 
     @staticmethod
     def _build_clarification_if_needed(

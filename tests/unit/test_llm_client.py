@@ -263,3 +263,72 @@ def test_get_llm_client_uses_openai_compatible_backend_settings() -> None:
     assert client.embedding_model == "text-embedding-3-small"
     assert client.api_key == "secret-token"
     assert client._api_style == "openai"
+
+
+def test_ollama_payloads_disable_thinking_by_default_and_respect_settings(monkeypatch) -> None:
+    from rca.config.settings import Settings
+    from rca.llm.client import ChatMessage
+    from rca.llm.factory import get_llm_client
+
+    def capture(client):
+        sent: list[dict] = []
+
+        def fake_post(path, payload, timeout=120):
+            sent.append(payload)
+            message = {"role": "assistant", "content": "ok", "tool_calls": []}
+            if "chat/completions" in path:
+                return {"choices": [{"message": message}]}
+            return {"message": message}
+
+        monkeypatch.setattr(client, "_post_json", fake_post)
+        client.chat([ChatMessage(role="user", content="hi")])
+        client.chat_with_tools([{"role": "user", "content": "hi"}], tools=[])
+        return sent
+
+    default = OllamaLLMClient(base_url="http://localhost:11434", model="qwen3.5:9b")
+    # Thinking models (e.g. qwen3.5) otherwise put the whole answer in message.thinking.
+    assert [payload["think"] for payload in capture(default)] == [False, False]
+
+    thinking = get_llm_client(
+        Settings(
+            llm_backend="ollama",
+            llm_base_url="http://localhost:11434",
+            generation_model="qwen3.5:9b",
+            llm_think=True,
+        )
+    )
+    assert [payload["think"] for payload in capture(thinking)] == [True, True]
+
+    openai = get_llm_client(
+        Settings(
+            llm_backend="openai_compatible",
+            generation_model="qwen3.5:9b",
+            openai_chat_model="gpt-4o-mini",
+            llm_think=True,
+        )
+    )
+    assert all("think" not in payload for payload in capture(openai))
+
+
+def test_http_errors_keep_the_server_message(monkeypatch) -> None:
+    import io
+    import urllib.error
+
+    import pytest
+
+    def refuse(request, timeout=120):
+        raise urllib.error.HTTPError(
+            request.full_url,
+            400,
+            "Bad Request",
+            hdrs=None,
+            fp=io.BytesIO(b'{"error":"\\"gemma3:12b\\" does not support thinking"}'),
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    client = OllamaLLMClient(base_url="http://localhost:11434", model="gemma3:12b", think=True)
+    with pytest.raises(RuntimeError) as excinfo:
+        client.chat_with_tools([{"role": "user", "content": "hi"}], tools=[])
+    message = str(excinfo.value)
+    assert message.startswith("HTTP Error 400: Bad Request")
+    assert "does not support thinking" in message

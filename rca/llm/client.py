@@ -104,12 +104,14 @@ class OllamaLLMClient(LLMClient):
         embedding_model: str | None = None,
         api_key: str | None = None,
         api_style: str | None = None,
+        think: bool = False,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.embedding_model = embedding_model or get_settings().embedding_model
         self.api_key = api_key or "ollama"
         self.api_style = api_style
+        self.think = think
         self.options = {"temperature": 0, "num_predict": 512}
         if options:
             self.options.update(options)
@@ -130,6 +132,7 @@ class OllamaLLMClient(LLMClient):
                 "model": self.model,
                 "messages": [{"role": m.role, "content": m.content} for m in messages],
                 "stream": False,
+                "think": self.think,
                 "options": self.options,
             }
             result = self._post_json("/api/chat", payload, timeout=120)
@@ -165,6 +168,7 @@ class OllamaLLMClient(LLMClient):
             "messages": normalized_messages,
             "tools": tools,
             "stream": False,
+            "think": self.think,
             "options": self.options,
         }
         result = self._post_json("/api/chat", payload, timeout=120)
@@ -291,6 +295,7 @@ class OllamaLLMClient(LLMClient):
         return normalized
 
     def _post_json(self, path: str, payload: dict[str, Any], timeout: int) -> dict[str, Any]:
+        import urllib.error
         import urllib.request
 
         data = json.dumps(payload).encode()
@@ -302,5 +307,15 @@ class OllamaLLMClient(LLMClient):
             data=data,
             headers=headers,
         )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read())
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read())
+        except urllib.error.HTTPError as exc:
+            # Keep the server's message (e.g. '"gemma3:12b" does not support thinking');
+            # urllib's own text is only "HTTP Error 400: Bad Request".
+            try:
+                body = exc.read().decode("utf-8", "replace").strip()[:500]
+            except Exception:
+                body = ""
+            message = f"HTTP Error {exc.code}: {exc.reason}"
+            raise RuntimeError(f"{message}: {body}" if body else message) from exc

@@ -313,6 +313,7 @@ def main() -> None:
     llm = OllamaLLMClient(
         base_url=settings.embedding_base_url,
         model=settings.generation_model,
+        think=settings.llm_think,
     )
     provenance = collect_provenance(settings, graph_store, vector_store)
 

@@ -334,10 +334,23 @@ First run, 2026-10-02, `qwen3.5:9b` (the configured agent model `qwen2.5:14b` is
 
 Invalid tool calls: `9`; answer accuracy `80%`; mean latency `24 s`; stop reasons: `19` final answer, `1` max iterations.
 
-Failure analysis:
-- Empty final answers (`exp-003`, `exp-004`, `multi-001`): the agent fetched the right data (the CUDA error, accuracy `0.89`) but its final turn had no text, so the loop returned the canned "I could not produce an answer from the available evidence." Likely cause (not yet verified): `qwen3.5:9b` is a thinking model and its final text lands in the reasoning field, which the client does not read.
+Failure analysis (first run):
+- Empty final answers (`exp-003`, `exp-004`, `multi-001`): the agent fetched the right data (the CUDA error, accuracy `0.89`) but its final turn had no text, so the loop returned the canned "I could not produce an answer from the available evidence." Confirmed with raw responses (#21): `qwen3.5:9b` is a thinking model and Ollama returned the whole answer in `message.thinking` with `message.content` empty.
 - Source IDs used as file paths: on knowledge-base tasks the agent passed `src:pdf/...` IDs from search results to `read_text_file` (`4` calls), then explored with `list_directory`; this is most of the invalid calls and why knowledge-base tasks run over the 4-step budget.
 - One wrong answer (`kb-003`): did not name the VLM-only vs YOLO+VLM pipelines.
+
+After #21 (Ollama requests send `think: false` by default, `RCA_LLM_THINK`), same model and tasks, 2026-10-03:
+
+| | First run | After #21 |
+|---|---:|---:|
+| Success | `12/20` | `19/20` |
+| Tool selection | `16/18` | `18/18` |
+| Tool precision | `0.81` | `0.93` |
+| Mean steps | `3.8` | `2.7` |
+| Invalid tool calls | `9` | `3` |
+| Mean latency | `24 s` | `11 s` |
+
+Without thinking the model also stopped wandering into filesystem tools on knowledge-base questions, so most of the source-ID-as-path behaviour disappeared; one call remains (`kb-003`, which also still misses the two pipeline names). An empty final turn now has its own stop reason (`empty_final_answer`) instead of counting as `final_answer`, and undecodable tool calls with no text stop as `unparsed_tool_call`.
 
 Limits: substring checks confirm that facts were reported, not reasoning quality (e.g. `exp-004` cannot tell which run the answer calls higher); 20 tasks and a single model run, so treat the numbers as a baseline, not a model ranking.
 

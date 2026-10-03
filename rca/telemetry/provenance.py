@@ -23,6 +23,7 @@ RESULT_SETTINGS = (
     "default_collection",
     "openai_chat_model",
     "openai_embed_model",
+    "llm_think",
     "enable_reranker",
     "reranker_model",
     "reranker_top_k",

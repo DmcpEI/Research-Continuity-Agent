@@ -465,3 +465,46 @@ def test_retrieve_flow_conflicting_with_explicit_search_or_registry_is_rejected(
         )
     with pytest.raises(ValueError, match="retrieve_flow"):
         AgentLoop(registry=FakeRegistry(), retrieve_flow=retrieve_flow, llm_client=FakeLLM([]))
+
+
+def test_empty_final_turn_is_reported_as_its_own_stop_reason() -> None:
+    llm = FakeLLM([ToolChatResponse(text="", tool_calls=[], raw={})])
+    loop = AgentLoop(registry=FakeRegistry(), llm_client=llm)
+
+    result = loop.run("Which run failed?")
+
+    assert result.trace.stopped_reason == "empty_final_answer"
+    assert result.answer == "I could not produce an answer from the available evidence."
+
+
+def test_unsupported_thinking_is_not_reported_as_unsupported_tool_calling() -> None:
+    class ThinkingRejectedLLM(ToolCallingFailsLLM):
+        def chat_with_tools(self, messages, tools) -> ToolChatResponse:
+            raise RuntimeError(
+                'HTTP Error 400: Bad Request: {"error":"\\"gemma3:12b\\" does not support thinking"}'
+            )
+
+    result = AgentLoop(registry=FakeRegistry(), llm_client=ThinkingRejectedLLM()).run("hi")
+
+    assert "does not support thinking" in (result.error or "")
+    assert "does not support agent mode tool-calling" not in result.answer
+    assert not any("tool-calling unsupported" in w for w in result.trace.warnings)
+
+
+def test_undecodable_tool_calls_with_no_text_are_not_a_final_answer() -> None:
+    bad = ToolChatResponse(text="", tool_calls=[{"function": {"arguments": "{}"}}], raw={})
+    result = AgentLoop(registry=FakeRegistry(), llm_client=FakeLLM([bad])).run("hi")
+
+    assert result.trace.stopped_reason == "unparsed_tool_call"
+
+
+def test_empty_answer_with_reasoning_is_flagged_in_the_trace() -> None:
+    empty = ToolChatResponse(
+        text="",
+        tool_calls=[],
+        raw={"done_reason": "stop", "message": {"content": "", "thinking": "The run failed..."}},
+    )
+    result = AgentLoop(registry=FakeRegistry(), llm_client=FakeLLM([empty])).run("hi")
+
+    assert result.trace.stopped_reason == "empty_final_answer"
+    assert any("reasoning but no answer text" in w for w in result.trace.warnings)

@@ -29,4 +29,5 @@ def get_llm_client(settings: Settings | None = None) -> LLMClient:
         embedding_model=settings.embedding_model,
         api_key=settings.llm_api_key,
         api_style="ollama",
+        think=settings.llm_think,
     )

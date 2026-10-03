@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     openai_chat_model: str = "gpt-4o-mini"
     openai_embed_model: str = "text-embedding-3-small"
     enable_reranker: bool = True
+    # Ollama "think" flag. Thinking models (qwen3.5, ...) otherwise return their whole
+    # answer in message.thinking and leave message.content empty. True only works with
+    # thinking-capable models; others reject it with HTTP 400.
+    llm_think: bool = False
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 10
     retrieval_fetch_limit: int = 20
@@ -136,6 +140,7 @@ class Settings(BaseSettings):
             "RCA_OPENAI_CHAT_MODEL": "openai_chat_model",
             "RCA_OPENAI_EMBED_MODEL": "openai_embed_model",
             "RCA_ENABLE_RERANKER": "enable_reranker",
+            "RCA_LLM_THINK": "llm_think",
             "RCA_RERANKER_MODEL": "reranker_model",
             "RCA_RERANKER_TOP_K": "reranker_top_k",
             "RCA_RETRIEVAL_FETCH_LIMIT": "retrieval_fetch_limit",
