@@ -1,0 +1,200 @@
+{
+  "description": "Retrieval regression gate (tests/integration/test_retrieval_gate.py). Synthetic corpus in corpus/; a question hits when every expected source is among the resolved sources of the top 5 hits.",
+  "questions": [
+    {
+      "id": "rg-01",
+      "query": "How does an antipodal grasp place the fingers of a parallel-jaw gripper?",
+      "expected_sources": [
+        "src:note/grasp-planning"
+      ]
+    },
+    {
+      "id": "rg-02",
+      "query": "Why do suction cups fail on deformable bags?",
+      "expected_sources": [
+        "src:note/grasp-planning"
+      ]
+    },
+    {
+      "id": "rg-03",
+      "query": "What is a heightmap used for when packing boxes into a container?",
+      "expected_sources": [
+        "src:note/bin-packing"
+      ]
+    },
+    {
+      "id": "rg-04",
+      "query": "When is a box placement rejected for stability?",
+      "expected_sources": [
+        "src:note/bin-packing"
+      ]
+    },
+    {
+      "id": "rg-05",
+      "query": "How can a language model plan in a building too large to fit in its context window?",
+      "expected_sources": [
+        "src:note/scene-graphs"
+      ]
+    },
+    {
+      "id": "rg-06",
+      "query": "How does a robot keep a bag open while inserting items?",
+      "expected_sources": [
+        "src:note/bag-manipulation"
+      ]
+    },
+    {
+      "id": "rg-07",
+      "query": "What corrects accumulated drift when the camera revisits a place?",
+      "expected_sources": [
+        "src:note/slam"
+      ]
+    },
+    {
+      "id": "rg-08",
+      "query": "Why does monocular SLAM have an unknown scale?",
+      "expected_sources": [
+        "src:note/slam"
+      ]
+    },
+    {
+      "id": "rg-09",
+      "query": "Which grocery perception pipeline generalised to unseen products and why?",
+      "expected_sources": [
+        "src:note/vlm-perception"
+      ]
+    },
+    {
+      "id": "rg-10",
+      "query": "How does constrained decoding guarantee valid JSON?",
+      "expected_sources": [
+        "src:note/structured-output"
+      ]
+    },
+    {
+      "id": "rg-11",
+      "query": "What is domain randomisation and how does it address the reality gap?",
+      "expected_sources": [
+        "src:note/sim2real"
+      ]
+    },
+    {
+      "id": "rg-12",
+      "query": "What equation does hand-eye calibration solve?",
+      "expected_sources": [
+        "src:note/hand-eye-calibration"
+      ]
+    },
+    {
+      "id": "rg-13",
+      "query": "Who will write the related-work section?",
+      "expected_sources": [
+        "src:note/lab-meeting-2026-02-10"
+      ]
+    },
+    {
+      "id": "rg-14",
+      "query": "Fragile items: where do eggs go when packing groceries, and how do packing policies protect fragile boxes?",
+      "expected_sources": [
+        "src:note/vlm-perception",
+        "src:note/bin-packing"
+      ]
+    },
+    {
+      "id": "rg-15",
+      "query": "Compare how plans are verified for scene-graph planners and how JSON output from planners is made valid.",
+      "expected_sources": [
+        "src:note/scene-graphs",
+        "src:note/structured-output"
+      ]
+    },
+    {
+      "id": "rg-16",
+      "query": "The gripper arrives with a constant offset from where the camera sees the object. What is the likely cause?",
+      "expected_sources": [
+        "src:note/hand-eye-calibration"
+      ]
+    },
+    {
+      "id": "rg-17",
+      "query": "The gripper misses objects by a centimetre in the same direction every time. Which calibration estimates the camera-to-gripper transform?",
+      "expected_sources": [
+        "src:note/hand-eye-calibration"
+      ]
+    },
+    {
+      "id": "rg-18",
+      "query": "Why does a policy trained in simulation succeed more often than on the real robot, and how is the gap reduced?",
+      "expected_sources": [
+        "src:note/sim2real"
+      ]
+    },
+    {
+      "id": "rg-19",
+      "query": "How does the robot pull the bag rim apart to make the bag opening larger?",
+      "expected_sources": [
+        "src:note/bag-manipulation"
+      ]
+    },
+    {
+      "id": "rg-20",
+      "query": "Why does the depth camera point cloud miss transparent objects when planning a grasp?",
+      "expected_sources": [
+        "src:note/grasp-planning"
+      ]
+    },
+    {
+      "id": "rg-21",
+      "query": "Robot packing plan: fragile eggs, heavy bottles, and boxes that overhang the container. Which notes cover item fragility perception and stable box placement?",
+      "expected_sources": [
+        "src:note/vlm-perception",
+        "src:note/bin-packing"
+      ]
+    },
+    {
+      "id": "rg-22",
+      "query": "Does the language model planner check its plan with a simulator before the robot executes it?",
+      "expected_sources": [
+        "src:note/scene-graphs"
+      ]
+    },
+    {
+      "id": "rg-23",
+      "query": "Robot lab gripper and camera practice: what force for fragile items, and how is a heightmap used for boxes?",
+      "expected_sources": [
+        "src:note/robot-lab-handbook",
+        "src:note/bin-packing"
+      ]
+    },
+    {
+      "id": "rg-24",
+      "query": "Robot lab handbook on the robot arm, gripper, cameras and logging runs; and which loop closure method fixes SLAM drift?",
+      "expected_sources": [
+        "src:note/robot-lab-handbook",
+        "src:note/slam"
+      ]
+    },
+    {
+      "id": "rg-25",
+      "query": "Project log of robot, gripper, camera and packing tests by week; what does the antipodal grasp note recommend?",
+      "expected_sources": [
+        "src:note/project-log",
+        "src:note/grasp-planning"
+      ]
+    },
+    {
+      "id": "rg-26",
+      "query": "What does the transfer note say about fine-tuning on real data?",
+      "expected_sources": [
+        "src:note/sim2real"
+      ]
+    },
+    {
+      "id": "rg-27",
+      "query": "In the handbook, what should be logged for every run?",
+      "expected_sources": [
+        "src:note/robot-lab-handbook"
+      ]
+    }
+  ]
+}

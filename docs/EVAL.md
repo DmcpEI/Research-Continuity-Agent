@@ -175,6 +175,34 @@ Interpretation guidance:
 
 ---
 
+## CI Retrieval Gate
+
+`tests/integration/test_retrieval_gate.py` runs in the normal pytest job (CI and pre-push) and fails when a change pushes fixture questions down the ranking. It needs no Ollama, model download, or network.
+
+- **Corpus:** 12 synthetic markdown notes in `tests/fixtures/retrieval_gate/corpus/` (robotics topics with overlapping vocabulary, plus two long generic notes that crowd the top 5). Questions with expected sources are in `questions.json`: 27 in all, 6 needing two sources.
+- **Path:** the same `RetrieveFlow.retrieve(query, limit=5, query_type=classify_query(query))` call `GenerateFlow` makes, with the vector store forced onto its JSON backend, reranker off, no rewrite, and every retrieval setting pinned so a local `.env` cannot change the result.
+- **Check:** each question's rank (hit position of its last expected source in the top 5, duplicates of a paper included) is compared with `baseline.json`. The test fails if any question ranks worse, even when others improve, and prints `hit@5` and MRR before → after plus every question whose rank moved. A trade-off therefore needs a deliberate baseline refresh, and the `baseline.json` diff shows it in review.
+- **Baseline:** `hit@5 96.3%` (26/27), MRR `0.717`. `rg-25` is a recorded miss: one long note fills all five slots, and the reserve slot only works with the reranker. After a deliberate retrieval change, refresh with `RCA_UPDATE_RETRIEVAL_BASELINE=1 uv run pytest tests/integration/test_retrieval_gate.py` and commit the `baseline.json` diff with the change. Do not leave the variable exported: every run, including pre-push, would rewrite the baseline and pass.
+
+Checked by breaking the real code (2026-10-04):
+
+| Breakage | Caught | How |
+|---|---|---|
+| `_lexical_score` returns 0 | yes | 3 questions leave top 5, MRR 0.717 → 0.601 |
+| score sort reversed | yes | 4 leave top 5, MRR → 0.361 |
+| `LEXICAL_TEXT_WEIGHT` = 0 | yes | MRR → 0.612 |
+| `LEXICAL_BASE_SCORE` 0.45 → 0.2 | yes | MRR → 0.676 |
+| proper-noun lexical base 0.65 → 0.10 | yes | MRR → 0.714 |
+| query type ignored (`None`) | yes | rg-24 3 → 4 although MRR rises to 0.751 |
+| conceptual lexical base 0.30 → 0.45 | no | |
+| `LEXICAL_TITLE_WEIGHT` = 0 | no | FTS candidates already come from the target note |
+| stopword list removed | no | |
+| vector search disabled, or score scale 0.5 | no | the JSON fallback is weak; with it disabled the fixture scores higher (MRR 0.760) |
+
+So the gate covers FTS5 candidates, lexical scoring, and tokenisation; it does not cover the vector component or most query-type weights. Also not covered: query rewrite (needs an LLM; the 72f71a3 rewrite regression would not have been caught here), cross-encoder rerank, real embeddings, source expansion, and the reserve slot. Without the reranker the call fetches only 5 candidates, so expansion and the reserve slot cannot change which sources are in the top 5. The reserve slot keeps its unit tests; the full path is measured by the ablations above.
+
+---
+
 ## Coefficient Sweep
 
 ```bash

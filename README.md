@@ -215,7 +215,7 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] **Expand negative set** — 10 → 39 typed unanswerable questions
 - [x] Observability — per-stage latency, token usage, retrieval provenance
 - [x] Docker + one-command local boot
-- [x] GitHub Actions CI — Ruff + pytest, and frontend type-check (app and tests) + build + vitest on Node 24, on push / PR
+- [x] GitHub Actions CI — Ruff + pytest (including a retrieval regression gate on a fixture corpus), and frontend type-check (app and tests) + build + vitest on Node 24, on push / PR
 - [x] AWS deployment-ready package — baked demo image, ECS task templates, one-off demo script
 - [ ] FastAPI backend surface for `IngestFlow`, `RetrieveFlow`, and `GenerateFlow` HTTP endpoints
 - [ ] React (Vite) frontend migration — Chat primary surface, Agent secondary mode, Library view for ingest/store, collapsible knowledge-map panel, status bar
