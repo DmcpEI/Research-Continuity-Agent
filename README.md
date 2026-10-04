@@ -4,6 +4,35 @@
 
 A **local-first research knowledge system** that ingests technical PDFs, performs hybrid retrieval over semantic and structured links, and generates grounded answers with source citations — built around research on structured visual perception for robotic inventory generation.
 
+## Results at a glance
+
+| What | Result | Details |
+|---|---|---|
+| Retrieval, production path | hit@5 `98.9%` (89/90 answerable questions) | [EVAL.md → Retrieval Ablations](docs/EVAL.md#retrieval-ablations) |
+| Abstention gate (cross-encoder score, held-out test split) | catches `5/12` unanswerable questions with `1/28` false abstentions | [EVAL.md → Abstention Calibration](docs/EVAL.md#abstention-calibration-retrieval-features) |
+| Agent benchmark (`qwen3.5:9b`, 20 sandboxed tasks) | `19/20` tasks, right tool `18/18` | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
+| Retrieval regression gate in CI | fails the build when any fixture question ranks worse | [EVAL.md → CI Retrieval Gate](docs/EVAL.md#ci-retrieval-gate) |
+
+Golden set: 129 questions, 39 of them unanswerable. Abstention is still the weakest area; see [Known Limitations](docs/EVAL.md#known-limitations).
+
+## Try the demo
+
+Requires [Docker](https://docs.docker.com/get-docker/) and [Ollama](https://ollama.com) running on the host. Only the default Ollama backend has been tested with the demo.
+
+```bash
+ollama pull nomic-embed-text && ollama pull gemma3:12b
+git clone https://github.com/DmcpEI/Research-Continuity-Agent.git && cd Research-Continuity-Agent
+docker compose up --build demo      # or: make demo
+```
+
+Open http://localhost:8000. The first start downloads five CC BY 4.0 papers from arXiv (listed in [demo/papers.json](demo/papers.json)) and ingests them. That takes a few minutes; later starts re-check the files but skip re-indexing unchanged ones. The server listens on localhost only. Data lives in Docker volumes, separate from your own `.rca/` store; `docker compose --profile demo down -v` removes it.
+
+Things to try:
+- *What does JSONSchemaBench measure?* gives an answer with `[[chk:...]]` chunk citations; click one to open the PDF.
+- *How does the planner use the scene graph to guide search?* answers from the scene-graph planning paper.
+- *What is the capital of Australia?* is out of corpus, so RCA says nothing relevant was found instead of generating an answer.
+- The Agent tab needs a tool-calling model; `ollama pull qwen3.5:9b` is the one benchmarked. It can search the knowledge base and list the downloaded papers.
+
 ---
 
 ## System Diagram

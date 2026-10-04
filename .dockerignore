@@ -14,3 +14,7 @@ eval/results
 htmlcov
 dist
 build
+frontend/node_modules
+.rca-demo
+.claude
+CLAUDE.md

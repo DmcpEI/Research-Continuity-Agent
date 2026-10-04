@@ -901,3 +901,30 @@ def _log_ollama_processes(settings: Settings, context: str) -> None:
 
 
 app = create_app()
+
+
+def create_site(api: FastAPI | None = None, frontend_dist: Path | None = None) -> FastAPI:
+    """Serve the API under /api and the built React app at /, as the Vite dev proxy does.
+
+    For single-process deployments such as the demo. Unknown paths return index.html so
+    client-side routes (/library, /agent, ...) survive a reload.
+    """
+    dist = (frontend_dist or get_settings().frontend_dist).resolve()
+    if not (dist / "index.html").is_file():
+        raise FileNotFoundError(f"frontend build not found at {dist}; run `npm run build`")
+    site = FastAPI(title="Research Continuity Agent", docs_url=None, openapi_url=None)
+    site.mount("/api", api or app)
+
+    @site.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    def frontend(path: str) -> FileResponse:
+        try:
+            candidate = (dist / path).resolve()
+        except (OSError, ValueError):  # e.g. an embedded null byte
+            raise HTTPException(status_code=404, detail="Not found") from None
+        if candidate.is_file() and candidate.is_relative_to(dist):
+            return FileResponse(candidate)
+        if Path(path).suffix:  # a missing asset, not a client-side route
+            raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(dist / "index.html")
+
+    return site

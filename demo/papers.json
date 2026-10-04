@@ -1,0 +1,40 @@
+{
+  "description": "Sample corpus for the public demo (cli/rca_demo.py). Every paper is licensed CC BY 4.0 on arXiv (checked 2026-10-04 via the arXiv OAI-PMH licence field for the pinned version). PDFs are downloaded from arXiv on first start, not stored in this repo. File names match the thesis corpus, so golden-set source IDs resolve.",
+  "papers": [
+    {
+      "arxiv": "2501.10868v3",
+      "title": "JSONSchemaBench: A Rigorous Benchmark of Structured Outputs for Language Models",
+      "authors": "Geng et al.",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "file": "JSONSchemaBench_A_Rigorous_Benchmark_of_Structured_Outputs_for_Language_Models.pdf"
+    },
+    {
+      "arxiv": "2309.09182v2",
+      "title": "Optimal Scene Graph Planning with Large Language Model Guidance",
+      "authors": "Dai et al.",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "file": "Optimal_Scene_Graph_Planning_with_Large_Language_Model_Guidance.pdf"
+    },
+    {
+      "arxiv": "2305.07716v1",
+      "title": "Learning to Reason over Scene Graphs: A Case Study of Finetuning GPT-2 into a Robot Language Model for Grounded Task Planning",
+      "authors": "Chalvatzaki et al.",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "file": "Learning_to_Reason_over_Scene_Graphs_A_Case_Study_of_Finetuning_GPT-2_into_a_Robot_Language_Model_for_Grounded_Task_Planning.pdf"
+    },
+    {
+      "arxiv": "2305.13971v6",
+      "title": "Grammar-Constrained Decoding for Structured NLP Tasks without Finetuning",
+      "authors": "Geng et al.",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "file": "Grammar-Constrained_Decoding_for_Structured_NLP_Tasks_without_Finetuning.pdf"
+    },
+    {
+      "arxiv": "2407.08103v3",
+      "title": "Automata-based constraints for language model decoding",
+      "authors": "Koo et al.",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "file": "Automata-based_constraints_for_language_model_decoding.pdf"
+    }
+  ]
+}

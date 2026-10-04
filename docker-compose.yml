@@ -11,9 +11,11 @@
 # host.docker.internal is available automatically.
 #
 # Usage
-#   docker compose up --build     # first run (builds image)
-#   docker compose up             # subsequent runs (reuses image)
-#   docker compose down           # stop and remove container
+#   docker compose up --build rca   # Streamlit dev UI on :8501 (builds image on first run)
+#   docker compose up --build demo  # public demo: React app + API on :8000 with a sample corpus
+#   docker compose --profile demo down   # stop and remove containers (add -v to drop demo data)
+#
+# The demo needs `ollama pull nomic-embed-text` and `ollama pull gemma3:12b` instead.
 
 services:
   rca:
@@ -25,7 +27,8 @@ services:
       # The host path is relative to this file; create it if it doesn't exist.
       - ./.rca:/app/.rca
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       RCA_LLM_BACKEND: ollama
       RCA_ENABLE_FILESYSTEM_TOOLS: "true"
@@ -51,3 +54,50 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  demo:
+    build: .
+    # Only started when named (`docker compose up demo`), so a bare `up` still runs Streamlit only.
+    profiles: ["demo"]
+    command: ["uv", "run", "python", "-m", "cli.rca_demo"]
+    ports:
+      # Localhost only: the API has no login and can delete sources.
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Demo store, downloaded papers, and the reranker model cache; separate from ./.rca.
+      - rca-demo:/app/.rca-demo
+      - hf-cache:/root/.cache/huggingface
+    environment:
+      RCA_LLM_BACKEND: ollama
+      RCA_GENERATION_MODEL: gemma3:12b
+      RCA_DATA_DIR: /app/.rca-demo
+      RCA_GRAPH_DB_PATH: /app/.rca-demo/graph.sqlite3
+      RCA_VECTOR_DIR: /app/.rca-demo/vectors
+      RCA_EVENT_LOG_PATH: /app/.rca-demo/events.jsonl
+      RCA_TELEMETRY_LOG_PATH: /app/.rca-demo/telemetry.jsonl
+      RCA_EXPERIMENT_DB_PATH: /app/.rca-demo/experiments.sqlite3
+      # Agent file tools see only the downloaded papers, not the app source.
+      RCA_ENABLE_FILESYSTEM_TOOLS: "true"
+      RCA_WORKSPACE_ROOT: /app/.rca-demo/papers
+      RCA_FILESYSTEM_ROOT: /app/.rca-demo/papers
+      RCA_EMBEDDING_BASE_URL: http://host.docker.internal:11434
+      RCA_LLM_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # first start downloads papers and ingests them before the server is up
+      start_period: 300s
+
+volumes:
+  rca-demo:
+  hf-cache:

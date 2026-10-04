@@ -189,6 +189,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 - [x] Docker, docker-compose, and Makefile-based local boot
 - [x] Configurable backend parity for chat, agent tool use, and embeddings across Ollama and OpenAI-compatible APIs
 - [x] AWS deployment-ready demo package with baked image defaults, ECS templates, and demo/teardown scripts
+- [x] One-command local demo (`docker compose up --build demo`) with a CC BY 4.0 sample corpus (#15); README screencast still to record
 - [x] GitHub Actions CI workflow added; local Ruff and pytest baseline verified
 - [x] Frontend CI job: type-check of app and tests, production build, vitest on Node 24
 
