@@ -28,6 +28,9 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 - Agent knowledge-base search now uses the same retrieve flow and vector store as chat (API and Streamlit), so a vector fallback hit by the agent shows up in `/status` and the UI. Previously the agent built its own store. `ToolRegistry` and `AgentLoop` accept an optional `retrieve_flow` (passing it together with `knowledge_base_search` or `registry` raises `ValueError`); Streamlit clears the cached agent loop whenever it rebuilds the chat flows after an ingest. Existing callers are unaffected.
 - Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
 
+### Removed
+- Empty `rca.mcp_servers.git` and `rca.mcp_servers.zotero` placeholder packages (#14). They held no code; nothing imported them. Zotero is no longer listed as planned work.
+
 ## [1.5.0] - 2026-09-29 (tag `v1.5.0`)
 
 ### Added

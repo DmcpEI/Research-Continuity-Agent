@@ -1,1 +1,0 @@
-"""Placeholder git server package."""

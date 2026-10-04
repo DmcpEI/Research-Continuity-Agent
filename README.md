@@ -222,7 +222,6 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [ ] **Confidence-calibrated abstention** — improve negative handling without destabilizing grounded answers
 - [ ] **Add a human-authored external eval subset** — reduce self-bias for external reporting
 - [ ] arxiv MCP server
-- [ ] Zotero MCP server
 - [ ] Weekly digest generator
 
 ### v2 — Production-shaped deployment
@@ -448,9 +447,7 @@ uv run python eval/run_ablations.py
 │   └── mcp_servers/
 │       ├── filesystem/         # MCP server: sandboxed file access and ripgrep search
 │       ├── experiments/        # MCP server: experiment run CRUD over SQLite
-│       ├── arxiv/              # Reserved — not implemented
-│       ├── zotero/             # Reserved — not implemented
-│       └── git/                # Reserved — not implemented
+│       └── arxiv/              # Reserved for the arXiv connector (#11)
 ├── cli/                        # Entry points: rca-ingest, rca-query
 ├── eval/                       # Golden question set, evaluation harness, and run results
 ├── tests/

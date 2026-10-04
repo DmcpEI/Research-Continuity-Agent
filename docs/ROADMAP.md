@@ -83,7 +83,7 @@ These are the highest-priority milestones for reliability and correctness.
 
 These are the next capability-building milestones once the correctness gaps above are addressed.
 
-- **Research connectors** — Add `arxiv` and `Zotero` MCP ingestion paths. Rationale: they reduce manual ingest work and make the eventual agent loop materially more useful.
+- **Research connectors** — Add an `arxiv` MCP ingestion path (#11). Rationale: it reduces manual ingest work and makes the agent loop materially more useful.
 
 ---
 
