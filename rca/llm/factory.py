@@ -30,4 +30,5 @@ def get_llm_client(settings: Settings | None = None) -> LLMClient:
         api_key=settings.llm_api_key,
         api_style="ollama",
         think=settings.llm_think,
+        keep_alive=settings.llm_keep_alive,
     )

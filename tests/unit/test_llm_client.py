@@ -332,3 +332,61 @@ def test_http_errors_keep_the_server_message(monkeypatch) -> None:
     message = str(excinfo.value)
     assert message.startswith("HTTP Error 400: Bad Request")
     assert "does not support thinking" in message
+
+
+def test_ollama_payloads_send_keep_alive_from_settings(monkeypatch) -> None:
+    # Ollama otherwise keeps every model in RAM for 5 minutes after each request.
+    from rca.config.settings import Settings
+    from rca.llm.client import ChatMessage
+    from rca.llm.factory import get_llm_client
+
+    def capture(client):
+        sent: list[dict] = []
+
+        def fake_post(path, payload, timeout=120):
+            sent.append(payload)
+            message = {"role": "assistant", "content": "ok", "tool_calls": []}
+            if "chat/completions" in path:
+                return {"choices": [{"message": message}]}
+            if "embed" in path:
+                return {"embedding": [0.1], "data": [{"embedding": [0.1]}]}
+            return {"message": message}
+
+        monkeypatch.setattr(client, "_post_json", fake_post)
+        client.chat([ChatMessage(role="user", content="hi")])
+        client.chat_with_tools([{"role": "user", "content": "hi"}], tools=[])
+        client.embed(["hi"])
+        return sent
+
+    default = get_llm_client(Settings(llm_backend="ollama", generation_model="m"))
+    assert [payload["keep_alive"] for payload in capture(default)] == ["1m", "1m", "1m"]
+
+    seconds = get_llm_client(
+        Settings(llm_backend="ollama", generation_model="m", llm_keep_alive="60")
+    )
+    # A unit-less string is an HTTP 400 in Ollama; whole seconds must go out as a number.
+    assert [payload["keep_alive"] for payload in capture(seconds)] == [60, 60, 60]
+
+    bare = OllamaLLMClient(base_url="http://localhost:11434", model="m", embedding_model="e")
+    assert all("keep_alive" not in payload for payload in capture(bare))
+
+    openai = get_llm_client(
+        Settings(llm_backend="openai_compatible", generation_model="m", llm_keep_alive="5m")
+    )
+    assert all("keep_alive" not in payload for payload in capture(openai))
+
+
+def test_keep_alive_setting_rejects_values_ollama_cannot_parse(monkeypatch) -> None:
+    import pytest
+
+    from rca.config.settings import Settings
+
+    assert Settings(llm_keep_alive="-1").llm_keep_alive == -1
+    assert Settings(llm_keep_alive=" 1h30m ").llm_keep_alive == "1h30m"
+    assert Settings(llm_keep_alive=0).llm_keep_alive == 0
+    monkeypatch.setenv("RCA_LLM_KEEP_ALIVE", "45")
+    assert Settings().llm_keep_alive == 45
+    # Python's \d also matches non-ASCII digits, which Ollama rejects.
+    for bad in ["abc", "", "5 m", "1d", "\u0663s", "\uff11\uff12s"]:
+        with pytest.raises(ValueError):
+            Settings(llm_keep_alive=bad)

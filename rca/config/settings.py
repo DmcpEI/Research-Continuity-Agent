@@ -1,11 +1,31 @@
 """Runtime settings loaded from environment variables."""
 
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
+
+# Go duration as Ollama parses it ("30s", "1m", "1h30m", "-1m").
+_GO_DURATION = re.compile(r"-?([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+")
+
+
+def parse_keep_alive(value: object) -> int | str:
+    """Normalise an Ollama keep_alive value: whole seconds as int, else a Go duration.
+
+    Ollama rejects unit-less strings such as "60", and a bad value fails every request,
+    so this raises at settings load instead.
+    """
+
+    text = str(value).strip()
+    if re.fullmatch(r"-?[0-9]+", text):
+        return int(text)
+    if _GO_DURATION.fullmatch(text):
+        return text
+    raise ValueError(f"keep_alive must be seconds or a duration like '30s' or '5m', got {value!r}")
+
 
 try:
     from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -63,6 +83,9 @@ class Settings(BaseSettings):
     # answer in message.thinking and leave message.content empty. True only works with
     # thinking-capable models; others reject it with HTTP 400.
     llm_think: bool = False
+    # How long Ollama keeps a model in memory after a request (Ollama's own default is
+    # 5m). Short by default so RCA frees RAM soon after answering; "-1" keeps it loaded.
+    llm_keep_alive: int | str = "1m"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 10
     retrieval_fetch_limit: int = 20
@@ -85,6 +108,11 @@ class Settings(BaseSettings):
         )
     else:
         model_config = {"extra": "ignore", "populate_by_name": True}
+
+    @field_validator("llm_keep_alive", mode="before")
+    @classmethod
+    def _check_keep_alive(cls, value: object) -> int | str:
+        return parse_keep_alive(value)
 
     def __init__(self, **data: object) -> None:
         if _HAS_PYDANTIC_SETTINGS:
@@ -143,6 +171,7 @@ class Settings(BaseSettings):
             "RCA_OPENAI_EMBED_MODEL": "openai_embed_model",
             "RCA_ENABLE_RERANKER": "enable_reranker",
             "RCA_LLM_THINK": "llm_think",
+            "RCA_LLM_KEEP_ALIVE": "llm_keep_alive",
             "RCA_RERANKER_MODEL": "reranker_model",
             "RCA_RERANKER_TOP_K": "reranker_top_k",
             "RCA_RETRIEVAL_FETCH_LIMIT": "retrieval_fetch_limit",

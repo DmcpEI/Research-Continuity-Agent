@@ -280,6 +280,9 @@ def _probe_tool_calling_capability_detailed(settings: Settings, model_name: str)
             ],
             "stream": False,
             "options": {"temperature": 0, "num_predict": 1},
+            # Unload right away: probing every installed model would otherwise hold
+            # each one in RAM for Ollama's default 5 minutes.
+            "keep_alive": 0,
         }
 
         for timeout_seconds in (5.0, 60.0):

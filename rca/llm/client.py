@@ -105,6 +105,7 @@ class OllamaLLMClient(LLMClient):
         api_key: str | None = None,
         api_style: str | None = None,
         think: bool = False,
+        keep_alive: int | str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -112,6 +113,8 @@ class OllamaLLMClient(LLMClient):
         self.api_key = api_key or "ollama"
         self.api_style = api_style
         self.think = think
+        # None leaves Ollama's own default (5m); see Settings.llm_keep_alive.
+        self.keep_alive = keep_alive
         self.options = {"temperature": 0, "num_predict": 512}
         if options:
             self.options.update(options)
@@ -134,6 +137,7 @@ class OllamaLLMClient(LLMClient):
                 "stream": False,
                 "think": self.think,
                 "options": self.options,
+                **self._keep_alive_field(),
             }
             result = self._post_json("/api/chat", payload, timeout=120)
             text = result["message"]["content"]
@@ -170,6 +174,7 @@ class OllamaLLMClient(LLMClient):
             "stream": False,
             "think": self.think,
             "options": self.options,
+            **self._keep_alive_field(),
         }
         result = self._post_json("/api/chat", payload, timeout=120)
         message = result.get("message", {})
@@ -211,7 +216,7 @@ class OllamaLLMClient(LLMClient):
         for text in texts:
             result = self._post_json(
                 "/api/embeddings",
-                {"model": self.embedding_model, "prompt": text},
+                {"model": self.embedding_model, "prompt": text, **self._keep_alive_field()},
                 timeout=120,
             )
             embedding = result.get("embedding")
@@ -221,6 +226,9 @@ class OllamaLLMClient(LLMClient):
                 )
             vectors.append([float(value) for value in embedding])
         return vectors
+
+    def _keep_alive_field(self) -> dict[str, int | str]:
+        return {} if self.keep_alive is None else {"keep_alive": self.keep_alive}
 
     @property
     def _api_style(self) -> str:

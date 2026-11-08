@@ -776,3 +776,27 @@ def test_agent_model_reprobe_endpoint_refreshes_cache(tmp_path: Path, monkeypatc
     second = client.post("/agent/models/reprobe")
     assert second.status_code == 200
     assert probe_counts.get("gemma4:e4b", 0) >= 2
+
+
+def test_tool_calling_probe_unloads_the_model_right_away(monkeypatch) -> None:
+    # The probe runs over every installed model; Ollama would otherwise keep each one
+    # in RAM for 5 minutes.
+    import io
+    import json as _json
+
+    from rca.api import main as api_main
+    from rca.config.settings import Settings
+
+    sent: list[dict] = []
+
+    def fake_urlopen(request, timeout=None):
+        sent.append(_json.loads(request.data))
+        return io.BytesIO(b"{}")
+
+    monkeypatch.setattr(api_main.urllib.request, "urlopen", fake_urlopen)
+    result = api_main._probe_tool_calling_capability_detailed(
+        Settings(llm_base_url="http://localhost:11434"), "qwen3:4b"
+    )
+
+    assert result["capable"] is True
+    assert sent and all(payload["keep_alive"] == 0 for payload in sent)

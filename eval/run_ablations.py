@@ -314,6 +314,7 @@ def main() -> None:
         base_url=settings.embedding_base_url,
         model=settings.generation_model,
         think=settings.llm_think,
+        keep_alive=settings.llm_keep_alive,
     )
     provenance = collect_provenance(settings, graph_store, vector_store)
 
