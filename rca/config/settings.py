@@ -69,8 +69,9 @@ class Settings(BaseSettings):
         default="ollama",
         validation_alias=AliasChoices("RCA_LLM_API_KEY", "LLM_API_KEY"),
     )
-    generation_model: str = "gemma3:12b"
-    agent_model: str = "qwen2.5:14b"
+    # One small model for chat and agent, so only one is in RAM (docs/EVAL.md bake-off).
+    generation_model: str = "qwen3.5:4b"
+    agent_model: str = "qwen3.5:4b"
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = Field(
         default="",

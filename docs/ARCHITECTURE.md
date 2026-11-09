@@ -29,7 +29,7 @@ GenerateFlow
     ├── query rewrite (inside GenerateFlow, optional)
     ├── retrieval via RetrieveFlow
     ├── prompt assembly (system + context chunks + query)
-    ├── LLM generation (gemma3:12b locally or OpenAI-compatible in deployment)
+    ├── LLM generation (qwen3.5:4b locally or OpenAI-compatible in deployment)
     ├── citation extraction (_extract_citations)
     ├── source-ID resolution (chunk ID → parent src: node)
     ├── rerank gate (max rerank_score <= -3.618 → abstain before LLM call)
@@ -184,8 +184,8 @@ Key settings:
 | `RCA_LLM_BACKEND` | ollama | Backend selector for chat, tool use, and embeddings |
 | `RCA_ENABLE_FILESYSTEM_TOOLS` | true | Enable or disable filesystem MCP tools in the agent loop |
 | `RCA_EMBEDDING_MODEL` | nomic-embed-text | Ollama embedding model |
-| `RCA_GENERATION_MODEL` | gemma3:12b | Ollama generation model |
-| `RCA_AGENT_MODEL` | qwen2.5:14b | Ollama model for the tool-using agent loop |
+| `RCA_GENERATION_MODEL` | qwen3.5:4b | Ollama generation model |
+| `RCA_AGENT_MODEL` | qwen3.5:4b | Ollama model for the tool-using agent loop |
 | `RCA_EMBEDDING_BASE_URL` | http://localhost:11434 | Ollama embedding base URL |
 | `RCA_LLM_BASE_URL` | http://localhost:11434 | Ollama chat base URL |
 | `RCA_OPENAI_BASE_URL` | https://api.openai.com/v1 | OpenAI-compatible base URL |

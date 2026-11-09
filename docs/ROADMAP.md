@@ -53,7 +53,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Agent eval (`qwen3.5:9b`) | `19/20` tasks, tool selection `18/18`, tool precision `0.94` (2026-10-03, after #21/#22; first run `12/20`) |
 | Tests | `146` passing |
 
-These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
+These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; the 2026-11-09 small-model comparison on the dev split replaces them for model choice (docs/EVAL.md, "Small-model bake-off").
 
 Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/EVAL.md). System structure lives in [ARCHITECTURE.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/docs/ARCHITECTURE.md). The user-facing overview stays in [README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/README.md).
 
@@ -62,7 +62,8 @@ Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/D
 ## Hardware constraints
 
 - On an 18GB M3 Pro, `phi4:14b` sits at the practical memory limit and should be reserved for quality-first runs.
-- `gemma3:12b` is the recommended daily driver for interactive speed.
+- `gemma3:12b` (8 GB) left about 2-4% RAM free during eval runs and made the laptop unusable; it was dropped on 2026-11-09.
+- `qwen3.5:4b` (4 GB) is the default for both chat and agent mode, so only one chat model is loaded (see the bake-off in docs/EVAL.md).
 
 ---
 
@@ -145,7 +146,7 @@ These are worthwhile, but they should follow the correctness and workflow milest
 - Documentation updated (`README`, `ROADMAP`, architecture/eval notes)
 - Baseline checks pass (lint, tests, frontend build, API smoke)
 - One fresh benchmark/eval snapshot is captured and linked in release notes
-- Response-structure checks pass for selected default model profile (`gemma3:12b`)
+- Response-structure checks pass for selected default model profile (`qwen3.5:4b`)
 
 ---
 

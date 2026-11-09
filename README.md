@@ -10,7 +10,7 @@ A **local-first research knowledge system** that ingests technical PDFs, perform
 |---|---|---|
 | Retrieval, production path | hit@5 `98.9%` (89/90 answerable questions) | [EVAL.md → Retrieval Ablations](docs/EVAL.md#retrieval-ablations) |
 | Abstention gate (cross-encoder score, held-out test split) | catches `5/12` unanswerable questions with `1/28` false abstentions | [EVAL.md → Abstention Calibration](docs/EVAL.md#abstention-calibration-retrieval-features) |
-| Agent benchmark (`qwen3.5:9b`, 20 sandboxed tasks) | `19/20` tasks, right tool `18/18` | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
+| Agent benchmark (`qwen3.5:9b`, 20 sandboxed tasks; default `qwen3.5:4b`: `17/20`) | `19/20` tasks, right tool `18/18` | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
 | Retrieval regression gate in CI | fails the build when any fixture question ranks worse | [EVAL.md → CI Retrieval Gate](docs/EVAL.md#ci-retrieval-gate) |
 
 Golden set: 129 questions, 39 of them unanswerable. Abstention is still the weakest area; see [Known Limitations](docs/EVAL.md#known-limitations).
@@ -20,7 +20,7 @@ Golden set: 129 questions, 39 of them unanswerable. Abstention is still the weak
 Requires [Docker](https://docs.docker.com/get-docker/) and [Ollama](https://ollama.com) running on the host. Only the default Ollama backend has been tested with the demo.
 
 ```bash
-ollama pull nomic-embed-text && ollama pull gemma3:12b
+ollama pull nomic-embed-text && ollama pull qwen3.5:4b
 git clone https://github.com/DmcpEI/Research-Continuity-Agent.git && cd Research-Continuity-Agent
 docker compose up --build demo      # or: make demo
 ```
@@ -28,10 +28,10 @@ docker compose up --build demo      # or: make demo
 Open http://localhost:8000. The first start downloads five CC BY 4.0 papers from arXiv (listed in [demo/papers.json](demo/papers.json)) and ingests them. That takes a few minutes; later starts re-check the files but skip re-indexing unchanged ones. The server listens on localhost only. Data lives in Docker volumes, separate from your own `.rca/` store; `docker compose --profile demo down -v` removes it.
 
 Things to try:
-- *What does JSONSchemaBench measure?* gives an answer with `[[chk:...]]` chunk citations; click one to open the PDF.
+- *What does JSONSchemaBench measure?* should answer with `[[chk:...]]` chunk citations; click one to open the PDF. The default `qwen3.5:4b` sometimes answers without citation tags (see [Known Limitations](docs/EVAL.md#known-limitations)).
 - *How does the planner use the scene graph to guide search?* answers from the scene-graph planning paper.
 - *What is the capital of Australia?* is out of corpus, so RCA says nothing relevant was found instead of generating an answer.
-- The Agent tab needs a tool-calling model; `ollama pull qwen3.5:9b` is the one benchmarked. It can search the knowledge base and list the downloaded papers.
+- The Agent tab uses the same `qwen3.5:4b` (17/20 agent tasks); it can search the knowledge base and list the downloaded papers.
 
 ---
 
@@ -63,7 +63,7 @@ flowchart TD
         RERANK["Cross-encoder rerank<br/>ms-marco-MiniLM-L-6-v2"]
         GF["GenerateFlow"]
         CTX["Context assembly<br/>top-k hits"]
-        LLM["LLM generation<br/>gemma3:12b via configured backend"]
+        LLM["LLM generation<br/>qwen3.5:4b via configured backend"]
         ABS["Abstention detection<br/>two-gate"]
         CITE["Citation extraction"]
         OUT["GeneratedAnswer<br/>text + citations + QueryTrace"]
@@ -90,7 +90,7 @@ The system composes FTS5/BM25 lexical search, dense vector retrieval, source gra
 uv run python eval/run_ablations.py
 
 # Run generation harness on the same golden set
-uv run python eval/harness.py --model gemma3:12b
+uv run python eval/harness.py --model qwen3.5:4b
 ```
 
 The checked-in golden set currently contains `129` questions: `90` answerable and `39` explicit negative / unanswerable queries. Refresh `eval/results/` locally after any corpus or backend change.
@@ -140,7 +140,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
 3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. Before generation, a reranker-score gate (`max rerank_score <= -3.618`, calibrated in `eval/calibrate_abstention.py`) abstains without calling the LLM when no retrieved chunk is a strong match. After generation, an abstention check combines hedge phrases, citation validity, and retrieval confidence.
 
-**LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `gemma3:12b` for generation and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
+**LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `qwen3.5:4b` for generation and agent mode and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
 
 **Contracts layer.** `rca/contracts/` defines the identifier rules, node/edge models, and other shared DTOs that every other layer imports. No layer other than `store` performs persistence; no persistence layer makes model calls.
 
@@ -163,7 +163,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 | Layer | Choice | Reason |
 |---|---|---|
 | Embeddings | nomic-embed-text (Ollama) | Local, fast, strong retrieval quality |
-| Generation | gemma3:12b (Ollama) | Default local open-source model for grounded generation |
+| Generation + agent | qwen3.5:4b (Ollama) | One small local model for grounded chat and tool use, so a laptop stays usable ([bake-off](docs/EVAL.md#small-model-bake-off-2026-11-09)) |
 | Vector DB | ChromaDB | Persistent, zero-infrastructure prototype |
 | Graph/metadata | SQLite | Zero-dependency, portable, easy to audit |
 | UI | React (Vite) + FastAPI | Production frontend path; Streamlit retained for local dev/eval only |
@@ -187,7 +187,7 @@ Latest local artifacts:
 - `eval/results/run_20260420T112737Z.json`
 - `eval/results/ablations.json`
 
-Current generation results on the 100-question corpus (production baseline `gemma3:12b`):
+Older generation results on the 100-question corpus (then-default `gemma3:12b`):
 
 | Metric | Value |
 |---|---|
@@ -198,7 +198,7 @@ Current generation results on the 100-question corpus (production baseline `gemm
 | Average latency | `9.7 s` |
 | Grounded rate | `94.0%` |
 
-These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; a fresh run is pending, together with a local model comparison (`gemma3:12b` / `gemma4:12b` / `qwen3.5:9b`).
+These numbers come from the 2026-04-21 `gemma3:12b` run on the original 100-question set (10 negatives), before the grounding check and failure labels landed; the 2026-11-09 small-model comparison on the dev split replaces them for model choice ([bake-off](docs/EVAL.md#small-model-bake-off-2026-11-09)).
 
 Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 
@@ -269,14 +269,14 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 
 **Requirements:** Python 3.11+, [uv](https://docs.astral.sh/uv/), [ripgrep](https://github.com/BurntSushi/ripgrep). [Ollama](https://ollama.com) is required only for the default local backend.
 
-If you run `phi4:14b` locally, close heavy applications (VS Code, browsers with many tabs) to avoid swap pressure. For daily use, `gemma3:12b` is the recommended default.
+The default `qwen3.5:4b` (4 GB) handles both chat and agent mode, so only one chat model is in memory. Larger models such as `gemma3:12b` left an 18 GB laptop swapping and are no longer recommended.
 
 ```bash
 brew install ripgrep
 
 # Pull models for the default local backend
 ollama pull nomic-embed-text   # embeddings (768-dim)
-ollama pull gemma3:12b         # answer generation and query rewriting
+ollama pull qwen3.5:4b         # answer generation, query rewriting and agent mode
 
 # Install dependencies
 uv sync
@@ -296,8 +296,8 @@ Key environment variables:
 | `RCA_CHUNK_SIZE` | `1200` | Target chunk size in characters |
 | `RCA_CHUNK_OVERLAP` | `150` | Overlap between consecutive chunks |
 | `RCA_LLM_BACKEND` | `ollama` | Backend selector for chat, tool use, and embeddings (`ollama` or `openai_compatible`) |
-| `RCA_GENERATION_MODEL` | `gemma3:12b` | Ollama model used for answer generation and query rewriting |
-| `RCA_AGENT_MODEL` | `qwen2.5:14b` | Ollama model for the tool-using agent loop (must support tool calling) |
+| `RCA_GENERATION_MODEL` | `qwen3.5:4b` | Ollama model used for answer generation and query rewriting |
+| `RCA_AGENT_MODEL` | `qwen3.5:4b` | Ollama model for the tool-using agent loop (must support tool calling) |
 | `RCA_LLM_THINK` | `false` | Ollama `think` flag; `true` only for thinking-capable models |
 | `RCA_LLM_KEEP_ALIVE` | `1m` | How long Ollama keeps a model in memory after a request (seconds or a duration such as `30s`, `5m`; `-1` keeps it loaded). Ollama's own default is `5m` |
 | `RCA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama model used for vector embeddings |
@@ -520,4 +520,4 @@ Before tagging `v2`:
 4. Run full quality gate (`ruff`, `pytest`, frontend build, basic API smoke checks).
 5. Draft release notes with migration notes and known limitations.
 6. Create release commit and annotate tag (`v2.0.0`).
-7. Validate response-shape compatibility for the default profile (`gemma3:12b`) against chat UI citation rendering.
+7. Validate response-shape compatibility for the default profile (`qwen3.5:4b`) against chat UI citation rendering.

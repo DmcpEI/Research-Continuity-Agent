@@ -390,3 +390,14 @@ def test_keep_alive_setting_rejects_values_ollama_cannot_parse(monkeypatch) -> N
     for bad in ["abc", "", "5 m", "1d", "\u0663s", "\uff11\uff12s"]:
         with pytest.raises(ValueError):
             Settings(llm_keep_alive=bad)
+
+
+def test_chat_and_agent_default_to_one_small_model(monkeypatch) -> None:
+    from rca.config.settings import Settings
+
+    for name in ("RCA_GENERATION_MODEL", "RCA_AGENT_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    settings = Settings(_env_file=None)
+
+    # One shared model means only one chat model is loaded in Ollama at a time.
+    assert settings.generation_model == settings.agent_model == "qwen3.5:4b"

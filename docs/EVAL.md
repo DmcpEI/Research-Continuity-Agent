@@ -49,7 +49,7 @@ Metric definitions:
 ## Generation Harness
 
 ```bash
-uv run python eval/harness.py --model gemma3:12b
+uv run python eval/harness.py --model qwen3.5:4b
 ```
 
 Optional model override for direct A/B runs:
@@ -240,15 +240,34 @@ Output artifacts:
 - aggregate matrix in `eval/results/model_matrix.json`
 
 Model onboarding recommendation:
-- keep at least one strong local baseline (`gemma3:12b`)
+- keep at least one local baseline that fits in RAM next to normal work (`qwen3.5:4b`)
 - test 1 fast/small model for latency-sensitive scenarios
 - test 1-2 alternate instruction-tuned models for citation and abstention variance
 - compare both quality (`citation_precision`, `abstention_recall`) and cost proxy (`average_latency_ms`)
 
 Current model-selection verdict:
-- Production default is `gemma3:12b`.
+- Production default is `qwen3.5:4b` for both chat and agent mode (2026-11-09, see below); `gemma3:12b` was dropped because it left the laptop swapping.
 - Split-model rewriting is retained as a research option but is not recommended for production. On this corpus it increased latency by 10s+ while improving citation precision by under 2 points and keyword hit rate by about 1 point.
 - `gemma4:e4b` was evaluated as a candidate default and rejected for daily use due to high latency and elevated answerable abstentions despite stronger citation precision.
+
+### Small-model bake-off (2026-11-09)
+
+Goal: one small model for both chat and agent, so RCA can run while the laptop is in use (M3 Pro, 18 GB). Dev split (89 questions, 27 negatives) plus the 20-task agent benchmark, Ollama 0.40.15, default 4096 context, citation prompt as of 7d3ef4c. "Min free RAM" is the lowest system free-memory reading (sampled every 15 s) while that model was loaded.
+
+| model | grounded | citation precision | abstention recall | answerable abstentions | s/question | agent success | tool selection | min free RAM |
+|---|---|---|---|---|---|---|---|---|
+| `qwen3.5:4b` | 0.28 | 0.49 | 0.93 | 15 | 5.0 | 0.85 | 0.94 | 8% |
+| `qwen3.5:2b` | 0.60 | 0.82 | 0.78 | 7 | 4.3 | 0.70 | 0.89 | 12% |
+| `ministral-3:3b` | 0.40 | 0.81 | 0.44 | 26 | 4.7 | 0.60 | 0.67 | 14% |
+| `phi4-mini:3.8b` | 0.37 | 0.50 | 0.52 | 2 | 3.6 | 0.10 | 0.06 | 16% |
+| `qwen3:4b` | 0.72 | 0.88 | 0.44 | 3 | 14.2 | 0.40 | 0.44 | 15% |
+| `gemma3:12b` | 0.78 | 0.98 | 0.59 | 4 | 28.4 | 0 (no tool support) | 0 | 2% |
+
+Choice: `qwen3.5:4b`, the best agent and good at tool use and refusals, and at 4 GB small enough to share the laptop (lowest free RAM 8% during the run, against 2% for `gemma3:12b`). Its grounded chat score is low because 23 of its 24 `citation_miss` answers carry no `[[...]]` tag at all; this is a prompt-following problem, tracked separately. `gemma3:12b` grounds best but cannot call tools in Ollama, so it always needed a second model loaded for agent mode. `qwen3:4b` leaks reasoning into answers and is slow; `phi4-mini` cannot use the tools. Keyword hit rate (about 0.25 for every model) does not separate the models and is left out.
+
+Against the old `gemma3:12b` default this is a chat regression with the current prompt: grounded 0.78 → 0.28, citation precision 0.98 → 0.49, answerable abstentions 4 → 15 of 62. Agent mode gains (the old default `qwen2.5:14b` was not installed; `qwen3.5:9b` scored 19/20 earlier but is about 6 GB). Not re-measured with `qwen3.5:4b` as the rewrite model: the retrieval hit@k in Retrieval Ablations and the −3.618 rerank-gate calibration, both produced with `gemma3:12b` rewrites.
+
+Artifacts (local only, not committed): `eval/results/bakeoff_20261109/<model>/run_*.json` and `agent_eval_*.json`, `ram.log`, and the dev split used (`golden_dev.json`).
 
 ---
 
@@ -257,6 +276,7 @@ Current model-selection verdict:
 - Keyword hit rate (`20.5%`) is currently the primary retrieval weakness.
 - Root cause appears to be rewrite prompt quality and corpus vocabulary alignment, not base model selection alone.
 - Split-model rewriting has been evaluated and rejected for production due to latency cost versus marginal gains.
+- The default `qwen3.5:4b` often answers without `[[...]]` citation tags, so the grounding check rejects otherwise relevant answers (dev split grounded rate 0.28; see Small-model bake-off).
 
 ---
 

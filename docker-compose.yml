@@ -4,7 +4,7 @@
 # -------------
 # Ollama must be running on the host with both models pulled:
 #   ollama pull nomic-embed-text
-#   ollama pull qwen2.5:14b
+#   ollama pull qwen3.5:4b
 #
 # The container reaches host Ollama via http://host.docker.internal:11434.
 # On Linux this requires the extra_hosts entry below; on Mac Docker Desktop
@@ -15,7 +15,7 @@
 #   docker compose up --build demo  # public demo: React app + API on :8000 with a sample corpus
 #   docker compose --profile demo down   # stop and remove containers (add -v to drop demo data)
 #
-# The demo needs `ollama pull nomic-embed-text` and `ollama pull gemma3:12b` instead.
+# The demo uses the same two models.
 
 services:
   rca:
@@ -69,7 +69,6 @@ services:
       - hf-cache:/root/.cache/huggingface
     environment:
       RCA_LLM_BACKEND: ollama
-      RCA_GENERATION_MODEL: gemma3:12b
       RCA_DATA_DIR: /app/.rca-demo
       RCA_GRAPH_DB_PATH: /app/.rca-demo/graph.sqlite3
       RCA_VECTOR_DIR: /app/.rca-demo/vectors
