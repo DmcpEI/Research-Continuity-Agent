@@ -460,6 +460,52 @@ Caveats: `12` test negatives is small, so test recall has a wide confidence inte
 
 ---
 
+## Answer Outcome Labels (#6)
+
+Why: `GenerateFlow` decides "answer" or "abstain" from hedge phrases plus citation validity. With the citation reminder, small models write "the context does not contain X ... [[source]]", which passes as a grounded answer whether or not the cited part helps. Answers that state a gap and then give useful information are a third outcome, not a refusal. Before choosing a classifier (current rule, self-declared status via structured output, claim-level entailment check), we need human labels on real answers to measure any of them against.
+
+Sample: `eval/sample_answer_labels.py` draws about 100 saved answers from the 2026-11-09 dev-split runs, weighted towards hedged answers, and writes `eval/answer_labels.json`. Answers produced by the pre-generation gates (empty retrieval, rerank gate) are left out, because the classifier never sees them. The file stores context node IDs, not paper text. Labels are judged against what the model saw: only the first 240 characters of each context chunk (`excerpt` in `rca/flows/retrieve_flow.py`), read from the local graph store. All `--run` arguments share one seeded generator, so changing the order or count of one run reshuffles the later ones.
+
+Labels (one per answer, judged against the question and the retrieved context only):
+- `answered`: gives the information the question asks for, taken from the context. Minor omissions are fine.
+- `partial`: says some of what was asked is not in the context, and gives information that answers another part of the question or corrects its premise (e.g. "SayPlan is not evaluated outdoors; it is evaluated in multi-floor indoor buildings").
+- `not_found`: says it cannot answer. Anything else in it is background that does not answer any part of the question (e.g. "the license is not stated; the text mentions a different paper's license"), whether or not it is cited.
+
+Test for `partial` vs `not_found`: would the user learn something that answers part of their question, or shows why it cannot be answered as asked? Yes means `partial`; background only means `not_found`.
+
+Rules settled with the project author on unclear cases (2026-11-09):
+- On an unanswerable question, a premise correction counts as `partial` only when the answer says outright that the premise is wrong ("JSON schemas, not XML"). A hint the reader has to infer ("the paper describes GAD as a decoding method", "SayPlan plans across multiple floors") is filler, so `not_found`.
+- A real fact about the subject does not make it `partial` when the comparison or setting asked about does not exist (AutoBag's real success rates for a made-up SuctionGrasp comparison).
+- An answer that says the context does not answer the question at all (anywhere in the answer) and still gives part of the answer is a bad response, not just a partial one: it keeps the `partial` label (the user does learn something) and gets `contradictory`. A good partial answer says which part is covered and which is not.
+
+Flags, independent of the label:
+- `unsupported`: the answer states a fact that the retrieved context does not support (invented or wrong detail). Judged on what is shown to the model, not on the full paper.
+- `contradictory`: see above.
+- `missed_in_context`: the answer says something is absent although the shown context contains it. None in this sample once judged against the 240-character excerpts.
+- `unsure`: the labeller could not decide; these go to a second person.
+
+How the labels will be used: classifier agreement with the label (three classes, and two classes with `partial` merged into `answered`), reported separately for answerable and negative questions. For negatives, `not_found` and premise-correcting `partial` are both acceptable; `answered` or `unsupported` is a failure. Every candidate classifier is designed on these dev-split labels and reported once on a separately labelled test-split sample, so the dev labels are not also the score.
+
+Bias: first-pass labels are drafted by the same assistant that wrote the classifiers (`labeled_by` field) and `unsure` cases are reviewed by the project author; a fully human-labelled subset would be stronger.
+
+First result, 100 answers (seed `20261109`; 35 `qwen3.5:4b` and 15 `qwen3.5:2b` with the citation reminder, 5 with the v3 refusal wording, 50 from the old prompt across `qwen3.5:4b`, `qwen3.5:2b`, `gemma3:12b`, `qwen3:4b`, `ministral-3:3b`). Hedged answers are weighted 3× in the draw, so these counts describe the sample, not how often each case happens in normal use.
+
+| | answerable (69) | unanswerable (31) |
+|---|---|---|
+| `answered` | 20 | 1 |
+| `partial` | 25 (17 `contradictory`) | 3 |
+| `not_found` | 24 | 27 |
+
+How the current `GenerateFlow` decision (abstain or answer) matches, with `answered` and `partial` merged as "useful":
+- useful answers shown as answers: `46/49`;
+- `not_found` answers caught as abstentions: `13/51` (`6/27` on unanswerable questions, `7/24` on answerable ones); the other `38` reach the user as answers (`37` marked grounded);
+- two-class agreement: `59/100`.
+- `unsupported`: 7 answers, all from the old prompt (`qwen3.5:2b`, `qwen3.5:4b`, `qwen3:4b`, `ministral-3:3b`); none from the citation-reminder runs.
+
+Two further findings. 17 of the 25 answerable `partial` answers also say the context does not answer the question, which a phrase rule cannot tell apart from a real refusal. And 24 of the 69 answerable cases are `not_found`: in several of them the answer sits in the same chunk just past the 240-character cut (item 73's excerpt stops at "The most usual strategy to consider vertical stability when"), so the truncated context, not only the model, explains many refusals on answerable questions. The excerpt length has been 240 characters since the first commit; it is a separate retrieval change to evaluate. Next: compare the candidate classifiers (self-declared status via structured output, claim-level entailment check) against these labels. Labelled file: `eval/answer_labels.json`.
+
+---
+
 ## Current Status
 
 What is true today, independent of any single artifact:
