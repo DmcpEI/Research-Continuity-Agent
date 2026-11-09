@@ -269,6 +269,23 @@ Against the old `gemma3:12b` default this is a chat regression with the current 
 
 Artifacts (local only, not committed): `eval/results/bakeoff_20261109/<model>/run_*.json` and `agent_eval_*.json`, `ram.log`, and the dev split used (`golden_dev.json`).
 
+### Citation reminder prompt (2026-11-09)
+
+Two prompt changes for small models that answered in uncited prose: every context header spells out the tag to copy (`[chk:...] Title (cite as [[chk:...]])`), and a short citation reminder follows the question. Dev split, answerable questions only (62); "cited refusals" are grounded answers that contain one of `_ABSTENTION_SIGNALS` (the model refuses but cites a nearby block anyway), counted separately because they are not real answers.
+
+| prompt | model | real cited answers | cited refusals | negatives refused (27) | keyword hit rate | s/question |
+|---|---|---|---|---|---|---|
+| old | `qwen3.5:4b` | 21 | 3 | 25 | 0.251 | 5.0 |
+| new | `qwen3.5:4b` | 40 | 18 | 12 | 0.264 | 6.3 |
+| old | `qwen3.5:2b` | 45 | 2 | 21 | 0.268 | 4.3 |
+| new | `qwen3.5:2b` | 45 | 14 | 13 | 0.247 | 3.3 |
+| old | `gemma3:12b` (30-question subset, 21 answerable) | 20 | 0 | 6/9 | | 30.2 |
+| new | `gemma3:12b` (same subset) | 17 | 0 | 7/9 | | 77.1 (laptop swapping) |
+
+For the default `qwen3.5:4b` the reminder nearly doubles real cited answers (21 → 40 of 62); for `qwen3.5:2b` it only turns refusals into cited refusals; `gemma3:12b` (since removed) lost 3 of 21 on a small subset. The cost is on refusals: the model now cites even when it says the context lacks the answer, and `_decide_abstention` treats a hedge with valid citations and retrieval score ≥ 0.5 as an answer, so negatives refused fall from 25 to 12 and the UI shows such refusals as grounded answers. The summary metrics overstate the gain for the same reason (grounded rate over all 89 cases 0.28 → 0.82, citation precision 0.49 → 0.97, answerable abstentions 15 → 3: about 9 of those 15 still refuse in substance). Fixing the hedge-plus-citation case is a separate change in `_decide_abstention` (#6).
+
+Rejected variants: a worked example in the system prompt (`qwen3.5:4b` grounded 0.80, precision 0.91) and asking for a bare refusal with no citations (the model ignored it; two degenerate "no , no" answers). Artifacts: `eval/results/bakeoff_20261109/prompt/` (local only).
+
 ---
 
 ## Known Limitations

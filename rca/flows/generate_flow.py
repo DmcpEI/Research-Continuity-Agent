@@ -66,6 +66,13 @@ Rules:
 - Keep tone precise and informative — this is a research tool, not a chatbot
 - If no retrieved chunks directly support your answer with specific facts, you must abstain
 - Do not generate answers that only restate the question without adding factual content from the sources"""
+    # Repeated after the question: small models (qwen3.5:4b) follow the system-prompt
+    # citation rule far better when it is the last thing they read (docs/EVAL.md).
+    CITATION_REMINDER = (
+        "Answer using only the context above. End every sentence that states a fact "
+        "with the [[id]] of the block it came from, copied exactly. If the context does not "
+        "answer the question, say so and use no [[...]]."
+    )
     _ABSTENTION_SIGNALS = (
         "does not contain information",
         "no information",
@@ -233,7 +240,7 @@ Rules:
                 role="user",
                 content=(
                     f"{self._build_conversation_history_block(conversation_messages)}"
-                    f"Context:\n{context}\n\nQuestion: {query}"
+                    f"Context:\n{context}\n\nQuestion: {query}\n\n{self.CITATION_REMINDER}"
                 ),
             ),
         ]
@@ -305,10 +312,14 @@ Rules:
         )
 
     def _build_context(self, hits: list) -> str:
-        """Format retrieved hits into a context block for the prompt."""
+        """Format retrieved hits into a context block for the prompt.
+
+        Each header spells out the exact citation tag so the model copies it instead of
+        writing uncited prose.
+        """
         lines = []
         for hit in hits:
-            lines.append(f"[{hit.node_id}] {hit.title}")
+            lines.append(f"[{hit.node_id}] {hit.title} (cite as [[{hit.node_id}]])")
             lines.append(hit.excerpt)
             lines.append("")
         return "\n".join(lines)

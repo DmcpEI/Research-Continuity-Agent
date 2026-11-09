@@ -407,3 +407,34 @@ def test_generate_answer_rerank_gate_passes_strong_match() -> None:
     assert result.abstained is False
     assert "low_rerank_score" not in result.failure_labels
     assert llm.calls == 1
+
+
+def test_generate_answer_prompt_spells_out_citation_tag_and_reminder() -> None:
+    llm = StubLLMClient()
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=llm)
+
+    flow.generate_answer("How does JamPacker handle recovery?")
+
+    assert llm.last_messages is not None
+    prompt = llm.last_messages[-1].content
+    assert "[src:pdf/jampacker] JamPacker (cite as [[src:pdf/jampacker]])" in prompt
+    # The reminder comes after the question, as the last thing the model reads.
+    assert prompt.index("Question: How does JamPacker handle recovery?") < prompt.index(
+        GenerateFlow.CITATION_REMINDER
+    )
+    assert prompt.endswith(GenerateFlow.CITATION_REMINDER)
+
+
+def test_conversational_prompt_has_no_citation_reminder() -> None:
+    llm = StubLLMClient(responses=["Yes, I can see our prior messages."])
+    retrieve_flow = StubRetrieveFlow()
+    flow = GenerateFlow(retrieve_flow=retrieve_flow, llm_client=llm)
+
+    flow.generate_answer(
+        "Why didn't you respond?",
+        conversation_messages=[{"role": "user", "content": "Is there a paper about LLM-Pack?"}],
+    )
+
+    assert retrieve_flow.queries == []  # conversational path: no context, nothing to cite
+    assert llm.last_messages is not None
+    assert GenerateFlow.CITATION_REMINDER not in llm.last_messages[-1].content
