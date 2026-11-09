@@ -47,7 +47,7 @@ All items in this phase are now shipped and tracked under Shipped milestones.
 | Citation precision | `90.8%` over `87` answerable, non-abstained cases |
 | Negative abstention recall | `3/10` (`30.0%`) |
 | Answerable abstentions | `3` |
-| Keyword hit rate | `20.5%` |
+| Keyword hit rate | `20.5%` (240-character context, since fixed) |
 | Grounded rate | `94.0%` |
 | Average latency | `9.7 s` |
 | Agent eval (`qwen3.5:9b`) | `19/20` tasks, tool selection `18/18`, tool precision `0.94` (2026-10-03, after #21/#22; first run `12/20`) |
@@ -71,7 +71,7 @@ Detailed methodology, artifacts, and caveats live in [EVAL.md](/Users/dmcp2003/D
 
 These are the highest-priority milestones for reliability and correctness.
 
-- **Keyword-hit improvement via rewrite prompt tuning** — Improve the rewrite prompt and retrieval-term alignment for the robotics corpus. Rationale: keyword hit rate (`20.5%`) is the clearest current retrieval weakness.
+- **Keyword-hit improvement via rewrite prompt tuning** — Improve the rewrite prompt and retrieval-term alignment for the robotics corpus. Rationale: keyword hit rate (`20.5%`) looked like the clearest retrieval weakness; on 2026-11-09 most of it turned out to be the 240-character context cut (fixed), so re-measure before tuning the rewrite prompt.
 - **Confidence-calibrated abstention** — The calibrated pre-generation rerank gate (`rerank_max <= -3.618`, test `5/12` negatives at `1/28` false abstentions) is wired into `GenerateFlow`; confirm with a full harness rerun. Remaining gap: unreported-detail and false-premise questions about papers that are in the corpus, which retrieval signals cannot catch and need a generation-side check. See [EVAL.md](EVAL.md#abstention-calibration-retrieval-features).
 - **Human-authored external eval subset** — Add a small independently written subset to the golden set. Rationale: it reduces self-bias in external reporting better than adding more self-authored questions.
 - **React API verification** — Keep the new FastAPI bridge covered by contract tests while Streamlit remains the supported local demo surface. Rationale: the React frontend is now technically usable, but product polish should follow correctness work.

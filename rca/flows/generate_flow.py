@@ -315,14 +315,20 @@ Rules:
         """Format retrieved hits into a context block for the prompt.
 
         Each header spells out the exact citation tag so the model copies it instead of
-        writing uncited prose.
+        writing uncited prose. The body is the full node text, not the 240-character
+        excerpt: answers often sit past that cut.
         """
         lines = []
         for hit in hits:
             lines.append(f"[{hit.node_id}] {hit.title} (cite as [[{hit.node_id}]])")
-            lines.append(hit.excerpt)
+            lines.append(self._hit_text(hit))
             lines.append("")
         return "\n".join(lines)
+
+    @staticmethod
+    def _hit_text(hit) -> str:
+        """What the answer model reads for a hit; hits built without full text fall back."""
+        return hit.text or hit.excerpt
 
     @staticmethod
     def _build_conversation_history_block(
@@ -523,8 +529,9 @@ Rules:
         evidence_by_source: dict[str, list[str]] = {}
         for hit in bundle.hits:
             source_id = self._resolve_source_id(hit.node_id)
-            evidence_by_source.setdefault(source_id, []).extend([hit.title, hit.excerpt])
-            evidence_by_source.setdefault(hit.node_id, []).extend([hit.title, hit.excerpt])
+            evidence = [hit.title, self._hit_text(hit)]
+            evidence_by_source.setdefault(source_id, []).extend(evidence)
+            evidence_by_source.setdefault(hit.node_id, []).extend(evidence)
 
         for citation in citations:
             evidence_text = " ".join(evidence_by_source.get(citation.source_id, []))

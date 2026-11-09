@@ -137,7 +137,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **Generate flow.** `GenerateFlow.generate_answer` is a three-step pipeline:
 1. **Query routing + rewriting** — a lightweight query classifier labels the question as `proper_noun`, `conceptual`, or `hybrid`. Proper-noun queries skip the LLM rewrite entirely; the other classes still produce a dense 8–12 keyword technical search query to improve vector recall over conversational phrasing.
-2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block. If the rewritten query yields no context, the pipeline retries with the original raw query.
+2. **Grounded context** — the rewritten query is passed to `RetrieveFlow`; hits scoring above 0.55 (or any `src:` node) are formatted into a bracketed context block with each hit's full chunk text (the reranker and the UI still use a 240-character excerpt). If the rewritten query yields no context, the pipeline retries with the original raw query.
 3. **Citation-enforced generation** — the LLM is instructed to follow every factual claim with `[[source_id]]` using the exact IDs from the context block when enough evidence exists. After generation, `_extract_citations` resolves cited IDs against the hit map, normalising chunk-style IDs (e.g. `chk:pdf/paper:0009`) to their parent source even when the final bundle is chunk-heavy. Before generation, a reranker-score gate (`max rerank_score <= -3.618`, calibrated in `eval/calibrate_abstention.py`) abstains without calling the LLM when no retrieved chunk is a strong match. After generation, an abstention check combines hedge phrases, citation validity, and retrieval confidence.
 
 **LLM client.** `OllamaLLMClient` now sits behind a small factory and supports both local Ollama and OpenAI-compatible `/v1` endpoints for chat, tool use, and embeddings. The default local models are `qwen3.5:4b` for generation and agent mode and `nomic-embed-text` for embeddings. The agent loop uses the same client boundary as grounded chat. `EchoLLMClient` is a deterministic stub for tests.
@@ -194,7 +194,7 @@ Older generation results on the 100-question corpus (then-default `gemma3:12b`):
 | Citation precision (answerable, non-abstained) | `90.8%` over `87` cases |
 | Negative abstention recall | `3/10` (`30.0%`) |
 | Answerable abstentions | `3` |
-| Average keyword hit rate | `0.205` |
+| Average keyword hit rate | `0.205` (240-character context; see below) |
 | Average latency | `9.7 s` |
 | Grounded rate | `94.0%` |
 
@@ -214,7 +214,7 @@ Current retrieval baselines — hit@5 / hit@10 (`n=90` answerable):
 The most important current evaluation takeaways are:
 - The production path (query-type-aware rewrite + hybrid retrieval + rerank + a reserved new-source slot) is the best configuration at `98.9%` hit@5 (2026-10-02); FTS5/BM25 remains the strongest single method.
 - Source expansion is still the biggest lift over dense retrieval alone.
-- Keyword hit rate remains the primary weakness (`20.5%`) and appears more sensitive to rewrite prompt quality than model choice.
+- Keyword hit rate (`20.5%` in that run) was read as the main retrieval weakness; the answer model then saw only 240 characters of each chunk. With full chunks, `qwen3.5:4b` goes from `0.264` to `0.484` on the dev split ([EVAL.md](docs/EVAL.md#full-chunk-text-in-the-prompt-2026-11-09)); the old `gemma3:12b` run was not repeated.
 - Split-model rewriting was evaluated and rejected for production: it added 10s+ latency for marginal quality gain.
 - Agent mode is intentionally separated from grounded chat so tool-use experimentation does not affect the measured QA path.
 

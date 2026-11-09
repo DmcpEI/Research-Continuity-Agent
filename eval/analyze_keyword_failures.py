@@ -85,7 +85,8 @@ def analyze_case(
     expected_keywords = case.get("expected_keywords", [])
     missing_keywords = case.get("missing_keywords", expected_keywords)
 
-    retrieval_corpus = "\n".join([f"{hit.title}\n{hit.excerpt}" for hit in bundle.hits])
+    # Same text the answer model reads (full node text), not the 240-char display excerpt.
+    retrieval_corpus = "\n".join([f"{hit.title}\n{hit.text or hit.excerpt}" for hit in bundle.hits])
     retrieval_norm = normalize(retrieval_corpus)
 
     missing_in_retrieval = [

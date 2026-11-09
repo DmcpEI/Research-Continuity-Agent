@@ -488,3 +488,63 @@ def test_retrieve_applies_configured_reserve_floor() -> None:
 
     assert run(-6.0) == [f"chk:pdf/a:000{i}" for i in range(5)]
     assert run(-8.0) == [f"chk:pdf/a:000{i}" for i in range(4)] + ["chk:pdf/b:0000"]
+
+
+def test_hits_carry_full_node_text_while_excerpt_stays_short() -> None:
+    long_chunk = "JamPacker components. " + "x" * 300 + " The answer sits past the cut."
+    long_paper = "JamPacker paper preview. " + "y" * 300 + " Paper tail."
+    long_lexical = "Lexical terms appear here. " + "z" * 300 + " Lexical tail."
+
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            return [
+                VectorQueryResult(
+                    id="chk:pdf/demo:0000",
+                    score=0.91,
+                    document=long_chunk,
+                    metadata={"source_id": "src:pdf/demo"},
+                )
+            ]
+
+    class StubGraphStore:
+        nodes = {
+            "chk:pdf/demo:0000": Node(
+                id="chk:pdf/demo:0000", kind=NodeKind.chunk, title="Chunk", text=long_chunk
+            ),
+            "src:pdf/demo": Node(
+                id="src:pdf/demo", kind=NodeKind.paper, title="Paper", text=long_paper
+            ),
+            "src:pdf/lexical": Node(
+                id="src:pdf/lexical", kind=NodeKind.paper, title="Lexical", text=long_lexical
+            ),
+        }
+
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return [self.nodes["src:pdf/lexical"]]
+
+        def get_node(self, node_id: str) -> Node | None:
+            return self.nodes.get(node_id)
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            if node_id == "chk:pdf/demo:0000":
+                return [Edge(source="src:pdf/demo", target=node_id, kind=EdgeKind.contains)]
+            return []
+
+    flow = object.__new__(RetrieveFlow)
+    flow.graph_store = StubGraphStore()
+    flow.vector_store = StubVectorStore()
+
+    bundle = flow.retrieve("JamPacker components", limit=5)
+
+    by_id = {hit.node_id: hit for hit in bundle.hits}
+    expected = {  # vector hit, lexical hit, and the expanded parent paper
+        "chk:pdf/demo:0000": long_chunk,
+        "src:pdf/lexical": long_lexical,
+        "src:pdf/demo": long_paper,
+    }
+    assert set(expected) <= set(by_id)
+    for node_id, full_text in expected.items():
+        assert by_id[node_id].text == full_text
+        assert by_id[node_id].excerpt == full_text[:240]

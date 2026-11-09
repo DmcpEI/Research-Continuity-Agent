@@ -252,7 +252,7 @@ Current model-selection verdict:
 
 ### Small-model bake-off (2026-11-09)
 
-Goal: one small model for both chat and agent, so RCA can run while the laptop is in use (M3 Pro, 18 GB). Dev split (89 questions, 27 negatives) plus the 20-task agent benchmark, Ollama 0.40.15, default 4096 context, citation prompt as of 7d3ef4c. "Min free RAM" is the lowest system free-memory reading (sampled every 15 s) while that model was loaded.
+Goal: one small model for both chat and agent, so RCA can run while the laptop is in use (M3 Pro, 18 GB). Dev split (89 questions, 27 negatives) plus the 20-task agent benchmark, Ollama 0.40.15, default context settings, citation prompt as of 7d3ef4c. "Min free RAM" is the lowest system free-memory reading (sampled every 15 s) while that model was loaded.
 
 | model | grounded | citation precision | abstention recall | answerable abstentions | s/question | agent success | tool selection | min free RAM |
 |---|---|---|---|---|---|---|---|---|
@@ -286,14 +286,24 @@ For the default `qwen3.5:4b` the reminder nearly doubles real cited answers (21 
 
 Rejected variants: a worked example in the system prompt (`qwen3.5:4b` grounded 0.80, precision 0.91) and asking for a bare refusal with no citations (the model ignored it; two degenerate "no , no" answers). Artifacts: `eval/results/bakeoff_20261109/prompt/` (local only).
 
+### Full chunk text in the prompt (2026-11-09)
+
+Until now the answer model saw only the first 240 characters of each retrieved chunk (`RetrievalHit.excerpt`, cut in `RetrieveFlow` since the first commit), although chunks average about 1,100 characters; the answer often sat just past the cut. The prompt and the post-generation support check now use the full node text; the cross-encoder and the UI keep the 240-character excerpt, so the rerank-gate threshold (−3.618) is unchanged. Dev split, `qwen3.5:4b`, citation reminder in both runs:
+
+| context per hit | real cited answers (62) | cited refusals | negatives refused (27) | answerable abstentions | keyword hit rate (answerable) | s/question | prompt tokens per generation call, mean / max |
+|---|---|---|---|---|---|---|---|
+| 240-char excerpt | 40 | 18 | 12 | 3 | 0.264 | 6.3 | 1110 / 1346 |
+| full chunk | 51 | 6 | 14 | 4 | 0.484 | 9.6 | 2193 / 2665 |
+
+The keyword hit rate, long read as a retrieval or rewrite weakness, nearly doubles: it measured answer content, and the model could not state what it was never shown. Part of the gain may be length (answers are about 22% longer and the metric scans the whole answer), and both are single runs at temperature 0. Context length is not a constraint for the default model: probed on Ollama 0.40.15, `qwen3.5:4b` (MLX runner, 262,144-token model context) evaluated a 28,923-token prompt in full and still followed its system rule, so long conversation history is not cut. The 4,096-token default may still apply to models on the llama.cpp runner; that was not probed. Not re-run: other models, the test split, and the agent's `search_knowledge_base` tool, which still returns 240-character excerpts. Side effects: the post-generation support check (two shared content tokens with the cited text) now compares against about five times more text, so it rejects even less: replayed offline on this run, an answer written for a different question passes it 96% of the time (68% with excerpts). `unsupported_claim` fired in neither run; a real claim check is #6. The paper node (`src:`) holds the same opening text as its chunk 0, and 39 of 89 prompts carry both, about 300 duplicate tokens. Artifact: `eval/results/bakeoff_20261109/fulltext/qwen3_5_4b/` (local only).
+
 ---
 
 ## Known Limitations
 
-- Keyword hit rate (`20.5%`) is currently the primary retrieval weakness.
-- Root cause appears to be rewrite prompt quality and corpus vocabulary alignment, not base model selection alone.
+- Keyword hit rate (`20.5%` on the old 100-question run) was long read as the primary retrieval weakness; most of it came from the answer model seeing only 240 characters per chunk (see "Full chunk text in the prompt"). With full chunks `qwen3.5:4b` reaches `0.484` on the dev split.
 - Split-model rewriting has been evaluated and rejected for production due to latency cost versus marginal gains.
-- The default `qwen3.5:4b` often answers without `[[...]]` citation tags, so the grounding check rejects otherwise relevant answers (dev split grounded rate 0.28; see Small-model bake-off).
+- Answers that say the context does not answer the question but still give part of an answer (`contradictory` in Answer Outcome Labels) pass as grounded answers; the abstention decision cannot tell them from refusals that cite a nearby block (#6).
 
 ---
 
@@ -502,7 +512,7 @@ How the current `GenerateFlow` decision (abstain or answer) matches, with `answe
 - two-class agreement: `59/100`.
 - `unsupported`: 7 answers, all from the old prompt (`qwen3.5:2b`, `qwen3.5:4b`, `qwen3:4b`, `ministral-3:3b`); none from the citation-reminder runs.
 
-Two further findings. 17 of the 25 answerable `partial` answers also say the context does not answer the question, which a phrase rule cannot tell apart from a real refusal. And 24 of the 69 answerable cases are `not_found`: in several of them the answer sits in the same chunk just past the 240-character cut (item 73's excerpt stops at "The most usual strategy to consider vertical stability when"), so the truncated context, not only the model, explains many refusals on answerable questions. The excerpt length has been 240 characters since the first commit; it is a separate retrieval change to evaluate. Next: compare the candidate classifiers (self-declared status via structured output, claim-level entailment check) against these labels. Labelled file: `eval/answer_labels.json`.
+Two further findings. 17 of the 25 answerable `partial` answers also say the context does not answer the question, which a phrase rule cannot tell apart from a real refusal. And 24 of the 69 answerable cases are `not_found`: in several of them the answer sits in the same chunk just past the 240-character cut (item 73's excerpt stops at "The most usual strategy to consider vertical stability when"), so the truncated context, not only the model, explains many refusals on answerable questions. The 240-character cut has since been removed for generation; see "Full chunk text in the prompt". Next: compare the candidate classifiers (self-declared status via structured output, claim-level entailment check) against these labels. Labelled file: `eval/answer_labels.json`.
 
 ---
 

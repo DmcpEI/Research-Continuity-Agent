@@ -92,7 +92,10 @@ class RetrievalHit(BaseModel):
     node_id: str
     score: float
     title: str
+    # Short preview for display and reranking (the rerank-gate threshold was
+    # calibrated on it); `text` is the full node text the answer model reads.
     excerpt: str
+    text: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -194,6 +197,7 @@ class RetrieveFlow:
                 score=max(score, lexical_score),
                 title=node.title,
                 excerpt=(node.text or "")[:240],
+                text=node.text or "",
                 metadata=node.metadata,
             )
             hit_stages.setdefault(node.id, "lexical")
@@ -301,6 +305,7 @@ class RetrieveFlow:
                 score=score,
                 title=title,
                 excerpt=excerpt,
+                text=result.document,
                 metadata=metadata,
             )
 
@@ -324,6 +329,7 @@ class RetrieveFlow:
                             score=hit.score * 0.95,
                             title=parent.title,
                             excerpt=(parent.text or "")[:240],
+                            text=parent.text or "",
                             metadata={**parent.metadata, "expanded_from": hit.node_id},
                         )
         return list(expanded.values())

@@ -438,3 +438,53 @@ def test_conversational_prompt_has_no_citation_reminder() -> None:
     assert retrieve_flow.queries == []  # conversational path: no context, nothing to cite
     assert llm.last_messages is not None
     assert GenerateFlow.CITATION_REMINDER not in llm.last_messages[-1].content
+
+
+class LongTextRetrieveFlow(StubRetrieveFlow):
+    TAIL = "Its fallback routine re-plans whenever a grasp slips."
+
+    def retrieve(self, query, limit=10, trace=None, query_type=None):
+        bundle = super().retrieve(query, limit=limit, trace=trace, query_type=query_type)
+        hit = bundle.hits[0]
+        full = hit.excerpt + " " + "filler " * 40 + self.TAIL
+        bundle.hits[0] = hit.model_copy(update={"text": full, "excerpt": full[:240]})
+        return bundle
+
+
+def test_prompt_gives_the_model_full_hit_text_not_the_short_excerpt() -> None:
+    llm = StubLLMClient()
+    flow = GenerateFlow(retrieve_flow=LongTextRetrieveFlow(), llm_client=llm)
+
+    flow.generate_answer("How does JamPacker handle recovery?")
+
+    assert llm.last_messages is not None
+    assert LongTextRetrieveFlow.TAIL in llm.last_messages[-1].content
+
+
+def test_grounding_check_accepts_claims_supported_past_the_excerpt_cut() -> None:
+    # Cites the hit, but every content word comes from text after the 240-char excerpt.
+    llm = StubLLMClient(
+        responses=[
+            "rewrite",
+            "The fallback routine re-plans whenever a grasp slips. [[src:pdf/jampacker]]",
+        ]
+    )
+    flow = GenerateFlow(retrieve_flow=LongTextRetrieveFlow(), llm_client=llm)
+
+    result = flow.generate_answer("What happens when a grasp slips?")
+
+    assert result.grounded is True
+    assert "unsupported_claim" not in result.failure_labels
+
+
+def test_grounding_check_still_flags_a_cited_claim_with_no_support_in_the_text() -> None:
+    llm = StubLLMClient(
+        # One response for every call, whether or not the query rewrite runs.
+        responses=["A quadruped base maps terrain using lidar sweeps. [[src:pdf/jampacker]]"]
+    )
+    flow = GenerateFlow(retrieve_flow=LongTextRetrieveFlow(), llm_client=llm)
+
+    result = flow.generate_answer("How does JamPacker handle recovery?")
+
+    assert result.grounded is False
+    assert "unsupported_claim" in result.failure_labels

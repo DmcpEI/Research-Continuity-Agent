@@ -98,7 +98,7 @@ Grounded answer generation with citation enforcement.
 
 1. **Classify + rewrite query** — a lightweight classifier can skip rewrite for proper-noun queries; conceptual and hybrid queries still derive a dense keyword query before retrieval
 2. **Retrieve** — calls `RetrieveFlow.retrieve()`
-3. **Assemble context** — formats retrieved hits into the prompt context block
+3. **Assemble context** — formats retrieved hits into the prompt context block. Each block carries the hit's full node text (`RetrievalHit.text`, up to one chunk); the 240-character `excerpt` is only for display and for the cross-encoder, whose rerank-gate threshold was calibrated on it. The post-generation support check reads the same full text.
 4. **Prompt** — system prompt enforces citation format `[[src:paper_name]]` or `[[chk:paper:NNNN]]`
 5. **Generate** — calls the configured generation backend
 6. **Extract citations** — parses inline citation markers from generated text
