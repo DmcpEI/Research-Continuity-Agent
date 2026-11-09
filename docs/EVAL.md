@@ -514,6 +514,46 @@ How the current `GenerateFlow` decision (abstain or answer) matches, with `answe
 
 Two further findings. 17 of the 25 answerable `partial` answers also say the context does not answer the question, which a phrase rule cannot tell apart from a real refusal. And 24 of the 69 answerable cases are `not_found`: in several of them the answer sits in the same chunk just past the 240-character cut (item 73's excerpt stops at "The most usual strategy to consider vertical stability when"), so the truncated context, not only the model, explains many refusals on answerable questions. The 240-character cut has since been removed for generation; see "Full chunk text in the prompt". Next: compare the candidate classifiers (self-declared status via structured output, claim-level entailment check) against these labels. Labelled file: `eval/answer_labels.json`.
 
+### Full-text labels and classifier comparison (2026-11-09)
+
+Because the model now reads full chunks, its answers changed, so the classifiers were compared on fresh labels instead of the sample above. Every answer that reached the model in the full-text `qwen3.5:4b` runs was labelled, not a weighted sample: 76 from the dev split (`eval/answer_labels_fulltext_dev.json`) and 35 from the test split (`eval/answer_labels_fulltext_test.json`, run `eval/results/fulltext_test_20261109/`). Gate answers are excluded as before. Labels are judged against the full chunk text, with the same rules as above. The test labels were written before any classifier was run on the test split.
+
+| | dev answerable (60) | dev unanswerable (16) | test answerable (28) | test unanswerable (7) |
+|---|---|---|---|---|
+| `answered` | 43 | 0 | 21 | 0 |
+| `partial` | 10 (5 `contradictory`) | 2 | 6 (1 `contradictory`) | 0 |
+| `not_found` | 7 | 14 | 1 | 7 |
+
+`missed_in_context`: 3 dev answers (the answer says it is absent, the shown chunk contains it). `unsupported`: 2 test answers, both still useful on the whole (`sgvl-003` presents another table's scores as Winoground results next to the right ones; `pic2-010` attributes a real label error to the YOLO+VLM pipeline, which the chunk does not). One dev item is `unsure` (`para-006`, scored as labelled; not yet reviewed by a second person).
+
+Classifiers (`eval/compare_answer_classifiers.py`), each scored on the decision `GenerateFlow` makes, with `partial` and `answered` merged as "useful". All rows below come from one run of the final code on each split (`--verifier verifier --verifier verifier_facts`):
+- `current`: the saved `abstained` decision.
+- `hedge`: the sampler's broad "context does not contain"-style regex; a match means `not_found`.
+- `verifier`: a second `qwen3.5:4b` call reads the question and answer and returns `answered` / `partial` / `not_found` (Ollama JSON schema output, temperature 0).
+- `verifier_facts`: a second `qwen3.5:4b` call copies the statements in the answer that give what the question asks about (same paper, method and setting), then says whether the answer states a gap and whether it plainly corrects the premise. The status comes from those fields in code: any fact means useful (`partial` if a gap is stated or the premise corrected), no facts but a premise correction means `partial`, otherwise `not_found`.
+- `*_on_hedge`: the verifier's prediction only where `hedge` matches; every other answer stays an answer, so the second call runs on 31/76 dev and 14/35 test answers.
+
+| | dev `not_found` caught | dev useful kept | dev 2-class | test `not_found` caught | test useful kept | test 2-class | median extra time |
+|---|---|---|---|---|---|---|---|
+| `current` | 4/21 | 54/55 | 58/76 | 1/8 | 26/27 | 27/35 | 0 |
+| `hedge` | 20/21 | 44/55 | 64/76 | 8/8 | 21/27 | 29/35 | 0 |
+| `verifier` | 20/21 | 43/55 | 63/76 | 8/8 | 21/27 | 29/35 | 3.0-3.7 s |
+| `verifier_on_hedge` | 19/21 | 45/55 | 64/76 | 8/8 | 22/27 | 30/35 | same, on hedged answers only |
+| `verifier_facts` | 20/21 | 49/55 | 69/76 | 8/8 | 26/27 | 34/35 | 3.3-3.6 s |
+| `verifier_facts_on_hedge` | 19/21 | 49/55 | 68/76 | 8/8 | 26/27 | 34/35 | same, on hedged answers only |
+
+"Caught" counts only answers that reached the model: the pre-generation gates had already stopped 13 dev questions (11 unanswerable, 2 answerable) and 5 test questions (all unanswerable). Counting those, the current pipeline stops 6 of the 13 test non-answers.
+
+Findings:
+- Of the non-answers that reach the model, the current decision lets almost all through: 1 of 8 on the test split.
+- The `hedge` rule catches nearly all of them but would hide about one useful answer in five (11/55 dev, 6/27 test), mostly partial answers that start with "the context does not contain".
+- Asking the model for the status directly (`verifier`) is no better than the regex: it anchors on that opening sentence and predicted `not_found` for 11 of 12 dev `partial` answers.
+- Asking it to list what the answer actually gives (`verifier_facts`) separates the two. On test it caught 8/8 and kept 26/27; the one loss is a `partial` that gives the SGVL side of a cross-paper question and says the survey side is missing. On dev it still loses 6 of 12 `partial` answers.
+- `partial` versus `answered` is not reliable with any classifier (dev: 4 of 12 `partial` answers predicted `partial`; test: 2 of 6): when the answer gives facts, the model often reports no gap. Use the classifiers for "useful or not", not for a three-way badge.
+- Running `verifier_facts` only when the regex matches gives nearly the same result with a second call on about 40% of answers. The one dev non-answer the regex misses ("does not explicitly describe") is also missed by the gated version.
+
+Caveats: the labels and the verifier prompts are drafted by the same assistant, and the prompts were tuned on dev: two prompts, then one field reorder (asking for facts before the gap question moved dev useful kept from 46 to 49 and `not_found` caught from 21 to 20). After the first test run, the review found that facts plus a premise correction mapped to `answered` although the labelling rules call a premise correction `partial`; the rule was fixed and both splits rerun, which changed no two-class number. The test split is small (8 `not_found`, 6 `partial`), so 8/8 and 26/27 are compatible with real rates well below 100% (Wilson 95% lower bounds about 68% and 82%). No claim-level entailment (NLI) model was tried: none is installed locally. The `unsupported` flag it would target occurred in 2 of 35 test answers, and none of the classifiers above looks for it. Per-answer predictions, verifier prompts and replies: `eval/results/classifiers_20261109/` (local, not committed).
+
 ---
 
 ## Current Status
