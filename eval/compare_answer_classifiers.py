@@ -233,11 +233,18 @@ def main(argv: list[str] | None = None) -> int:
     replies: dict[str, dict[str, dict]] = {}
     if args.verifier:
         from rca.config.settings import Settings
-        from rca.llm.factory import get_llm_client
+        from rca.llm import factory
+        from rca.llm.client import OllamaLLMClient
 
         settings = Settings()
         model = args.model or settings.generation_model
-        client = get_llm_client(settings)
+        client = factory.get_llm_client(settings)
+        # predict_verifier posts Ollama's native /api/chat with structured output.
+        if not (isinstance(client, OllamaLLMClient) and client.api_style == "ollama"):
+            parser.error(
+                "--verifier needs the Ollama backend: RCA_LLM_BACKEND=ollama and a non-empty "
+                f"RCA_GENERATION_MODEL (got {type(client).__name__})"
+            )
         for variant in args.verifier:
             predictions[variant], replies[variant] = {}, {}
             for item in items:

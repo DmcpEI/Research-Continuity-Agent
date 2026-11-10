@@ -5,6 +5,7 @@ import json
 import pytest
 
 from eval import compare_answer_classifiers as cac
+from rca.llm.client import EchoLLMClient, OllamaLLMClient
 
 
 def _item(item_id: str, label: str | None, answerable: bool = True, **extra) -> dict:
@@ -224,3 +225,26 @@ def test_main_without_verifier_scores_rule_classifiers_and_writes_output(tmp_pat
     assert set(payload["predictions"]) == {"current", "hedge"}
     assert payload["reports"]["hedge"]["all"]["two_class"] == 2
     assert payload["verifier_prompts"] == {}
+
+
+@pytest.mark.parametrize(
+    "client",
+    [
+        EchoLLMClient(),
+        OllamaLLMClient(
+            base_url="http://localhost:1", model="m", embedding_model="e", api_style="openai"
+        ),
+    ],
+    ids=["echo", "openai_compatible"],
+)
+def test_verifier_run_refuses_a_client_that_does_not_speak_ollama_chat(
+    tmp_path, monkeypatch, client
+):
+    labels = tmp_path / "labels.json"
+    labels.write_text(json.dumps({"items": [_item("a", "answered")]}))
+    monkeypatch.setattr("rca.llm.factory.get_llm_client", lambda settings: client)
+
+    with pytest.raises(SystemExit) as exit_info:
+        cac.main(["--labels", str(labels), "--verifier", "verifier"])
+
+    assert exit_info.value.code == 2
