@@ -1,0 +1,69 @@
+/*
+ * The only place in the frontend where raw colours, sizes and durations live.
+ * Components use these through var(); tokens.test.ts fails on any raw value elsewhere.
+ * Rules and reasons: docs/DESIGN.md, section 3.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #0b0c10;
+  --surface: #13151b;
+  --raised: #1b1e27;
+  --border: #272b36;
+  --border-strong: #3a4050;
+
+  /* Text. Each is at least 4.5:1 on bg, surface and raised. */
+  --text: #e6e8ee;
+  --text-2: #a7adbb;
+  --text-3: #868d9e;
+
+  /* Accent: interactive and selected only */
+  --accent: #9d91ff;
+  --accent-solid: #6657e8;
+  --accent-soft: rgb(157 145 255 / 0.12);
+  --accent-line: rgb(157 145 255 / 0.4);
+
+  /* Outcomes and health only */
+  --ok: #4cc38a;
+  --ok-soft: rgb(76 195 138 / 0.12);
+  --ok-line: rgb(76 195 138 / 0.4);
+  --warn: #e5a83b;
+  --warn-soft: rgb(229 168 59 / 0.12);
+  --warn-line: rgb(229 168 59 / 0.4);
+  --danger: #f47c74;
+  --danger-soft: rgb(244 124 116 / 0.12);
+  --danger-line: rgb(244 124 116 / 0.4);
+
+  /* Type */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-read: 16px;
+  --fs-lg: 20px;
+  --tracking-caps: 0.06em;
+
+  /* Space (4px base) */
+  --s-half: 2px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+
+  /* Shape and depth */
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-full: 999px;
+  --shadow-float: 0 12px 32px rgb(0 0 0 / 0.4);
+
+  /* Motion */
+  --t-fast: 120ms ease-out;
+  --t-base: 200ms ease-out;
+  --t-slow: 600ms ease-out;
+  --t-loop: 1s; /* one cycle of a looping indicator, e.g. the thinking dots */
+}

@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    // tokens.test.ts reads the stylesheet as text; vitest blanks CSS it does not include.
+    css: { include: [/src\/styles\/[^/]+\.css\?raw$/] },
   },
   server: {
     proxy: {

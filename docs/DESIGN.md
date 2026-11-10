@@ -1,7 +1,9 @@
 # RCA frontend: review and design system
 
 2026-11-10. Companion to [PLAN.md](PLAN.md). Based on reading `frontend/` and using every screen
-of the built app in a browser at 1280×800 and 1440×900. Nothing here is implemented yet.
+of the built app in a browser at 1280×800 and 1440×900. Step F1 is done (section 6); the rest is
+not implemented yet. The values themselves live in `frontend/src/styles/tokens.css`; this file
+explains them.
 
 ## 1. What the UI is for
 
@@ -116,11 +118,11 @@ and 600 for Sans, 400 and 500 for Mono) with a system-font fallback. No network 
 
 | Token | Size / line | Use |
 |---|---|---|
-| `--text-xs` | 12 / 16 | captions, table headers, badges. The minimum. |
-| `--text-sm` | 13 / 20 | controls, rows, chips, status bar |
-| `--text-md` | 14 / 20 | default UI text |
-| `--text-read` | 16 / 26 | answers and questions; column capped at `68ch` |
-| `--text-lg` | 20 / 28 | page titles |
+| `--fs-xs` | 12 / 16 | captions, table headers, badges. The minimum. |
+| `--fs-sm` | 13 / 20 | controls, rows, chips, status bar |
+| `--fs-md` | 14 / 20 | default UI text |
+| `--fs-read` | 16 / 26 | answers and questions; column capped at `68ch` |
+| `--fs-lg` | 20 / 28 | page titles |
 
 Weights: 400 and 600 only. **Mono is for data**: IDs, numbers, timings, model names, code. Labels,
 buttons and suggestions are Sans. Uppercase with letter-spacing is for section headers only
@@ -128,7 +130,7 @@ buttons and suggestions are Sans. Uppercase with letter-spacing is for section h
 
 ### Space, shape, depth
 
-- Spacing scale, 4 px base: `--s-1` 4, `--s-2` 8, `--s-3` 12, `--s-4` 16, `--s-6` 24, `--s-8` 32,
+- Spacing scale, 4 px base: `--s-half` 2 (hairline gaps inside pills only), `--s-1` 4, `--s-2` 8, `--s-3` 12, `--s-4` 16, `--s-6` 24, `--s-8` 32,
   `--s-12` 48. Nothing in between.
 - Radius: `--r-sm` 4 (chips, badges inside text), `--r-md` 8 (inputs, buttons, cards, menus),
   `--r-full` (pills, dots).
@@ -150,6 +152,12 @@ buttons and suggestions are Sans. Uppercase with letter-spacing is for section h
   baseline and render differently per font.
 - Numbers in tables are right-aligned with `font-variant-numeric: tabular-nums`.
 
+### Interaction states
+
+Hover is a neutral tint (`--raised`). Selected or current is the accent (`--accent-soft`, plus an
+accent bar or border where the row needs it). The two never share a colour, so the user can tell
+"under the pointer" from "chosen". Destructive actions use `--danger`, not `--warn`.
+
 ### Motion
 
 Motion is feedback. If it does not tell the user that something was received, is progressing, or
@@ -160,8 +168,9 @@ where something went, it is removed.
 | `--t-fast` | 120 ms ease-out | hover, press, colour, focus ring |
 | `--t-base` | 200 ms ease-out | a panel, menu or disclosure opening; a new message arriving |
 | `--t-slow` | 600 ms ease-out | one-shot highlight on the passage a citation points to |
+| `--t-loop` | 1 s | one cycle of a looping indicator (the thinking dots; delays are fractions of it) |
 
-`@media (prefers-reduced-motion: reduce)` sets all three to 0 ms and stops looping animations.
+`@media (prefers-reduced-motion: reduce)` sets every duration to 0 and stops looping animations.
 
 ### States every component must have
 
@@ -246,7 +255,7 @@ browser at 1280×800, in both colour schemes once the light theme exists.
 
 | # | Step | Proof |
 |---|---|---|
-| F1 | `tokens.css`; snap `globals.css` to it; delete Tailwind; local fonts; one `:focus-visible` rule; reduced motion | Script: no hex, `rgba(` or raw `px`/`rem` font-size outside `tokens.css`. Before/after screenshots of all four screens |
+| F1 | **Done.** `tokens.css`; snap `globals.css` to it; delete Tailwind; one `:focus-visible` rule; reduced motion. Local fonts moved to after question 3; graph labels (SVG, 9 px) and graph colours wait for question 1. | `tokens.test.ts` (colours, scaled properties incl. `font`, `animation*` and `transition*`, colour literals in components; fails on the old files). Browser audit of Chat, Library and Agent: every HTML text element at least 4.5:1, smallest 12 px, focus ring present. Before: 34 text elements under 4.5:1 on Agent, smallest 9.9 px |
 | F2 | Reading column, 16 px answers, alignment rules, answer without nested cards | Screenshot; measured line length ≤ 75 characters |
 | F3 | Numbered inline citations, source list with title and excerpt | vitest: marker `[[chk:..]]` renders link "1" and the excerpt; no " ." left behind |
 | F4 | Evidence tab in the side panel; missing-PDF message; remove Concepts | vitest for empty, loaded and missing-file states; live check with the affected source |

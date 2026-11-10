@@ -14,17 +14,9 @@ type GraphLink = d3.SimulationLinkDatum<GraphNode> & {
   target: string | GraphNode;
 };
 
+// CSS variables only resolve through style(), not SVG presentation attributes.
 function kindColor(kind: string): string {
-  if (kind === 'note') {
-    return '#22c55e';
-  }
-  if (kind === 'experiment') {
-    return '#f59e0b';
-  }
-  if (kind === 'paper' || kind === 'pdf') {
-    return '#7c6af7';
-  }
-  return '#a0a0b8';
+  return kind === 'paper' || kind === 'pdf' ? 'var(--accent)' : 'var(--text-2)';
 }
 
 function nodeLabel(sourceId: string): string {
@@ -155,7 +147,7 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
 
     const linkSelection = svg
       .append('g')
-      .attr('stroke', '#2c2c3a')
+      .style('stroke', 'var(--border-strong)')
       .attr('stroke-opacity', 0.9)
       .selectAll('line')
       .data(links)
@@ -176,7 +168,7 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
         }
         return 5;
       })
-      .attr('fill', (node: GraphNode) => kindColor(node.kind))
+      .style('fill', (node: GraphNode) => kindColor(node.kind))
       .attr('opacity', (node: GraphNode) => {
         if (focusSet.size === 0) {
           return 0.9;
@@ -195,10 +187,10 @@ export function KnowledgeGraph({ focusSourceIds = [], selectedSourceId = null }:
       .data(nodes)
       .join('text')
       .text((node: GraphNode) => nodeLabel(node.id))
-      .attr('font-family', 'IBM Plex Mono, monospace')
+      .style('font-family', 'var(--font-mono)')
       .attr('font-size', 9)
-      .attr('fill', (node: GraphNode) =>
-        selectedPaperSourceId && node.id === selectedPaperSourceId ? '#e2e2e8' : '#a0a0b8',
+      .style('fill', (node: GraphNode) =>
+        selectedPaperSourceId && node.id === selectedPaperSourceId ? 'var(--text)' : 'var(--text-2)',
       )
       .attr('text-anchor', 'middle')
       .attr('opacity', (node: GraphNode) => (focusSet.size === 0 || focusSet.has(node.id) ? 0.95 : 0.28))

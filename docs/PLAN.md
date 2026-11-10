@@ -342,6 +342,16 @@ Found while checking (not fixed in step 1; each needs a step):
 - The chat-about-chat reply leaks prompt wording ("the provided context does not contain...").
 - A refusal still fills the "Active sources" panel, and the status bar keeps saying "Ollama connected" when the API is down.
 - The UI took 7.4 s for the refusal that took 1.0 s through the API alone; cause not investigated.
+- **The test suite opens the real library.** `rca/api/main.py` builds `app = create_app()` at import
+  time with default settings, so every test that imports it (three test files) opens `.rca/`:
+  the FTS index is rebuilt and the event log reopened. Checked on 2026-11-10: row counts and event
+  log content unchanged, timestamps bumped on every `pytest` run. Present on `686f13b`. Fix with
+  the `RCA_DATA_DIR` fix above: tests get a temp data directory, and the module-level app is
+  created lazily.
+- **`index.html` is served cacheable** (`ETag`/`Last-Modified`, no `Cache-Control: no-cache`).
+  After a rebuild the browser kept the old `index.html`, which names asset files that no longer
+  exist; a user upgrading the demo can get a stale or blank page. Fix: `no-cache` on `index.html`
+  only; hashed assets can stay cacheable.
 
 ## 8. Questions only you can answer
 
