@@ -131,7 +131,9 @@ buttons and suggestions are Sans. Uppercase with letter-spacing is for section h
 ### Space, shape, depth
 
 - Spacing scale, 4 px base: `--s-half` 2 (hairline gaps inside pills only), `--s-1` 4, `--s-2` 8, `--s-3` 12, `--s-4` 16, `--s-6` 24, `--s-8` 32,
-  `--s-12` 48. Nothing in between.
+  `--s-12` 48. Nothing in between, and no `%` or viewport units in padding, margin or gap (use
+  `aspect-ratio` for proportional boxes). `tokens.test.ts` enforces this, with custom properties
+  outside `tokens.css` counted as raw values.
 - Radius: `--r-sm` 4 (chips, badges inside text), `--r-md` 8 (inputs, buttons, cards, menus),
   `--r-full` (pills, dots).
 - Depth: borders, not shadows. One shadow token, for things that float (model picker, row menu).
