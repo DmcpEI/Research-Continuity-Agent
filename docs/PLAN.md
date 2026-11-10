@@ -257,7 +257,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 
 | # | Step | Verified by | What it adds to the CV story |
 |---|---|---|---|
-| 1 | **Typed answer outcome** end to end (flow, `/chat`, badge, harness). Done in the working tree, not committed. | New tests fail on old code; full suite; frontend checks; live `/chat` | "Illegal states are unrepresentable"; a correct refusal is no longer shown as a warning |
+| 1 | **Typed answer outcome** end to end (flow, `/chat`, badge, harness). Done (`1476225`). | New tests fail on old code; full suite; frontend checks; live `/chat` | "Illegal states are unrepresentable"; a correct refusal is no longer shown as a warning |
 | 2 | **A refusal always has text; an error is not an answer.** Empty-reply fix in the flow; the client marks failed requests as `error`, shows a retry, and keeps them out of history. | Failing test first for the empty reply; vitest for history | Small, shows root-cause habit |
 | 3 | **Ship the facts check** (#6): hedge-gated second call, `partial` outcome, one hedge definition, setting to disable. | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
 | 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
@@ -271,6 +271,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 12 | **"Cited" becomes "Supported"** (#7 reframed): per-sentence support check validated on ~50 hand labels; the badge changes from "Cited" to "Supported" only when it passes. | Label file; classifier comparison as in #6 | The second measured claim |
 | 13 | **Ingest consistency** (M2): commit-record comment, incomplete flag, upload hash check. | Mid-ingest failure test | Shows the two-store trade-off was understood |
 | 14 | **External questions** (needs you): 20 questions written by someone else, reported separately. | Harness | Answers "you graded your own homework" |
+| 15 | **Own model: distil the facts check** (needs 3 and 4). Step 3's `qwen3.5:4b` verifier labels a few thousand answers to questions generated from the library (teacher); fine-tune the reranker's MiniLM cross-encoder (22M parameters; `sentence-transformers` is already a dependency) to predict `answered` / `partial` / `not_found` from the question, the answer and the cited passage (student). Ship it in place of the second LLM call only if it matches the teacher on the hand labels. | Hand-labelled test split never used for training or tuning; agreement with labels and with the teacher; latency per answer; training time on the M3 Pro | "Trained my own model: the same refusal accuracy as the 4B verifier in milliseconds instead of 3.5 s", with the numbers |
 
 **Frontend.** The UI review, the design system (colour, type, spacing, motion tokens) and its own
 steps F1–F10 are in [DESIGN.md](DESIGN.md). F3 and F4 (a citation shows the passage; the side
@@ -278,6 +279,16 @@ panel shows evidence, not a graph) rank with steps 2–3 here: they are the clai
 Step 6 above is covered by F8. Backend work they need: store uploaded PDFs under the data
 directory (today an upload is ingested from a temp path that is later deleted, so 1 of 25
 sources has no PDF to open and the viewer shows raw JSON), and a page number per chunk.
+
+**Own model (step 15).** A model of your own is worth it when it does a job RCA already measures,
+so the result is a number, not a demo. The facts check is that job: step 3 adds a 3.5 s LLM call to
+about 40% of answers, hand labels for it already exist (`eval/answer_labels_fulltext_*.json`), and a
+small classifier is fast to train and run on 18 GB. The 4B verifier writes the training labels, so
+the hand labels stay a clean judge; their test split is never trained or tuned on. Not chosen:
+training a language model from scratch (no data or compute to beat `qwen3.5:4b`, and nothing to
+measure it against); a LoRA fine-tune of the chat model to cite better (possible later with MLX, but
+only once step 12 gives a support metric to train and judge against); fine-tuning the reranker on the
+library (129 eval questions are too few, and the rerank gate is calibrated on them).
 
 Steps 1 to 4 are the project. Stop after 4 and the CV story is already better than after all of
 the old v2 tracks. Steps 5 and 6 make it presentable. Steps 7 to 13 are depth, in the order a user
@@ -360,8 +371,8 @@ Found while checking (not fixed in step 1; each needs a step):
    first paragraph and whether step 10 (agent) or step 12 (faithfulness) comes first.
 2. **The GitHub billing lock.** CI cannot run until it is cleared. Is the repo public, and can the
    lock be removed?
-3. **Commit and push.** `686f13b` is local and unpushed. This session's changes are uncommitted, as
-   you asked. Suggested split: one commit for step 1, one for this plan.
+3. **Commit and push.** Settled on 2026-11-10: step 1, this plan and F1 are separate commits, each
+   reviewed before the push.
 4. **Facts check on by default (step 3)?** My decision is yes, with a setting to turn it off. It
    costs about 3.5 s on about 40% of answers. Say no if latency matters more to you day to day.
 5. **Delete the Streamlit app?** 1,204 lines, the only user of `plotly` and `networkx`, and the
@@ -376,3 +387,5 @@ Found while checking (not fixed in step 1; each needs a step):
    your call.
 9. **`gemma4:e4b`** (9.5 GB on disk): remove?
 10. **The screencast** (#15): only you can record it; do it after step 6.
+11. **Own model (step 15).** I placed the one that can be measured: a small classifier distilled
+    from the facts check. If you meant a chat model of your own, say so; it fits after step 12.
