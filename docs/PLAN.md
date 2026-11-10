@@ -137,7 +137,7 @@ and RCA's own agent.
   `partial` is added when the facts check ships (step 3). `error` exists only in the client.
 - **UX:** a refusal reads "No evidence found" in neutral colour; a question about the chat itself has
   no badge; a failed request says so. A greeting such as "hello" is not classified as
-  conversational and still gets a refusal (section 7; fixed with step 2). **DX:** one field to switch on; a constructor must name the outcome.
+  conversational and still gets a refusal (section 7; not part of step 2, still open). **DX:** one field to switch on; a constructor must name the outcome.
   **AX:** an agent adding a new path cannot forget to decide what it is, and eval artifacts carry
   the same word the UI shows.
 - **Proof:** unit tests for every return path (each fails on `686f13b`), an API contract test,
@@ -208,8 +208,8 @@ and RCA's own agent.
   lock; error bubbles and refusals are stored as assistant turns and sent back as history, with no
   length bound.
 - **Decision:** keep `localStorage` (one user; no backend sessions). Remove the seeds. Send only
-  the last N turns and never `error` turns. The global lock goes once M5 makes requests
-  independent.
+  the last N turns and never `error` turns (the second half is done in step 2; the bound is not).
+  The global lock goes once M5 makes requests independent.
 - **Proof:** vitest for the history filter; a browser check of a fresh profile.
 
 ### M8. Request and UI states (#16)
@@ -243,8 +243,7 @@ and RCA's own agent.
 
 - An empty model reply with low retrieval confidence returns `not_found` with an **empty answer
   string**. Reproduced on `686f13b` with a stub LLM (`'' False True ['missing_citation',
-  'low_retrieval_confidence']`). Fix is one line; it is step 2, kept out of step 1 because it
-  changes behaviour.
+  'low_retrieval_confidence']`). Fixed in step 2; a citation-only reply had the same hole.
 - A hedged reply with one valid citation and good retrieval is `answered` with no failure label:
   the `llm_abstained` label is computed and then dropped. This is the #6 gap; step 3 closes it.
 - Two definitions of "hedged" exist (`GenerateFlow._ABSTENTION_SIGNALS` and
@@ -258,7 +257,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | # | Step | Verified by | What it adds to the CV story |
 |---|---|---|---|
 | 1 | **Typed answer outcome** end to end (flow, `/chat`, badge, harness). Done (`1476225`). | New tests fail on old code; full suite; frontend checks; live `/chat` | "Illegal states are unrepresentable"; a correct refusal is no longer shown as a warning |
-| 2 | **A refusal always has text; an error is not an answer.** Empty-reply fix in the flow; the client marks failed requests as `error`, shows a retry, and keeps them out of history. | Failing test first for the empty reply; vitest for history | Small, shows root-cause habit |
+| 2 | **A refusal always has text; an error is not an answer.** Empty-reply fix in the flow; the client marks failed requests as `error`, shows a retry, and keeps them out of history. Done. | Failing test first for the empty reply; vitest for history | Small, shows root-cause habit |
 | 3 | **Ship the facts check** (#6): hedge-gated second call, `partial` outcome, one hedge definition, setting to disable. | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
 | 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
 | 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |

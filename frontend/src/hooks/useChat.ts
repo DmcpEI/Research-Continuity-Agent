@@ -18,6 +18,26 @@ export type Message = {
 
 export type MessagesByConversation = Record<string, Message[]>;
 
+// Builds before outcomes existed saved error bubbles with no outcome; their id prefix has always
+// marked them, so it identifies them without guessing from the text.
+export function isFailedRequest(message: Message): boolean {
+  return message.outcome === 'error' || (message.outcome === undefined && message.id.startsWith('msg-error-'));
+}
+
+// The turns the model sees as history. A failed request is not an answer, so neither it nor the
+// question it failed on is sent; refusals are answers and stay.
+export function toApiHistory(messages: Message[]): ApiChatMessage[] {
+  return messages
+    .filter((message, index) => {
+      if (message.role === 'system' || isFailedRequest(message)) {
+        return false;
+      }
+      const next = messages.slice(index + 1).find((later) => later.role !== 'system');
+      return !(message.role === 'user' && next !== undefined && isFailedRequest(next));
+    })
+    .map((message) => ({ role: message.role as 'user' | 'assistant', content: message.content }));
+}
+
 type UseChatArgs = {
   conversationId?: string;
   activeModel?: string;
@@ -62,12 +82,7 @@ export function useChat({
       content: trimmed,
       timestamp: now,
     };
-    const outboundHistory: ApiChatMessage[] = [...messages, userMessage]
-      .filter((message): message is Message & { role: 'user' | 'assistant' } => message.role !== 'system')
-      .map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
+    const outboundHistory = toApiHistory([...messages, userMessage]);
 
     setMessagesByConversation((previous) => ({
       ...previous,
@@ -122,10 +137,33 @@ export function useChat({
     }
   };
 
+  // Removes a failed request and the question it failed on, and returns that question so the
+  // caller can send it again. Returns undefined for anything that is not a failed request.
+  const takeFailedQuestion = (errorId: string): string | undefined => {
+    const errorIndex = messages.findIndex((message) => message.id === errorId);
+    if (errorIndex < 0 || !isFailedRequest(messages[errorIndex])) {
+      return undefined;
+    }
+    const question = messages
+      .slice(0, errorIndex)
+      .reverse()
+      .find((message) => message.role !== 'system');
+    if (question?.role !== 'user') {
+      return undefined;
+    }
+    const drop = new Set([errorId, question.id]);
+    setMessagesByConversation((previous) => ({
+      ...previous,
+      [key]: (previous[key] ?? []).filter((message) => !drop.has(message.id)),
+    }));
+    return question.content;
+  };
+
   return {
     messagesByConversation,
     messages,
     send,
+    takeFailedQuestion,
     isLoading: mutation.isPending,
     error: mutation.error,
   };

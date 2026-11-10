@@ -108,7 +108,7 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   const activeConversationModel =
     activeConversation?.model ?? window.localStorage.getItem(CHAT_MODEL_STORAGE_KEY) ?? undefined;
 
-  const { send, isLoading } = useChat({
+  const { send, takeFailedQuestion, isLoading } = useChat({
     conversationId: activeConversationId,
     activeModel: activeConversationModel,
     messagesByConversation,
@@ -357,6 +357,18 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
     }
   };
 
+  const handleRetry = (errorId: string) => {
+    // Check the lock first: once taken out, the question would otherwise be lost.
+    if (hasGlobalPending) {
+      return;
+    }
+    const question = takeFailedQuestion(errorId);
+    if (question) {
+      // A second failure appends a new error bubble, so there is nothing more to do here.
+      handleSend(question).catch(() => undefined);
+    }
+  };
+
   useEffect(() => {
     const handler = (event: Event) => {
       const customEvent = event as CustomEvent<ChatModelSelectedEventDetail>;
@@ -437,6 +449,7 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
         messages={activeMessages}
         onCitationClick={handleCitationClick}
         onSend={handleSend}
+        onRetry={handleRetry}
         inputDisabledReason={
           isWaitingOnOtherConversation
             ? 'Waiting for response in another conversation.'

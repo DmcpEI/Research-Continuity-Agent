@@ -838,6 +838,22 @@ input {
   padding-bottom: var(--s-half);
 }
 
+.answer-retry {
+  align-self: flex-start;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--accent);
+  padding: var(--s-1) var(--s-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.answer-retry:hover {
+  background: var(--raised);
+}
+
 .thread-thinking {
   display: inline-flex;
   align-items: center;

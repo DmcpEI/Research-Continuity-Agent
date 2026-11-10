@@ -22,6 +22,7 @@ type AnswerBubbleProps = {
   grounded: boolean;
   trace: Record<string, unknown> | null;
   onCitationClick?: (sourceId: string) => void;
+  onRetry?: () => void;
 };
 
 export function AnswerBubble({
@@ -31,6 +32,7 @@ export function AnswerBubble({
   grounded,
   trace,
   onCitationClick,
+  onRetry,
 }: AnswerBubbleProps) {
   const normalizedCitations = citations.filter((citation, index, all) => {
     const sourceId = citation.source_id?.trim();
@@ -76,6 +78,12 @@ export function AnswerBubble({
             />
           ))}
         </div>
+      ) : null}
+
+      {onRetry ? (
+        <button className="answer-retry" type="button" onClick={onRetry}>
+          Retry
+        </button>
       ) : null}
 
       <QueryTrace trace={trace} />

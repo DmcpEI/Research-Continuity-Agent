@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { AnswerBubble } from './AnswerBubble';
-import type { Message } from '../../hooks/useChat';
+import { isFailedRequest, type Message } from '../../hooks/useChat';
 
 type MessageThreadProps = {
   conversationId: string;
   messages: Message[];
   isLoading: boolean;
   onSend: (query: string) => Promise<void>;
+  onRetry?: (errorId: string) => void;
   onCitationClick?: (sourceId: string) => void;
   showWelcomeEmptyState?: boolean;
   inputDisabledReason?: string | null;
@@ -23,6 +24,7 @@ export function MessageThread({
   messages,
   isLoading,
   onSend,
+  onRetry,
   onCitationClick,
   showWelcomeEmptyState = false,
   inputDisabledReason = null,
@@ -57,6 +59,11 @@ export function MessageThread({
   };
 
   const shouldShowEmptyState = showWelcomeEmptyState && messages.length === 0 && !isLoading;
+
+  // Only the latest turn can be retried, so a retry never reorders the conversation.
+  const latest = [...messages].reverse().find((message) => message.role !== 'system');
+  const retryId =
+    onRetry && !inputDisabled && latest?.role === 'assistant' && isFailedRequest(latest) ? latest.id : null;
 
   const handleSuggestionClick = (suggestion: string) => {
     setQuery(suggestion);
@@ -97,6 +104,7 @@ export function MessageThread({
               key={message.id}
               outcome={message.outcome}
               onCitationClick={onCitationClick}
+              onRetry={message.id === retryId ? () => onRetry?.(message.id) : undefined}
               trace={message.trace ?? null}
             />
           ) : message.role === 'system' ? (
