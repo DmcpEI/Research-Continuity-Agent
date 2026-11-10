@@ -107,6 +107,7 @@ Rules:
     # Calibrated on eval dev split for cross-encoder/ms-marco-MiniLM-L-6-v2 logits
     # (eval/calibrate_abstention.py); recalibrate if the reranker model changes.
     _RERANK_ABSTENTION_THRESHOLD = -3.618
+    NO_EVIDENCE_ANSWER = "I couldn't find evidence for this in your knowledge base."
     _CONTENT_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9+_.-]*")
     _LOOSE_CITATION_PATTERN = re.compile(r"(?<!\[)\[((?:src|chk):[^\]\s]+)\](?!\])")
     _REWRITE_PROMPT_TEMPLATE = (
@@ -243,7 +244,7 @@ Rules:
             trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
             return GeneratedAnswer(
                 query=query,
-                answer="I couldn't find evidence for this in your knowledge base.",
+                answer=self.NO_EVIDENCE_ANSWER,
                 outcome=AnswerOutcome.not_found,
                 failure_labels=["low_rerank_score", "low_retrieval_confidence"],
                 trace=trace,
@@ -282,7 +283,8 @@ Rules:
             trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
             return GeneratedAnswer(
                 query=query,
-                answer=abstention.answer or self._strip_citation_markers(answer_text),
+                # An empty or citation-only reply still declines, so say so instead of nothing.
+                answer=abstention.answer or self.NO_EVIDENCE_ANSWER,
                 outcome=AnswerOutcome.not_found,
                 citations=[],
                 failure_labels=abstention.failure_labels,

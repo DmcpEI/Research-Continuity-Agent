@@ -560,6 +560,7 @@ def test_generate_answer_reports_one_outcome_per_path(
     result = flow.generate_answer(query)
 
     assert result.outcome == expected
+    assert result.answer.strip()
     # The legacy flags are views of the outcome and are still serialised for old readers.
     dumped = result.model_dump(mode="json")
     assert dumped["outcome"] == expected
@@ -579,3 +580,21 @@ def test_generated_answer_cannot_be_grounded_and_abstained() -> None:
 
     assert refusal.grounded is False
     assert refusal.abstained is True
+
+
+@pytest.mark.parametrize(
+    "reply",
+    ["", "   \n", "[[src:pdf/jampacker]]"],
+    ids=["empty", "whitespace", "citation-only"],
+)
+def test_refusal_after_generation_always_has_text(reply) -> None:
+    # Low retrieval confidence plus nothing usable from the model: RCA declines, and must say so.
+    flow = GenerateFlow(
+        retrieve_flow=StubRetrieveFlow(score=0.40),
+        llm_client=StubLLMClient(responses=[_REWRITE, reply]),
+    )
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    assert result.outcome == "not_found"
+    assert result.answer == GenerateFlow.NO_EVIDENCE_ANSWER
