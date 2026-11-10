@@ -7,6 +7,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -56,6 +57,7 @@ class EvaluationCaseResult(BaseModel):
     expected_sources: list[str] = Field(default_factory=list)
     expected_keywords: list[str] = Field(default_factory=list)
     answer: str
+    outcome: str | None = None  # AnswerOutcome value, "error", or None in pre-outcome artifacts
     grounded: bool
     abstained: bool = False
     citations: list[str] = Field(default_factory=list)
@@ -164,6 +166,7 @@ def evaluate_pair(
                 expected_sources=expected_sources,
                 expected_keywords=pair.expected_keywords,
                 answer=generated.answer,
+                outcome=generated.outcome.value,
                 grounded=generated.grounded,
                 abstained=generated.abstained,
                 citations=citation_source_ids,
@@ -201,6 +204,7 @@ def evaluate_pair(
                 expected_sources=expected_sources,
                 expected_keywords=pair.expected_keywords,
                 answer="",
+                outcome="error",
                 grounded=False,
                 abstained=False,
                 citations=[],
@@ -307,6 +311,7 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
             "answerable_abstentions": 0,
             "average_keyword_hit_rate": 0.0,
             "average_latency_ms": 0.0,
+            "outcome_counts": {},
             "failure_label_counts": {},
             "failure_stage_counts": {},
             "abstention_by_negative_type": {},
@@ -341,6 +346,9 @@ def aggregate_results(results: list[EvaluationCaseResult]) -> dict[str, Any]:
         "answerable_abstentions": sum(result.abstained for result in answerable),
         "average_keyword_hit_rate": sum(result.keyword_hits for result in results) / total,
         "average_latency_ms": sum(result.latency_ms for result in results) / total,
+        "outcome_counts": dict(
+            sorted(Counter(result.outcome or "unknown" for result in results).items())
+        ),
         "failure_label_counts": count_failure_labels(results),
         "failure_stage_counts": count_failure_stages(results),
         "abstention_by_negative_type": abstention_by_negative_type(results),

@@ -488,3 +488,94 @@ def test_grounding_check_still_flags_a_cited_claim_with_no_support_in_the_text()
 
     assert result.grounded is False
     assert "unsupported_claim" in result.failure_labels
+
+
+_REWRITE = "JamPacker components planning recovery packing efficiency"
+_CONCEPTUAL = "what approaches exist for robotic bin packing?"  # rewritten, so two LLM calls
+
+
+class _NoHitsRetrieveFlow(StubRetrieveFlow):
+    def retrieve(
+        self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None
+    ) -> RetrievalBundle:
+        return RetrievalBundle(query=query, hits=[], related_edges=[], trace=trace)
+
+
+class _WeakChunkRetrieveFlow(StubRetrieveFlow):
+    """Only a low-scoring chunk comes back, so no hit is selected as context."""
+
+    def retrieve(
+        self, query: str, limit: int = 10, trace=None, query_type: QueryType | None = None
+    ) -> RetrievalBundle:
+        hit = RetrievalHit(node_id="chk:pdf/jampacker:0001", score=0.30, title="", excerpt="x")
+        return RetrievalBundle(query=query, hits=[hit], related_edges=[], trace=trace)
+
+
+@pytest.mark.parametrize(
+    ("retrieve_flow", "responses", "query", "expected"),
+    [
+        (StubRetrieveFlow(), ["Yes, I can see it."], "Why didn't you respond?", "conversational"),
+        (_NoHitsRetrieveFlow(), [_REWRITE], _CONCEPTUAL, "not_found"),
+        (_WeakChunkRetrieveFlow(), [_REWRITE], _CONCEPTUAL, "not_found"),
+        (
+            StubRetrieveFlow(rerank_score=-8.0),
+            [_REWRITE],
+            _CONCEPTUAL,
+            "not_found",
+        ),
+        (
+            StubRetrieveFlow(score=0.40),
+            [_REWRITE, "The provided context does not contain this. [[src:pdf/jampacker]]"],
+            _CONCEPTUAL,
+            "not_found",
+        ),
+        (
+            StubRetrieveFlow(),
+            [_REWRITE, "JamPacker combines planning and recovery modules. [[src:pdf/jampacker]]"],
+            _CONCEPTUAL,
+            "answered",
+        ),
+        (
+            StubRetrieveFlow(),
+            [_REWRITE, "JamPacker combines planning and recovery modules."],
+            _CONCEPTUAL,
+            "unverified",
+        ),
+    ],
+    ids=[
+        "question-about-the-chat",
+        "empty-retrieval",
+        "empty-context",
+        "rerank-gate",
+        "post-generation-refusal",
+        "cited",
+        "uncited",
+    ],
+)
+def test_generate_answer_reports_one_outcome_per_path(
+    retrieve_flow, responses, query, expected
+) -> None:
+    flow = GenerateFlow(retrieve_flow=retrieve_flow, llm_client=StubLLMClient(responses=responses))
+
+    result = flow.generate_answer(query)
+
+    assert result.outcome == expected
+    # The legacy flags are views of the outcome and are still serialised for old readers.
+    dumped = result.model_dump(mode="json")
+    assert dumped["outcome"] == expected
+    assert dumped["grounded"] is (expected == "answered")
+    assert dumped["abstained"] is (expected == "not_found")
+
+
+def test_generated_answer_cannot_be_grounded_and_abstained() -> None:
+    from pydantic import ValidationError
+
+    from rca.flows.generate_flow import GeneratedAnswer
+
+    with pytest.raises(ValidationError):
+        GeneratedAnswer(query="q", answer="a", grounded=True, abstained=True)
+
+    refusal = GeneratedAnswer(query="q", answer="a", outcome="not_found", grounded=True)
+
+    assert refusal.grounded is False
+    assert refusal.abstained is True

@@ -95,6 +95,7 @@ export function MessageThread({
               content={message.content}
               grounded={Boolean(message.grounded)}
               key={message.id}
+              outcome={message.outcome}
               onCitationClick={onCitationClick}
               trace={message.trace ?? null}
             />

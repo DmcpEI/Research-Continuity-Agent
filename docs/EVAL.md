@@ -59,6 +59,7 @@ uv run python eval/harness.py --model llama3.1:8b
 ```
 
 The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py) over all `129` questions and records:
+- `outcome` (`answered`, `unverified`, `not_found`, `conversational`, or `error` when the question raised; `grounded` and `abstained` are derived from it)
 - `grounded`
 - `abstained`
 - `citations`

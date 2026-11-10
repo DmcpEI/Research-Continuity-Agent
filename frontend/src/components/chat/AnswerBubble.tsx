@@ -1,12 +1,24 @@
-import { type ApiCitation } from '../../api/client';
+import { type AnswerOutcome, type ApiCitation } from '../../api/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CitationChip } from './CitationChip';
 import { QueryTrace } from './QueryTrace';
 
+type BubbleOutcome = AnswerOutcome | 'error';
+
+const BADGES: Record<BubbleOutcome, { label: string; className: string } | null> = {
+  answered: { label: '✓ Grounded', className: 'is-grounded' },
+  unverified: { label: '⚠ Unverified', className: 'is-unverified' },
+  not_found: { label: 'No evidence found', className: 'is-not-found' },
+  conversational: null,
+  error: { label: 'Request failed', className: 'is-error' },
+};
+
 type AnswerBubbleProps = {
   content: string;
   citations: ApiCitation[];
+  // Messages saved before outcomes existed only have `grounded`.
+  outcome?: BubbleOutcome;
   grounded: boolean;
   trace: Record<string, unknown> | null;
   onCitationClick?: (sourceId: string) => void;
@@ -15,6 +27,7 @@ type AnswerBubbleProps = {
 export function AnswerBubble({
   content,
   citations,
+  outcome,
   grounded,
   trace,
   onCitationClick,
@@ -36,13 +49,18 @@ export function AnswerBubble({
     .join('\n')
     .trim();
 
+  // An outcome this build does not know (newer server) falls back to the grounded flag too.
+  const fallback = grounded ? BADGES.answered : BADGES.unverified;
+  const known = outcome !== undefined && Object.prototype.hasOwnProperty.call(BADGES, outcome);
+  const badge = known ? BADGES[outcome] : fallback;
+
   return (
     <article className="answer-bubble">
-      <header>
-        <span className={`grounded-badge ${grounded ? 'is-grounded' : 'is-unverified'}`}>
-          {grounded ? '✓ Grounded' : '⚠ Unverified'}
-        </span>
-      </header>
+      {badge ? (
+        <header>
+          <span className={`grounded-badge ${badge.className}`}>{badge.label}</span>
+        </header>
+      ) : null}
 
       <div className="answer-prose">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>

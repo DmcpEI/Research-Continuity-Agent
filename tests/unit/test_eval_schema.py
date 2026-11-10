@@ -161,8 +161,7 @@ def test_harness_evaluate_pair_records_trace_retrieval_features() -> None:
                 query=question,
                 answer="Answer [[src:pdf/a]]",
                 citations=[Citation(source_id="src:pdf/a", title="A", excerpt="")],
-                grounded=True,
-                abstained=False,
+                outcome="answered",
                 failure_labels=["unsupported_claim"],
                 trace=trace,
             )
@@ -180,6 +179,7 @@ def test_harness_evaluate_pair_records_trace_retrieval_features() -> None:
 
     assert result.max_retrieval_score == 0.91
     assert result.unique_sources_top5 == 2
+    assert result.outcome == "answered"
     assert result.failure_labels == ["unsupported_claim"]
     assert trace_payload is not None
 
@@ -217,6 +217,37 @@ def test_harness_aggregate_results_counts_failure_labels() -> None:
         "low_retrieval_confidence": 1,
         "missing_citation": 1,
     }
+
+
+def test_harness_counts_outcomes_including_errors_and_old_artifacts() -> None:
+    harness = load_module(ROOT / "eval" / "harness.py", "eval_harness_outcomes")
+
+    class BrokenFlow:
+        def generate_answer(self, question: str) -> GeneratedAnswer:
+            raise RuntimeError("model unavailable")
+
+    pair = harness.GoldenPair(id="q1", question="Q?", difficulty="easy")
+    errored, _ = harness.evaluate_pair(BrokenFlow(), pair)
+    base = {"question": "Q?", "difficulty": "easy", "answer": "a", "latency_ms": 1.0}
+    refused = harness.EvaluationCaseResult(
+        id="q2",
+        outcome="not_found",
+        grounded=False,
+        abstained=True,
+        source_correct=False,
+        keyword_hits=0.0,
+        **base,
+    )
+    # A result saved before outcomes existed has no outcome field.
+    legacy = harness.EvaluationCaseResult.model_validate(
+        {"id": "q3", "grounded": True, "source_correct": True, "keyword_hits": 1.0, **base}
+    )
+
+    summary = harness.aggregate_results([errored, refused, refused, legacy])
+
+    assert errored.outcome == "error"
+    assert summary["outcome_counts"] == {"error": 1, "not_found": 2, "unknown": 1}
+    assert harness.aggregate_results([])["outcome_counts"] == {}
 
 
 def test_ablation_summary_includes_wilson_intervals() -> None:

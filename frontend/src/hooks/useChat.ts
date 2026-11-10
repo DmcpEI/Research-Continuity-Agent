@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { type ApiCitation, type ApiChatMessage, sendChat } from '../api/client';
+import { type AnswerOutcome, type ApiCitation, type ApiChatMessage, sendChat } from '../api/client';
 
 export type Message = {
   id: string;
@@ -8,6 +8,8 @@ export type Message = {
   content: string;
   citations?: ApiCitation[];
   activeSourceIds?: string[];
+  // 'error' is client-only: the request failed, so there is no answer to classify.
+  outcome?: AnswerOutcome | 'error';
   grounded?: boolean;
   model?: string;
   trace?: Record<string, unknown> | null;
@@ -85,6 +87,7 @@ export function useChat({
         content: response.answer,
         citations: response.citations,
         activeSourceIds: response.active_source_ids ?? [],
+        outcome: response.outcome,
         grounded: response.grounded,
         model: response.model ?? model,
         trace: response.trace,
@@ -102,6 +105,7 @@ export function useChat({
         id: `msg-error-${Date.now()}`,
         role: 'assistant',
         content: `I could not complete the request. ${String(error)}`,
+        outcome: 'error',
         grounded: false,
         citations: [],
         activeSourceIds: [],

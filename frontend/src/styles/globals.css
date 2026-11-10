@@ -743,6 +743,18 @@ body,
   background: rgba(245, 158, 11, 0.12);
 }
 
+.grounded-badge.is-not-found {
+  border: 1px solid var(--border);
+  color: var(--text-mono);
+  background: transparent;
+}
+
+.grounded-badge.is-error {
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+}
+
 .answer-prose {
   color: var(--text-primary);
   line-height: 1.6;

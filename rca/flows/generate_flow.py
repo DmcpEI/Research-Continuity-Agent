@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Sequence
+from enum import StrEnum
 from time import perf_counter
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from rca.config.settings import Settings, get_settings
 from rca.contracts.trace import QueryTrace, StageTrace
@@ -25,14 +26,33 @@ class Citation(BaseModel):
     excerpt: str
 
 
+class AnswerOutcome(StrEnum):
+    """What kind of reply this is. Exactly one holds; failure_labels say why."""
+
+    answered = "answered"  # cites retrieved context and the citation check passed
+    unverified = "unverified"  # shown to the user, but no citation that checks out
+    not_found = "not_found"  # RCA declined: no usable evidence for the question
+    conversational = "conversational"  # a question about the chat itself; retrieval skipped
+
+
 class GeneratedAnswer(BaseModel):
     query: str
     answer: str
+    outcome: AnswerOutcome
     citations: list[Citation] = Field(default_factory=list)
-    grounded: bool = False
-    abstained: bool = False
     failure_labels: list[str] = Field(default_factory=list)
     trace: QueryTrace | None = None
+
+    # Derived from outcome so the two flags can never contradict it or each other.
+    @computed_field
+    @property
+    def grounded(self) -> bool:
+        return self.outcome is AnswerOutcome.answered
+
+    @computed_field
+    @property
+    def abstained(self) -> bool:
+        return self.outcome is AnswerOutcome.not_found
 
 
 class GroundingCheck(BaseModel):
@@ -154,9 +174,8 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer=response.text.strip() or "I don't have prior context to answer that yet.",
+                outcome=AnswerOutcome.conversational,
                 citations=[],
-                grounded=False,
-                abstained=False,
                 trace=trace,
             )
 
@@ -182,8 +201,7 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer="No relevant context found in your knowledge base.",
-                grounded=False,
-                abstained=True,
+                outcome=AnswerOutcome.not_found,
                 failure_labels=["empty_retrieval", "low_retrieval_confidence"],
                 trace=trace,
             )
@@ -211,8 +229,7 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer="No relevant context found in your knowledge base.",
-                grounded=False,
-                abstained=True,
+                outcome=AnswerOutcome.not_found,
                 failure_labels=["empty_context", "low_retrieval_confidence"],
                 trace=trace,
             )
@@ -227,8 +244,7 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer="I couldn't find evidence for this in your knowledge base.",
-                grounded=False,
-                abstained=True,
+                outcome=AnswerOutcome.not_found,
                 failure_labels=["low_rerank_score", "low_retrieval_confidence"],
                 trace=trace,
             )
@@ -267,9 +283,8 @@ Rules:
             return GeneratedAnswer(
                 query=query,
                 answer=abstention.answer or self._strip_citation_markers(answer_text),
+                outcome=AnswerOutcome.not_found,
                 citations=[],
-                grounded=False,
-                abstained=True,
                 failure_labels=abstention.failure_labels,
                 trace=trace,
             )
@@ -304,9 +319,8 @@ Rules:
         return GeneratedAnswer(
             query=query,
             answer=answer_text,
+            outcome=AnswerOutcome.answered if grounded else AnswerOutcome.unverified,
             citations=citations,
-            grounded=grounded,
-            abstained=False,
             failure_labels=grounding.failure_labels,
             trace=trace,
         )

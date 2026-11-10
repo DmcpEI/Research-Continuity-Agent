@@ -149,7 +149,7 @@ def test_harness_records_provenance_and_stamps_corpus_version_on_traces(tmp_path
 
         def generate_answer(self, query: str) -> GeneratedAnswer:
             return GeneratedAnswer(
-                query=query, answer="answer", grounded=False, trace=QueryTrace(query=query)
+                query=query, answer="answer", outcome="unverified", trace=QueryTrace(query=query)
             )
 
     golden = tmp_path / "golden.json"

@@ -149,8 +149,7 @@ def test_chat_endpoint_returns_generate_flow_payload(tmp_path: Path) -> None:
                         excerpt="Sample excerpt",
                     )
                 ],
-                grounded=True,
-                abstained=False,
+                outcome="answered",
                 trace=None,
             )
 
@@ -173,6 +172,7 @@ def test_chat_endpoint_returns_generate_flow_payload(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["answer"].startswith("RCA is")
+    assert payload["outcome"] == "answered"
     assert payload["grounded"] is True
     assert payload["citations"][0]["source_id"] == "src:pdf/sample"
     assert payload["failure_labels"] == []
@@ -471,8 +471,7 @@ def test_model_selection_keeps_chat_and_agent_models_separate(tmp_path: Path) ->
                 query=query,
                 answer="ok",
                 citations=[],
-                grounded=True,
-                abstained=False,
+                outcome="answered",
                 trace=None,
             )
 

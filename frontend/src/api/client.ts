@@ -4,9 +4,13 @@ export type ApiCitation = {
   excerpt: string;
 };
 
+// Mirrors AnswerOutcome in rca/flows/generate_flow.py.
+export type AnswerOutcome = 'answered' | 'unverified' | 'not_found' | 'conversational';
+
 export type ApiChatResponse = {
   answer: string;
   citations: ApiCitation[];
+  outcome?: AnswerOutcome; // absent from servers older than the outcome field
   grounded: boolean;
   failure_labels?: string[];
   active_source_ids?: string[];

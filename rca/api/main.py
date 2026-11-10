@@ -601,6 +601,7 @@ def create_app(
         return {
             "answer": result.answer,
             "citations": [citation.model_dump(mode="json") for citation in result.citations],
+            "outcome": result.outcome.value,
             "grounded": result.grounded,
             "trace": result.trace.model_dump(mode="json") if result.trace else None,
             "failure_labels": result.failure_labels,
