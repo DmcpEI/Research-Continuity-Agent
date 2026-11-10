@@ -1,0 +1,142 @@
+--- CLAUDE.md
++++ CLAUDE.md
+@@ -1,61 +1,95 @@
+-## Working rules
++# Working rules for coding agents (RCA)
+ 
+-### Before coding
+-- Read the project's docs and coding rules before non-trivial work.
+-- Reproduce the bug first, with logs or a probe against the real system. Find out what is actually sent and stored instead of guessing.
+-- Note your assumptions and decisions in a design note before coding. When docs and code disagree, flag it; don't quietly "fix" either one.
++RCA's claim: a small local model answers questions about the user's papers, cites the passage, and
++says so when the answer is not there, with measurements to prove it. Prefer work that makes that
++claim more true or better proven. The plan is `docs/PLAN.md`.
+ 
+-### Scope
+-- One change per PR. Don't mix a refactor with a behaviour change.
++## Start of session
++- Read `.agent_handoff/CURRENT_STATE.md`, then `docs/PLAN.md`. Update the handoff before you stop.
++- Docs can be stale. When docs and code disagree, say so; don't quietly "fix" either one.
++
++## Before coding
++- Reproduce the bug first, with logs or a probe against the real system. Find out what is actually
++  sent and stored instead of guessing.
++- A change that crosses a module boundary or changes a contract (API payload, stored data, eval
++  artifact) gets a short design note first, in `docs/PLAN.md` or the commit body: assumptions,
++  decision, what could break. A local fix does not need one.
++
++## Scope
++- One change per commit, committed straight to `main`. Don't mix a refactor with a behaviour change.
+ - Keep diffs small. Don't touch files outside the task unless the build needs it.
+-- Bug fix = root cause. Grep every caller of what you change, and fix it once where they all meet.
++- Bug fix = root cause. Grep every caller of what you change, fix it once where they all meet, then
++  grep for sibling sites that handle the same case and for every name you renamed or removed
++  (docs included).
++- No new dependency without asking. Deleting code beats adding it.
+ 
+-### Tests
++## State
++- A new state is a value of an enum or typed field (see `AnswerOutcome`), not another boolean and
++  not a match on message text. Two flags that can contradict each other are a bug.
++- No silent mode changes. A fallback (vector store, reranker, model) must be visible in `/status`
++  or in the answer's failure labels.
++
++## Tests
+ - Test behaviour, not implementation. Never weaken a test to make the code pass.
+ - Prove each new test: run it against the old code and see it fail.
+ - Logic lives in small importable functions, so it can be tested on its own.
+-- Each test cleans up its own mocks and state (`try/finally`), so a failure can't leak into the next test.
++- Each test cleans up its own mocks and state (`try/finally`).
++- `.rca/` is the user's real library, not a fixture. Tests and probes use a temp directory or a copy.
+ 
+-### The "how could this break" checklist (every PR)
+-- Timing: the same request arriving twice, a second request while the first is still running, a reset in the middle, a restart.
+-- Inputs: empty, zero, missing, wrong type, just over a limit, a limit when some items were skipped.
+-- Timestamps without a timezone; always normalise to UTC.
+-- Every new user-facing text in every supported language.
++## How could this break (check the ones that apply, and say which you checked)
++- The same request twice; a second request while the first is running; a restart in the middle.
++- Two stores, no shared transaction: what is left behind if the second write fails, and does a
++  retry repair it?
++- Inputs: empty, missing, wrong type, just over a limit. An empty or malformed model reply.
++- The model is not deterministic and may be down: every LLM call has a failure path that is not a
++  crash and not an empty answer.
++- Timestamps are UTC.
++- Data from outside (model output, MCP tools, uploads) is checked or converted before use.
+ - Every un-awaited promise gets a `.catch`.
+-- Related values live in one object, not in parallel arrays matched by index.
+-- Data from outside (APIs, webhooks) is never trusted: check or convert it before use.
+-- Don't assume how people write. Check filters and classifiers against real messages.
++- Filters and classifiers are checked against real questions and answers, not invented ones.
+ 
+-### Sibling sites
+-- After changing how one place handles a case, grep for every other place that handles it and apply the change there too.
+-- Grep the docs for every name you renamed or removed.
++## Evaluation
++- The dev split is for tuning; the test split is for final numbers only. Never tune on test.
++- Every number carries its split, n, model and commit. Numbers live in `docs/EVAL.md`; other docs
++  link to it. Nothing is reported from a dirty tree or a degraded index.
++- `-3.618` (rerank gate), `0.55` (context selection), `0.50` (abstention) and the reranker's
++  240-character input are calibrated together. Changing one means recalibrating on dev and
++  rerunning; say so in the commit.
++- A change to retrieval, prompts or abstention is not done until the relevant eval was rerun.
+ 
+-### Review before the PR
+-- Before opening a PR, have an independent reviewer whose only job is to break the change. Fix what it finds, with a test for each.
+-- If your own testing exposes a bug, fix it in the same PR, or test the claim that it was already there before deferring it.
++## Hardware
++- 18 GB RAM: one chat model loaded at a time. Never use `gemma3:12b`. Default is `qwen3.5:4b`.
++- Run long jobs (evals, benches) in the background. Use `uv run python`, never bare `python`.
+ 
+-### Verify for real
+-- Passing tests don't prove it works. Run it against the real system: locally, in a staging environment, or against a small stand-in server when the real one can't produce the case.
+-- When a case can't be triggered by hand (timing, sizes, files), build a small local fake for it.
+-- Report honestly what was tested live and what only by unit tests.
++## Review and verification
++- A behaviour change in `rca/flows/`, `rca/retrieval/`, `rca/store/` or `rca/api/` gets an independent reviewer whose
++  only job is to break it, before you ask to push. Fix what it finds, with a test for each. Docs
++  and mechanical changes get a careful self-review of the full diff instead.
++- If your own testing exposes a bug, fix it in the same commit if it is part of the change;
++  otherwise prove it was already there, record it in the plan, and fix it in its own commit.
++- Passing tests don't prove it works. Run the change against the real system, or against a small
++  local fake when the case can't be triggered by hand (timing, sizes, failures).
++- Report honestly what was tested live, what only by unit tests, and what not at all.
+ 
+-### Hooks and CI
+-- Install the git hooks in every clone (pre-commit and pre-push). Never use `--no-verify`.
+-- Run the same command CI runs (e.g. tests with coverage), and check the exit code, not just the pass count.
++## Done means
++- These pass, checked by exit code (they are the CI commands; the git hooks run them):
++  `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest -v --tb=short`, and in
++  `frontend/`: `npm run typecheck`, `npm run build`, `npm test`.
++- `CHANGELOG.md` has one `Unreleased` entry if behaviour changed: what changed, who is affected.
++- Docs that name the changed behaviour are updated. Only English UI text exists.
++- Hooks are installed in every clone (`uv run pre-commit install`). Never use `--no-verify`.
+ 
+-### Safety
+-- Ask before anything hard to undo or outward-facing: pushing, posting comments, deleting, writing to shared systems.
+-- Never put secrets, credentials or real personal names in code, commits, tests or docs. Use placeholders like "User A".
++## Safety
++- Ask before anything hard to undo or outward-facing: pushing, posting comments, deleting, writing
++  to shared systems. Ask before every push.
++- Never put secrets, credentials or real personal names in code, commits, tests or docs. Use
++  placeholders like "User A".
+ - Stop only processes you started, by their exact id, never by a name pattern.
+ - Back up any config file before changing it for a test, and restore it afterwards.
++- Stop and ask when a step would delete user data, change a published number, or go against the
++  plan.
+ 
+-### Commits and PRs
+-- One meaningful changelog entry per change: what changed, who is affected, any migration.
+-- Commit messages explain *why*, not just what.
+-- Keep issue and PR text short and plain: before → after, and how it was tested.
+-
+-## Project decisions (2026-10-02, override the generic rules above where they conflict)
+-- Commit straight to `main`; no PR per change. Still: one change per commit, break-it review before asking to push, ask before every push.
+-- Changelog lives in `CHANGELOG.md` (Keep a Changelog, `Unreleased` section); every commit that changes behaviour adds one entry.
+-- Git hooks via the `pre-commit` framework (`.pre-commit-config.yaml`): pre-commit runs ruff check + ruff format check, pre-push runs the CI pytest command. Install in every clone with `uv run pre-commit install`.
+-- Only English UI text exists, so the "every supported language" check is satisfied by English.
++## Commits
++- `Type(scope): Subject`, then `- ` bullets that explain *why*, not just what.
++- No AI co-author or "generated with" lines.
++- Keep issue text short and plain: before → after, and how it was tested.

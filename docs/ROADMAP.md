@@ -1,5 +1,9 @@
 # RCA Roadmap
 
+> **2026-11-10:** planning moved to [PLAN.md](PLAN.md). Where the two disagree, PLAN.md wins. The
+> "Current metrics" table below is the April run on a different question set and model; current
+> numbers are in [EVAL.md](EVAL.md).
+
 ## North star
 
 Build a measured, testable, production-shaped research knowledge system that demonstrates:
