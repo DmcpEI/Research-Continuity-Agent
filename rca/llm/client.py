@@ -40,6 +40,12 @@ class LLMClient(ABC):
     def embed(self, texts: list[str], dimensions: int = 32) -> list[list[float]]:
         raise NotImplementedError
 
+    def chat_json(self, messages: list[ChatMessage], schema: dict[str, Any]) -> ChatResponse:
+        """Chat whose reply should follow a JSON schema. Providers without structured output
+        get a plain chat; callers must still validate the reply."""
+        del schema
+        return self.chat(messages)
+
     def chat_with_tools(
         self,
         messages: list[dict[str, Any]],
@@ -120,14 +126,33 @@ class OllamaLLMClient(LLMClient):
             self.options.update(options)
 
     def chat(self, messages: list[ChatMessage]) -> ChatResponse:
+        return self._chat(messages, schema=None)
+
+    def chat_json(self, messages: list[ChatMessage], schema: dict[str, Any]) -> ChatResponse:
+        return self._chat(messages, schema=schema)
+
+    # A JSON reply can quote the text it checks; cut short it is invalid JSON, so it gets
+    # twice the room of a normal answer.
+    _JSON_MIN_PREDICT = 1024
+
+    def _chat(self, messages: list[ChatMessage], schema: dict[str, Any] | None) -> ChatResponse:
+        options = dict(self.options)
+        limit = options.get("num_predict")
+        if schema is not None and isinstance(limit, int) and 0 < limit < self._JSON_MIN_PREDICT:
+            options["num_predict"] = self._JSON_MIN_PREDICT
         if self._api_style == "openai":
             payload = {
                 "model": self.model,
                 "messages": [{"role": m.role, "content": m.content} for m in messages],
-                "temperature": self.options.get("temperature", 0),
-                "max_tokens": self.options.get("num_predict"),
+                "temperature": options.get("temperature", 0),
+                "max_tokens": options.get("num_predict"),
                 "stream": False,
             }
+            if schema is not None:
+                payload["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "reply", "schema": schema},
+                }
             result = self._post_json(self._openai_path("chat/completions"), payload, timeout=120)
             text = self._extract_openai_text(result)
         else:
@@ -136,9 +161,11 @@ class OllamaLLMClient(LLMClient):
                 "messages": [{"role": m.role, "content": m.content} for m in messages],
                 "stream": False,
                 "think": self.think,
-                "options": self.options,
+                "options": options,
                 **self._keep_alive_field(),
             }
+            if schema is not None:
+                payload["format"] = schema
             result = self._post_json("/api/chat", payload, timeout=120)
             text = result["message"]["content"]
         return ChatResponse(text=text, raw=result)

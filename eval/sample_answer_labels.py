@@ -25,8 +25,9 @@ GATE_ANSWERS = frozenset(
     }
 )
 
-# Broader than GenerateFlow._ABSTENTION_SIGNALS on purpose: used only to weight
-# the sample towards answers that state a gap, never to label them.
+# Frozen on purpose: the label files were drawn with this regex, and changing it would change
+# which answers a re-run draws. Used only to weight the sample, never to label. The runtime
+# rule, rca.flows.facts_check.is_hedged, matches everything this does and a little more.
 _HEDGE = re.compile(
     r"\b(context|text|sources?|documents?|papers?)\b[^.]{0,40}?\b"
     r"(does not|doesn't|do not|don't)\s+"

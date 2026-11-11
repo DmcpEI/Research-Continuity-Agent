@@ -521,6 +521,7 @@ def build_run_config(
         else settings.openai_embed_model,
         "graph_db_path": str(settings.graph_db_path),
         "vector_dir": str(settings.vector_dir),
+        "facts_check_enabled": settings.facts_check_enabled,
     }
 
 

@@ -30,7 +30,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from eval.sample_answer_labels import is_hedged  # noqa: E402
+from rca.flows.facts_check import (  # noqa: E402  (the shipped prompt, measured here)
+    FACTS_SCHEMA,
+    FACTS_SYSTEM,
+    is_hedged,
+    json_object,
+    parse_facts,
+)
 
 STATUSES = ("answered", "partial", "not_found")
 
@@ -51,23 +57,6 @@ VERIFIER_SCHEMA = {
 }
 
 
-FACTS_SYSTEM = """You check an answer written by a research assistant that may only use the user's papers. Do not judge whether the answer is true.
-- facts: copy each statement from the answer that gives information the question asks for, about the exact paper, method and setting named in the question. Include such statements even when the answer also says that other parts are missing. Leave out background: facts about other papers, other settings or other tasks, and general descriptions that do not answer what was asked. Use an empty list when there are none.
-- gap_stated: does the answer say that some or all of what was asked is not in the papers?
-- premise_corrected: does the answer state plainly that something the question assumes is wrong, and say what is true instead?
-Reply with JSON."""
-
-FACTS_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "facts": {"type": "array", "items": {"type": "string"}},
-        "gap_stated": {"type": "boolean"},
-        "premise_corrected": {"type": "boolean"},
-    },
-    "required": ["facts", "gap_stated", "premise_corrected"],
-}
-
-
 def verifier_messages(question: str, answer: str, system: str = VERIFIER_SYSTEM) -> list[dict]:
     return [
         {"role": "system", "content": system},
@@ -77,39 +66,9 @@ def verifier_messages(question: str, answer: str, system: str = VERIFIER_SYSTEM)
 
 def parse_status(content: str) -> str | None:
     """Status from the verifier's JSON reply; None when it is missing or not a known status."""
-    payload = _json_object(content)
+    payload = json_object(content)
     status = payload.get("status") if payload else None
     return status if status in STATUSES else None
-
-
-def parse_facts(content: str) -> str | None:
-    """Status derived in code from the facts reply; None when the reply is malformed.
-
-    Facts that answer the question make it useful: partial when the answer also states
-    a gap or corrects the premise, else answered. With no such facts, only a plain
-    premise correction is partial.
-    """
-    payload = _json_object(content)
-    if not payload:
-        return None
-    facts, gap, premise = (
-        payload.get("facts"),
-        payload.get("gap_stated"),
-        payload.get("premise_corrected"),
-    )
-    if not isinstance(facts, list) or not isinstance(gap, bool) or not isinstance(premise, bool):
-        return None
-    if any(isinstance(fact, str) and fact.strip() for fact in facts):
-        return "partial" if gap or premise else "answered"
-    return "partial" if premise else "not_found"
-
-
-def _json_object(content: str) -> dict | None:
-    try:
-        payload = json.loads(content)
-    except (TypeError, ValueError):
-        return None
-    return payload if isinstance(payload, dict) else None
 
 
 # name -> (system prompt, JSON schema, reply parser)

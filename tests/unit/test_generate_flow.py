@@ -598,3 +598,179 @@ def test_refusal_after_generation_always_has_text(reply) -> None:
 
     assert result.outcome == "not_found"
     assert result.answer == GenerateFlow.NO_EVIDENCE_ANSWER
+
+
+# --- Facts check (#6): a hedged reply is a refusal only when it gives nothing that was asked. ---
+
+# Hedges, but cites a nearby block that checks out, with good retrieval: before the facts check
+# this was "answered" and showed a green badge.
+_HEDGED_NEARBY = (
+    "The provided context does not specify which object sets were used; it describes "
+    "JamPacker's planning and recovery modules. [[src:pdf/jampacker]]"
+)
+_NO_FACTS = '{"facts": [], "gap_stated": true, "premise_corrected": false}'
+_SOME_FACTS = '{"facts": ["JamPacker uses planning and recovery modules"], "gap_stated": true, "premise_corrected": false}'
+
+
+class FactsCheckLLM(StubLLMClient):
+    """Plain chat replies come from `responses`; JSON-schema calls are recorded separately."""
+
+    def __init__(self, responses: list[str], facts_reply: str | Exception) -> None:
+        super().__init__(responses=responses)
+        self.facts_reply = facts_reply
+        self.json_calls: list[tuple[list, dict]] = []
+
+    def chat_json(self, messages, schema):
+        self.json_calls.append((messages, schema))
+        if isinstance(self.facts_reply, Exception):
+            raise self.facts_reply
+        return ChatResponse(text=self.facts_reply, raw={})
+
+
+def _facts_flow(
+    reply: str, facts_reply: str | Exception, **settings
+) -> tuple[GenerateFlow, FactsCheckLLM]:
+    from rca.config.settings import Settings
+
+    llm = FactsCheckLLM([_REWRITE, reply], facts_reply)
+    flow = GenerateFlow(
+        settings=Settings(**settings), retrieve_flow=StubRetrieveFlow(), llm_client=llm
+    )
+    return flow, llm
+
+
+def test_hedged_reply_with_nothing_asked_for_is_a_refusal_even_when_its_citation_checks_out() -> (
+    None
+):
+    from rca.flows.facts_check import FACTS_SCHEMA
+
+    flow, llm = _facts_flow(_HEDGED_NEARBY, _NO_FACTS)
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    assert result.outcome == "not_found"
+    assert result.citations == []
+    assert "[[" not in result.answer and "does not specify" in result.answer
+    assert "facts_check_no_answer" in result.failure_labels
+    [(messages, schema)] = llm.json_calls
+    assert schema == FACTS_SCHEMA
+    assert _CONCEPTUAL in messages[-1].content and "does not specify" in messages[-1].content
+    stages = {stage.name: stage for stage in result.trace.stages}
+    assert list(stages)[-1] == "facts_check"
+    # The UI shows the last stage's hit count as "N hits"; the check must not reset it.
+    assert stages["facts_check"].hit_count == stages["llm_generate"].hit_count > 0
+
+
+def test_hedged_reply_that_gives_part_of_the_answer_stays_an_answer() -> None:
+    flow, _ = _facts_flow(_HEDGED_NEARBY, _SOME_FACTS)
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    assert result.outcome == "answered"
+    assert [citation.source_id for citation in result.citations] == ["src:pdf/jampacker"]
+
+
+@pytest.mark.parametrize(
+    "facts_reply",
+    ["not json", '{"facts": "x"}', RuntimeError("Ollama timed out")],
+    ids=["text", "bad-shape", "error"],
+)
+def test_failed_facts_check_falls_back_to_the_hedge_rule_and_says_so(facts_reply) -> None:
+    flow, _ = _facts_flow(_HEDGED_NEARBY, facts_reply)
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    # The old rule keeps a hedged reply whose citation checks out with good retrieval.
+    assert result.outcome == "answered"
+    assert "facts_check_failed" in result.failure_labels
+
+
+def test_unhedged_reply_gets_no_facts_check() -> None:
+    flow, llm = _facts_flow(
+        "JamPacker combines planning and recovery modules. [[src:pdf/jampacker]]", _NO_FACTS
+    )
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    assert result.outcome == "answered"
+    assert llm.json_calls == []
+
+
+def test_facts_check_can_be_turned_off() -> None:
+    flow, llm = _facts_flow(_HEDGED_NEARBY, _NO_FACTS, facts_check_enabled=False)
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    assert result.outcome == "answered"
+    assert llm.json_calls == []
+    assert "facts_check_failed" not in result.failure_labels
+
+
+def test_eval_measures_the_shipped_hedge_rule_and_prompt() -> None:
+    from eval import compare_answer_classifiers
+    from rca.flows import facts_check
+
+    assert compare_answer_classifiers.is_hedged is facts_check.is_hedged
+    assert compare_answer_classifiers.FACTS_SYSTEM is facts_check.FACTS_SYSTEM
+    assert compare_answer_classifiers.parse_facts is facts_check.parse_facts
+
+
+def test_runtime_hedge_rule_matches_everything_the_label_sampler_weighted_up() -> None:
+    # The sampler keeps its regex frozen so the label files stay reproducible; the runtime
+    # rule must be a superset, or the facts check would skip replies the labels cover.
+    import json
+
+    from eval.sample_answer_labels import is_hedged as sampler_hedged
+    from rca.flows.facts_check import is_hedged
+
+    answers = [
+        item["answer"]
+        for name in (
+            "answer_labels.json",
+            "answer_labels_fulltext_dev.json",
+            "answer_labels_fulltext_test.json",
+        )
+        for item in json.load(open(f"eval/{name}", encoding="utf-8"))["items"]
+    ]
+    assert [a for a in answers if sampler_hedged(a) and not is_hedged(a)] == []
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "The batch size is not provided in the retrieved context.",
+        "It does not contain information about the batch size.",
+        "The provided excerpts do not contain information about the batch size.",
+        "The retrieved passages don't mention the batch size.",
+        "I can't find the batch size in your papers.",
+    ],
+)
+@pytest.mark.parametrize("check", [True, False], ids=["check-on", "check-off"])
+def test_refusal_phrasings_count_as_hedged_with_the_check_on_or_off(reply, check) -> None:
+    # Phrasings the earlier phrase list caught, and close variants, must stay refusals.
+    flow, llm = _facts_flow(reply, _NO_FACTS, facts_check_enabled=check)
+
+    result = flow.generate_answer(_CONCEPTUAL)
+
+    assert result.outcome == "not_found"
+    assert "llm_abstained" in result.failure_labels
+    assert len(llm.json_calls) == (1 if check else 0)
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        # The phrase list GenerateFlow used before the facts check; each must stay a hedge.
+        "does not contain information",
+        "no information",
+        "cannot find",
+        "not mentioned in",
+        "no relevant information",
+        "cannot answer",
+        "not provided in",
+    ],
+)
+def test_hedge_rule_covers_the_earlier_phrase_list(phrase) -> None:
+    from rca.flows.facts_check import is_hedged
+
+    assert is_hedged(f"Sorry, the answer {phrase} the sources.")

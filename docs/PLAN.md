@@ -134,7 +134,8 @@ and RCA's own agent.
   question about the chat itself and a failed request, as "⚠ Unverified".
 - **Decision:** `AnswerOutcome` = `answered | unverified | not_found | conversational`. It is the
   only stored field; `grounded` and `abstained` are derived from it and stay in every payload.
-  `partial` is added when the facts check ships (step 3). `error` exists only in the client.
+  `partial` was planned for step 3 and left out: no classifier tells it apart reliably (see "Step 3:
+  facts check, design"). `error` exists only in the client.
 - **UX:** a refusal reads "No evidence found" in neutral colour; a question about the chat itself has
   no badge; a failed request says so. A greeting such as "hello" is not classified as
   conversational and still gets a refusal (section 7; not part of step 2, still open). **DX:** one field to switch on; a constructor must name the outcome.
@@ -245,9 +246,10 @@ and RCA's own agent.
   string**. Reproduced on `686f13b` with a stub LLM (`'' False True ['missing_citation',
   'low_retrieval_confidence']`). Fixed in step 2; a citation-only reply had the same hole.
 - A hedged reply with one valid citation and good retrieval is `answered` with no failure label:
-  the `llm_abstained` label is computed and then dropped. This is the #6 gap; step 3 closes it.
-- Two definitions of "hedged" exist (`GenerateFlow._ABSTENTION_SIGNALS` and
-  `eval/sample_answer_labels.is_hedged`). Step 3 keeps one.
+  the `llm_abstained` label is computed and then dropped. This is the #6 gap; step 3 sends such
+  replies to the facts check.
+- Two definitions of "hedged" existed (`GenerateFlow._ABSTENTION_SIGNALS` and
+  `eval/sample_answer_labels.is_hedged`). Step 3 kept the second, now `rca.flows.facts_check.is_hedged`.
 
 ## 5. Steps
 
@@ -258,7 +260,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 |---|---|---|---|
 | 1 | **Typed answer outcome** end to end (flow, `/chat`, badge, harness). Done (`1476225`). | New tests fail on old code; full suite; frontend checks; live `/chat` | "Illegal states are unrepresentable"; a correct refusal is no longer shown as a warning |
 | 2 | **A refusal always has text; an error is not an answer.** Empty-reply fix in the flow; the client marks failed requests as `error`, shows a retry, and keeps them out of history. Done. | Failing test first for the empty reply; vitest for history | Small, shows root-cause habit |
-| 3 | **Ship the facts check** (#6): hedge-gated second call, `partial` outcome, one hedge definition, setting to disable. | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
+| 3 | **Ship the facts check** (#6): hedge-gated second call, one hedge definition, setting to disable. The planned `partial` outcome was dropped (see "Step 3: facts check, design"). Done: test split, unanswerable declined 6/12 → 12/12, answerable 1/28 → 2/28, +0.6 s mean (EVAL.md). | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
 | 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
 | 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
 | 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
@@ -362,6 +364,40 @@ Found while checking (not fixed in step 1; each needs a step):
   After a rebuild the browser kept the old `index.html`, which names asset files that no longer
   exist; a user upgrading the demo can get a stale or blank page. Fix: `no-cache` on `index.html`
   only; hashed assets can stay cacheable.
+
+## Step 3: facts check, design (2026-11-11)
+
+- **What ships** is the measured `verifier_facts_on_hedge` (EVAL.md, "Answer classifiers") plus the
+  citation rules that were already there: when the reply hedges, a second call with the same chat
+  model lists the statements that answer the question, and none means RCA declines. Because the
+  citation rules still decline on their own, the offline numbers are an upper bound: recomputed
+  from the saved predictions and pipeline labels, dev is unchanged (19/21 caught, 49/55 kept) and
+  test keeps 25/27 instead of 26/27 (`jampacker-001`, unhedged, declined for `invalid_citation`). Prompt, schema and parser move from `eval/` into
+  `rca/flows/facts_check.py`, and the comparison script imports them, so the eval measures the
+  shipped prompt.
+- **It replaces only the hedge rule.** Before, a hedged reply was a refusal only when its citation
+  failed or retrieval was weak, so a refusal citing a nearby block showed as "Grounded". Now the
+  check decides whether a hedged reply is a refusal. The citation rules (invalid or unsupported
+  citation, missing citation with weak retrieval) are unchanged, as are unhedged replies.
+- **No `partial` outcome.** Section 5 planned one; EVAL.md found partial versus answered unreliable
+  with every classifier (test: 2 of 6 partials predicted), so a "Partial answer" badge would mostly
+  be wrong. The check is used for useful or not, as EVAL.md recommends. Add `partial` only when a
+  classifier earns it.
+- **One runtime hedge definition,** `rca.flows.facts_check.is_hedged`: the eval sampler's regex,
+  widened to cover every phrase of the old list (the review found "not provided in" and "does not
+  contain information" refusals missed by the regex alone) and a few close variants (passages,
+  excerpts, "couldn't find"). On the 211 labelled answers it matches what the sampler's regex
+  matches, plus 41 replies the old phrase list missed, mostly partial answers and refusals citing a
+  nearby block. The sampler keeps its own frozen copy so the label files stay reproducible; a test
+  checks the runtime rule is a superset. With the check off or failed the old hedge rule runs with
+  the wider definition, so "off" declines slightly more often than before step 3.
+- **Failure is not a refusal:** if the call fails or the reply is malformed, the old rule decides
+  and the answer carries `facts_check_failed`. A refusal from the check carries
+  `facts_check_no_answer`. The trace gets a `facts_check` stage.
+- **On by default** (open question 4), `RCA_FACTS_CHECK_ENABLED=false` turns it off. Cost: about
+  3.5 s on the roughly 40% of replies that hedge.
+- **Proof:** stub-LLM tests for each branch, failing first; harness on the test split with the check
+  on and off; a live `/chat` check.
 
 ## 8. Questions only you can answer
 

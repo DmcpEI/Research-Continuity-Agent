@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import urllib.request
 
+import pytest
+
 from rca.config.settings import Settings
 from rca.llm.client import ChatMessage, OllamaLLMClient
 from rca.llm.factory import get_llm_client
@@ -401,3 +403,46 @@ def test_chat_and_agent_default_to_one_small_model(monkeypatch) -> None:
 
     # One shared model means only one chat model is loaded in Ollama at a time.
     assert settings.generation_model == settings.agent_model == "qwen3.5:4b"
+
+
+@pytest.mark.parametrize("api_style", ["ollama", "openai"])
+def test_chat_json_asks_for_the_schema_and_plain_chat_does_not(monkeypatch, api_style) -> None:
+    from rca.llm.client import ChatMessage
+
+    client = OllamaLLMClient(base_url="http://localhost:11434", model="m", api_style=api_style)
+    sent: list[dict] = []
+
+    def fake_post(path, payload, timeout=120):
+        sent.append(payload)
+        message = {"role": "assistant", "content": '{"ok": true}'}
+        return (
+            {"choices": [{"message": message}]}
+            if "chat/completions" in path
+            else {"message": message}
+        )
+
+    monkeypatch.setattr(client, "_post_json", fake_post)
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}}
+    messages = [ChatMessage(role="user", content="hi")]
+
+    reply = client.chat_json(messages, schema)
+    client.chat(messages)
+
+    assert reply.text == '{"ok": true}'
+    if api_style == "ollama":
+        assert sent[0]["format"] == schema
+        # A JSON reply cut short is invalid, so it gets more room than a normal answer.
+        assert (sent[0]["options"]["num_predict"], sent[1]["options"]["num_predict"]) == (1024, 512)
+    else:
+        assert sent[0]["response_format"]["json_schema"]["schema"] == schema
+        assert (sent[0]["max_tokens"], sent[1]["max_tokens"]) == (1024, 512)
+    assert "format" not in sent[1] and "response_format" not in sent[1]
+    assert client.options["num_predict"] == 512
+
+
+def test_clients_without_structured_output_fall_back_to_plain_chat() -> None:
+    from rca.llm.client import ChatMessage, EchoLLMClient
+
+    reply = EchoLLMClient().chat_json([ChatMessage(role="user", content="hi")], {"type": "object"})
+
+    assert reply.text == "[stubbed-llm] hi"

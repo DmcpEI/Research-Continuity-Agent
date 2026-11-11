@@ -12,6 +12,13 @@ from pydantic import BaseModel, Field, computed_field
 
 from rca.config.settings import Settings, get_settings
 from rca.contracts.trace import QueryTrace, StageTrace
+from rca.flows.facts_check import (
+    FACTS_SCHEMA,
+    FactsStatus,
+    facts_messages,
+    is_hedged,
+    parse_facts,
+)
 from rca.flows.retrieve_flow import RetrievalBundle, RetrieveFlow
 from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
 from rca.llm.factory import get_llm_client
@@ -92,15 +99,6 @@ Rules:
         "Answer using only the context above. End every sentence that states a fact "
         "with the [[id]] of the block it came from, copied exactly. If the context does not "
         "answer the question, say so and use no [[...]]."
-    )
-    _ABSTENTION_SIGNALS = (
-        "does not contain information",
-        "no information",
-        "cannot find",
-        "not mentioned in",
-        "no relevant information",
-        "cannot answer",
-        "not provided in",
     )
     _CITATION_PATTERN = re.compile(r"\[\[((?:src|chk):[^\]]+)\]\]")
     _ABSTENTION_SCORE_THRESHOLD = 0.50
@@ -276,7 +274,13 @@ Rules:
         answer_text = self._normalize_loose_citation_markers(response.text, bundle)
         citations = self._extract_citations(answer_text, bundle)
         grounding = self._verify_grounding(answer_text, citations, bundle)
-        abstention = self._decide_abstention(answer_text, bundle, grounding)
+        hedged = is_hedged(answer_text)
+        check_facts = hedged and self.settings.facts_check_enabled
+        facts_status = self._check_facts(query, answer_text, trace) if check_facts else None
+        facts_failed = check_facts and facts_status is None
+        abstention = self._decide_abstention(
+            answer_text, bundle, grounding, hedged, facts_status, facts_failed
+        )
         self._append_failure_warnings(trace, abstention.failure_labels)
 
         if abstention.abstain:
@@ -323,9 +327,34 @@ Rules:
             answer=answer_text,
             outcome=AnswerOutcome.answered if grounded else AnswerOutcome.unverified,
             citations=citations,
-            failure_labels=grounding.failure_labels,
+            failure_labels=grounding.failure_labels
+            + (["facts_check_failed"] if facts_failed else []),
             trace=trace,
         )
+
+    def _check_facts(self, query: str, answer_text: str, trace: QueryTrace) -> FactsStatus | None:
+        """Ask the chat model what the hedged reply gives; None when the check fails."""
+        started = perf_counter()
+        status: FactsStatus | None = None
+        try:
+            reply = self.llm.chat_json(facts_messages(query, answer_text), FACTS_SCHEMA)
+        except Exception:  # the model call failed: keep the answer, the hedge rule decides
+            logger.warning("Facts check call failed for query %r", query, exc_info=True)
+        else:
+            self._accumulate_usage(trace, reply.raw)
+            status = parse_facts(reply.text)
+            if status is None:
+                logger.warning("Facts check reply not usable for query %r: %r", query, reply.text)
+        trace.stages.append(
+            StageTrace(
+                name="facts_check",
+                duration_ms=(perf_counter() - started) * 1000.0,
+                # Same as llm_generate: the UI reads the last stage's count as "N hits".
+                hit_count=len(trace.context_node_ids),
+                notes=status or "failed",
+            )
+        )
+        return status
 
     def _build_context(self, hits: list) -> str:
         """Format retrieved hits into a context block for the prompt.
@@ -467,11 +496,6 @@ Rules:
 
         return self._LOOSE_CITATION_PATTERN.sub(replace, answer_text)
 
-    @classmethod
-    def _contains_abstention_signal(cls, answer_text: str) -> bool:
-        normalized = answer_text.casefold()
-        return any(signal in normalized for signal in cls._ABSTENTION_SIGNALS)
-
     def _verify_grounding(
         self,
         answer_text: str,
@@ -505,21 +529,30 @@ Rules:
         answer_text: str,
         bundle: RetrievalBundle,
         grounding: GroundingCheck,
+        hedged: bool,
+        facts_status: FactsStatus | None,
+        facts_failed: bool,
     ) -> AbstentionDecision:
         labels = list(grounding.failure_labels)
-        has_hedge = self._contains_abstention_signal(answer_text)
         max_retrieval_score = max((hit.score for hit in bundle.hits), default=0.0)
+        low_confidence = max_retrieval_score < self._ABSTENTION_SCORE_THRESHOLD
 
-        if has_hedge:
+        if hedged:
             labels.append("llm_abstained")
-        if max_retrieval_score < self._ABSTENTION_SCORE_THRESHOLD:
+        if low_confidence:
             labels.append("low_retrieval_confidence")
+        if facts_failed:
+            labels.append("facts_check_failed")
+        if facts_status == "not_found":
+            labels.append("facts_check_no_answer")
 
         labels = self._dedupe_labels(labels)
         should_abstain = False
-        if has_hedge and (
-            not grounding.valid or max_retrieval_score < self._ABSTENTION_SCORE_THRESHOLD
-        ):
+        if facts_status is not None:
+            # The facts check read the hedged reply: it declines only if nothing asked is given.
+            should_abstain = facts_status == "not_found"
+        elif hedged and (not grounding.valid or low_confidence):
+            # Check off or failed: a hedge declines when the citation or retrieval is weak.
             should_abstain = True
         if "invalid_citation" in labels or "unsupported_claim" in labels:
             should_abstain = True

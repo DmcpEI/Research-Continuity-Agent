@@ -555,6 +555,20 @@ Findings:
 
 Caveats: the labels and the verifier prompts are drafted by the same assistant, and the prompts were tuned on dev: two prompts, then one field reorder (asking for facts before the gap question moved dev useful kept from 46 to 49 and `not_found` caught from 21 to 20). After the first test run, the review found that facts plus a premise correction mapped to `answered` although the labelling rules call a premise correction `partial`; the rule was fixed and both splits rerun, which changed no two-class number. The test split is small (8 `not_found`, 6 `partial`), so 8/8 and 26/27 are compatible with real rates well below 100% (Wilson 95% lower bounds about 68% and 82%). No claim-level entailment (NLI) model was tried: none is installed locally. The `unsupported` flag it would target occurred in 2 of 35 test answers, and none of the classifiers above looks for it. Per-answer predictions, verifier prompts and replies: `eval/results/classifiers_20261109/` (local, not committed).
 
+### Facts check shipped, end to end on the test split (2026-11-11)
+
+`verifier_facts_on_hedge` now runs inside `GenerateFlow` (prompt, schema and parser in `rca/flows/facts_check.py`, imported by `compare_answer_classifiers.py`; design in docs/PLAN.md, "Step 3: facts check, design"). Unlike the offline rows above, the shipped decision keeps the citation rules, and the hedge rule was widened to cover the old phrase list; no labelled answer changes hedge status. Harness on the 40 test questions, `qwen3.5:4b`, against a copy of the library, every store path pointed at the copy; "before" is `a19d7fb`, "after" the step-3 code with the check on:
+
+| | before | after |
+|---|---|---|
+| unanswerable questions refused | 6/12 | 12/12 |
+| answerable questions refused | 1/28 | 2/28 |
+| outcomes | 31 answered, 2 unverified, 7 not found | 26 answered, 14 not found |
+| answer keyword hit rate (answerable) | 0.601 | 0.601 |
+| mean time per question | 8.6 s | 9.2 s |
+
+The check ran on 13 of 40 replies (median 1.7 s, max 4.8 s) and never failed; it declined 8 and kept 5. The new answerable refusal is `cross-004`, the partial cross-paper answer the offline comparison already lost; the other is `jampacker-001`, declined before and after by the citation rule. An earlier "after" run (before the review widened the hedge rule) got different reply text from the model for 11 of 40 questions at temperature 0, and two answerable outcomes differed: `review-002` hedged and was declined in that run (the same wording was labelled `not_found` on 2026-11-09), and `pic2-009` was `unverified`. Single-question changes between runs are therefore not all caused by the check. 12/12 has a Wilson 95% lower bound of about 76%. Artifacts: scratchpad only, not committed.
+
 ---
 
 ## Current Status

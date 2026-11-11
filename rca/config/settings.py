@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     openai_chat_model: str = "gpt-4o-mini"
     openai_embed_model: str = "text-embedding-3-small"
     enable_reranker: bool = True
+    # Facts check (#6): when a reply hedges, a second call with the chat model decides whether
+    # it gives anything that was asked; nothing means RCA declines. About 3.5 s on hedged replies.
+    facts_check_enabled: bool = True
     # Ollama "think" flag. Thinking models (qwen3.5, ...) otherwise return their whole
     # answer in message.thinking and leave message.content empty. True only works with
     # thinking-capable models; others reject it with HTTP 400.
@@ -171,6 +174,7 @@ class Settings(BaseSettings):
             "RCA_OPENAI_CHAT_MODEL": "openai_chat_model",
             "RCA_OPENAI_EMBED_MODEL": "openai_embed_model",
             "RCA_ENABLE_RERANKER": "enable_reranker",
+            "RCA_FACTS_CHECK_ENABLED": "facts_check_enabled",
             "RCA_LLM_THINK": "llm_think",
             "RCA_LLM_KEEP_ALIVE": "llm_keep_alive",
             "RCA_RERANKER_MODEL": "reranker_model",

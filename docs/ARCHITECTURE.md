@@ -33,7 +33,8 @@ GenerateFlow
     ├── citation extraction (_extract_citations)
     ├── source-ID resolution (chunk ID → parent src: node)
     ├── rerank gate (max rerank_score <= -3.618 → abstain before LLM call)
-    ├── abstention check (hedge phrases + retrieval confidence)
+    ├── facts check (hedged replies only: a second LLM call lists what the reply gives)
+    ├── abstention check (facts check or hedge rule + citation validity + retrieval confidence)
     └── grounding check → GeneratedAnswer(answer, citations, outcome, failure_labels)
     │
     ▼
@@ -103,7 +104,7 @@ Grounded answer generation with citation enforcement.
 5. **Generate** — calls the configured generation backend
 6. **Extract citations** — parses inline citation markers from generated text
 7. **Resolve source IDs** — strips `:NNNN` suffix and resolves chunk IDs to parent `src:` nodes unconditionally
-8. **Abstention gates** — before generation, a calibrated cross-encoder score gate abstains when no hit is a strong match (label `low_rerank_score`); after generation, unsupported answers are suppressed using hedge phrases, citation validity, and retrieval confidence
+8. **Abstention gates** — before generation, a calibrated cross-encoder score gate abstains when no hit is a strong match (label `low_rerank_score`); after generation, a reply that hedges ("the context does not contain ...", `rca/flows/facts_check.is_hedged`) goes to the facts check: a second call with the chat model lists the statements in it that give what the question asks for, and none means RCA declines (`facts_check_no_answer`). If the check is off (`RCA_FACTS_CHECK_ENABLED=false`) or fails (`facts_check_failed`), a hedged reply declines only when its citation fails or retrieval is weak. Independently, an invalid or unsupported citation, or a missing citation with weak retrieval, also declines. Prompt and measurements: docs/EVAL.md, "Answer classifiers"
 9. **Outcome** — every reply carries exactly one `AnswerOutcome`; `failure_labels` say why:
    - `answered`: the answer cites retrieved context and passes the citation check (the cited ID resolves to a retrieved hit and the answer shares content words with the cited text). This is a citation check, not proof that each claim is supported.
    - `unverified`: an answer is shown but no citation passes the check (`missing_citation`, `invalid_citation` or `unsupported_claim`).
@@ -112,7 +113,7 @@ Grounded answer generation with citation enforcement.
 
    `grounded` and `abstained` are derived from the outcome (`answered` and `not_found`) and are still present in API payloads and eval artifacts. `/chat` returns `outcome`; the React badge reads it and shows a refusal as "No evidence found" instead of "Unverified". A failed request is marked `error` by the client only.
 
-**QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the seven pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, `cross_encoder_rerank`, and `llm_generate`. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.
+**QueryTrace observability.** Each query builds a single in-memory `QueryTrace` that records the seven pipeline stages: `llm_rewrite`, `vector_search`, `graph_search`, `score_merge`, `expand_sources`, `cross_encoder_rerank`, and `llm_generate`, plus `facts_check` when a hedged reply is checked. The trace is attached to the returned `GeneratedAnswer` (and nested `RetrievalBundle` during retrieval), while persistence stays outside the core flows; the evaluation harness writes per-query trace files under `eval/results/traces/`.
 
 ### GraphStore (`rca/store/graph_store.py`)
 
