@@ -265,3 +265,14 @@ def test_main_finds_the_repo_from_any_working_directory(tmp_path: Path, monkeypa
     run_path.write_text(json.dumps(run), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     assert sc.main([str(run_path)]) == 1
+
+
+def test_published_docs_match_the_committed_scorecard() -> None:
+    """README and EVAL.md carry exactly what eval/scorecard.json renders; no hand edits."""
+    sc = _load()
+    root = SCORECARD_PATH.parents[1]
+    card = json.loads((root / sc.CARD).read_text(encoding="utf-8"))
+    block = sc.render(card)
+    for doc in sc.DOCS:
+        text = (root / doc).read_text(encoding="utf-8")
+        assert sc.replace_block(text, block) == text, f"{doc} differs from {sc.CARD}"

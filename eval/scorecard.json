@@ -1,0 +1,63 @@
+{
+  "run": "20261111T173354Z",
+  "split": "test",
+  "questions": 40,
+  "model": "qwen3.5:4b",
+  "model_digest": "7f3251fa6878a78a606bcb3c074283306e5ad2ea411a7774a9dd98a4bc7f2d13",
+  "reranker": {
+    "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "revision": "233902d25c440f23af6f7d6e94d2946bac0bee0a"
+  },
+  "commit": "77ec660d1069c11bda7761ef5506dbbad8f550f3",
+  "corpus_version": "51b6785c3405cb16",
+  "facts_check_enabled": true,
+  "metrics": {
+    "answered_with_expected_citation": {
+      "hits": 24,
+      "n": 28,
+      "lower": 0.685,
+      "upper": 0.943
+    },
+    "answerable_refused": {
+      "hits": 3,
+      "n": 28,
+      "lower": 0.037,
+      "upper": 0.272
+    },
+    "unanswerable_refused": {
+      "hits": 12,
+      "n": 12,
+      "lower": 0.757,
+      "upper": 1.0
+    },
+    "citation_precision": {
+      "hits": 24,
+      "n": 25,
+      "lower": 0.805,
+      "upper": 0.993
+    },
+    "retrieval_hit_at_5": {
+      "hits": 27,
+      "n": 28,
+      "lower": 0.823,
+      "upper": 0.994
+    },
+    "keyword_hit_rate": 0.595,
+    "mean_seconds": 8.9,
+    "median_seconds": 8.9
+  },
+  "misses": {
+    "answerable_refused": [
+      "review-002",
+      "cross-004",
+      "autobag-004"
+    ],
+    "answered_without_expected_citation": [
+      "pic2-009"
+    ],
+    "unanswerable_answered": [],
+    "retrieval_not_in_top5": [
+      "cross-004"
+    ]
+  }
+}

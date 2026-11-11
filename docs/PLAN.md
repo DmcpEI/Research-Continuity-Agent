@@ -13,6 +13,9 @@ not checked, it says so.
 > says "not in your papers" when that is the truth. Here is how often each of those happens on a
 > held-out test split, and the one command that reproduces the numbers.
 
+The numbers for that sentence are the generated scorecard in the README ("Results at a glance")
+and EVAL.md, from `eval/scorecard.json` (step 4); they are not copied here, so they cannot drift.
+
 Everything in this plan is ranked by how much it helps that sentence become true and provable.
 A reviewer has about five minutes. A project that makes one claim and proves it beats a project
 with twelve features and a mixed table of numbers.
@@ -261,7 +264,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 1 | **Typed answer outcome** end to end (flow, `/chat`, badge, harness). Done (`1476225`). | New tests fail on old code; full suite; frontend checks; live `/chat` | "Illegal states are unrepresentable"; a correct refusal is no longer shown as a warning |
 | 2 | **A refusal always has text; an error is not an answer.** Empty-reply fix in the flow; the client marks failed requests as `error`, shows a retry, and keeps them out of history. Done. | Failing test first for the empty reply; vitest for history | Small, shows root-cause habit |
 | 3 | **Ship the facts check** (#6): hedge-gated second call, one hedge definition, setting to disable. The planned `partial` outcome was dropped (see "Step 3: facts check, design"). Done: test split, unanswerable declined 6/12 → 12/12, answerable 1/28 → 2/28, +0.6 s mean (EVAL.md). | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
-| 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
+| 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. Done: `eval/scorecard.json`, generated into README and EVAL.md; rerank gate unchanged (see "Step 4: one scorecard, design"). | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
 | 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
 | 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
 | 7 | **Vector store recovers** (#19), as in M3. | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
@@ -431,6 +434,14 @@ Found while checking (not fixed in step 1; each needs a step):
   false abstentions, as with `gemma3:12b`); on test it catches 5/12 at 0/28 (was 1/28).
 - **Not in the scorecard:** dev numbers (tuning only), the agent bench (a separate claim with its
   own README line), hit@10.
+- **Open, found by the second review:** an empty model reply (the #21 failure mode) and a reply
+  cut off at `num_predict` leave no trace warning on `/chat`, so the scorecard cannot refuse a
+  run that had them. Fixing it means a flow change (a warning on both paths), so it is not part
+  of this step. The published run had no empty reply.
+- **Run-to-run variation is larger than the intervals suggest.** The two step-4 runs gave
+  identical replies; the step-3 run of the same flow code that morning differed on 18 of 40
+  replies and 4 outcomes. Cause not found (same model digest, settings and corpus). Noted next to
+  the scorecard in EVAL.md.
 
 ## 8. Questions only you can answer
 
