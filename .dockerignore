@@ -15,6 +15,10 @@ htmlcov
 dist
 build
 frontend/node_modules
+# private local data and notes: never in an image
+.rca
 .rca-demo
+data
+.agent_handoff
 .claude
 CLAUDE.md

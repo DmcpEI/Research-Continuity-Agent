@@ -5,6 +5,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 ## [Unreleased]
 
 ### Security
+- Docker images no longer contain your library. `.dockerignore` did not exclude `.rca/`, so every `docker compose build` (including the public `demo` service) copied the local graph, vectors, uploaded PDFs and experiment database (plus the git-ignored `data/` and `.agent_handoff/` folders) into an image layer, a leftover from the deleted ECS path that baked a corpus in. The running containers never used it (`rca` mounts `./.rca`, `demo` uses its own volume). Rebuild your images, and delete old ones (`docker image rm research-continuity-agent-rca research-continuity-agent-demo`) if they were ever pushed or shared.
 - The filesystem MCP server's `search_text` passed the model-supplied pattern to ripgrep as a positional argument, so a pattern such as `--pre=CMD` became an rg flag and ran `CMD` on every file in the sandbox. A prompt-injected document could therefore trigger command execution through the agent. The pattern now follows `-e` and the path follows `--`. Upgrade recommended for anyone running agent mode.
 
 ### Added

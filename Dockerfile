@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-install-project
 
-# Copy application code plus the baked demo corpus under .rca/
+# Copy application code. The library (.rca/) is never baked in: compose mounts it.
 COPY . .
 
 # Install the project itself once the package sources are present.
