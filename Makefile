@@ -1,4 +1,4 @@
-.PHONY: help install run demo eval test ablations aws-demo aws-deploy aws-down
+.PHONY: help install run demo eval test ablations
 
 help:
 	@echo "Usage:"
@@ -8,9 +8,6 @@ help:
 	@echo "  make eval       Run the generation evaluation harness (local, no Docker)"
 	@echo "  make ablations  Run retrieval ablation study (local, no Docker)"
 	@echo "  make test       Run the test suite (local, no Docker)"
-	@echo "  make aws-demo   Build, push, run a one-off ECS demo task, then tear it down"
-	@echo "  make aws-deploy Build, push, and update an ECS service (expects precreated infra)"
-	@echo "  make aws-down   Scale the ECS service back to zero"
 
 install:
 	uv sync
@@ -29,12 +26,3 @@ ablations:
 
 test:
 	uv run pytest
-
-aws-demo:
-	./infra/demo.sh
-
-aws-deploy:
-	./infra/deploy.sh
-
-aws-down:
-	./infra/teardown_service.sh

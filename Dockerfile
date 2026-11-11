@@ -20,7 +20,7 @@ COPY . .
 RUN uv sync --frozen
 
 ENV RCA_ENVIRONMENT=production \
-    RCA_LLM_BACKEND=openai_compatible \
+    RCA_LLM_BACKEND=ollama \
     RCA_ENABLE_FILESYSTEM_TOOLS=false \
     RCA_WORKSPACE_ROOT=/app \
     RCA_FILESYSTEM_ROOT=/app \
@@ -35,8 +35,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
   CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"
 
-# Local Docker Compose overrides the backend back to Ollama. The image defaults
-# to an external OpenAI-compatible endpoint so it can run unchanged on ECS.
+# Ollama runs on the host: docker-compose.yml points RCA_LLM_BASE_URL and
+# RCA_EMBEDDING_BASE_URL at host.docker.internal.
 # Serves the built React app (frontend/dist) and the API under /api.
 CMD ["uv", "run", "uvicorn", "rca.api.main:create_site", "--factory", \
      "--host", "0.0.0.0", "--port", "8000"]

@@ -307,8 +307,6 @@ Runtime directories under `.rca/` are created automatically on first use.
 
 To use any OpenAI-compatible endpoint (OpenAI, Groq, local vLLM, etc.), set `RCA_LLM_BACKEND=openai_compatible`, provide `RCA_OPENAI_API_KEY`, and override `RCA_OPENAI_BASE_URL` / model names as needed. The currently selected embedding model must match the embeddings used to build the active vector collection; switching providers for an existing corpus may require re-ingest.
 
-For a production-shaped demo container, use `.env.production.example` as the starting point instead of `.env`. The deployment image defaults to `RCA_LLM_BACKEND=openai_compatible` and disables filesystem MCP tools unless you explicitly re-enable them.
-
 ### Model picker recommendation policy
 
 Model discovery is dynamic: RCA reads available models from the active backend (`/api/tags` for Ollama) and computes recommendations from that live list. This is not a static list tied to one machine.
@@ -328,23 +326,6 @@ The picker UI groups models into:
 This means different users with different local Ollama catalogs will naturally see different recommendations.
 
 > **Always use `uv run python`.** Never bare `python` — the system Python lacks ChromaDB and silently falls back to the JSON backend, returning 0 documents.
-
-### AWS demo path
-
-The repo now includes a **cost-aware AWS deployment-ready package** under [infra/README.md](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/README.md). The intended student-friendly flow is:
-
-1. build and push the image
-2. run a short-lived ECS task for screenshots or a demo
-3. tear it down immediately
-
-Key artifacts:
-- [infra/demo.sh](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/demo.sh) — one-off Fargate demo task with automatic teardown prompt
-- [infra/deploy.sh](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/deploy.sh) — longer-lived ECS service deployment against pre-created infra
-- [infra/teardown_service.sh](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/teardown_service.sh) — scale the ECS service back to zero
-- [infra/ecs-task-def.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/ecs-task-def.json) — Fargate task definition template
-- [infra/ecs-service.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/infra/ecs-service.json) — ECS service template
-
-This is deliberately a deployment-ready package, not a promise that RCA should stay live on AWS full time.
 
 ---
 
