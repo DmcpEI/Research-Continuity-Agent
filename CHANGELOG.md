@@ -44,6 +44,7 @@ All notable changes to RCA. Format follows [Keep a Changelog](https://keepachang
 - Integration tests no longer load the real cross-encoder, which made Hugging Face Hub requests and could stall the pre-push hook for over a minute on a slow network. Contributors only; reranking stays covered by a stubbed unit test.
 
 ### Removed
+- Code nothing imported: `rca.orchestrator` (intent router and tool-policy checks), `rca/config/tool_policies.yaml` and the `tool_policy_path` setting (`RCA_TOOL_POLICY_PATH`) only it read, `rca.telemetry.metrics`, `rca.telemetry.tracing`, the empty `rca.mcp_servers.arxiv` package, and the direct `PyJWT` dependency. No runtime change; an old `.env` that still sets `RCA_TOOL_POLICY_PATH` keeps working, because unknown settings are ignored. Affects only code importing these modules.
 - Empty `rca.mcp_servers.git` and `rca.mcp_servers.zotero` placeholder packages (#14). They held no code; nothing imported them. Zotero is no longer listed as planned work.
 
 ## [1.5.0] - 2026-09-29 (tag `v1.5.0`)

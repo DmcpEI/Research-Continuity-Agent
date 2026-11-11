@@ -53,7 +53,6 @@ class Settings(BaseSettings):
     telemetry_log_path: Path = Field(default_factory=lambda: Path(".rca/telemetry.jsonl"))
     experiment_db_path: Path = Field(default_factory=lambda: Path(".rca/experiments.sqlite3"))
     default_collection: str = "research-continuity"
-    tool_policy_path: Path = Field(default_factory=lambda: Path("rca/config/tool_policies.yaml"))
     frontend_dist: Path = Field(default_factory=lambda: Path("frontend/dist"))
     chunk_size: int = 1200
     chunk_overlap: int = 150
@@ -154,7 +153,6 @@ class Settings(BaseSettings):
             "RCA_TELEMETRY_LOG_PATH": "telemetry_log_path",
             "RCA_EXPERIMENT_DB_PATH": "experiment_db_path",
             "RCA_DEFAULT_COLLECTION": "default_collection",
-            "RCA_TOOL_POLICY_PATH": "tool_policy_path",
             "RCA_FRONTEND_DIST": "frontend_dist",
             "RCA_CHUNK_SIZE": "chunk_size",
             "RCA_CHUNK_OVERLAP": "chunk_overlap",

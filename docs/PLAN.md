@@ -443,6 +443,36 @@ Found while checking (not fixed in step 1; each needs a step):
   replies and 4 outcomes. Cause not found (same model digest, settings and corpus). Noted next to
   the scorecard in EVAL.md.
 
+## Step 5: cut and tidy, design (2026-11-11)
+
+Your answers (2026-11-11): delete the Streamlit app, delete `infra/`, delete the event log (not
+read by hand), keep tracking `frontend/dist` for now. One commit per cut, so each can be reverted
+alone:
+
+1. **Code nothing imports.** `rca/orchestrator/` (Router, tool policies) with
+   `rca/config/tool_policies.yaml` and the `tool_policy_path` setting it alone read,
+   `rca/telemetry/metrics.py`, `rca/telemetry/tracing.py`, the empty `rca/mcp_servers/arxiv/`, and
+   the `PyJWT` dependency (no importer). `PyYAML` stays: the experiment extractor uses it. Checked by
+   grep for every module and import name. An old `.env` that still sets `RCA_TOOL_POLICY_PATH` keeps
+   working: settings ignore unknown keys.
+2. **The event log.** `rca/store/event_log.py` is written on every ingest and read by nothing. The
+   writer, the `event_log_path` setting and `RCA_EVENT_LOG_PATH` go; existing `events.jsonl` files
+   are left on disk.
+3. **Streamlit.** `app.py`, `.streamlit/`, and the `streamlit`, `plotly` and `networkx`
+   dependencies (only `app.py` imports them). The Docker image now serves the React app and API
+   (`create_site`) on port 8000 instead of Streamlit on 8501; `docker compose up rca` and `make run`
+   serve the user's `./.rca` there, bound to localhost like the demo (the API has no login and can
+   delete sources). `rca` and `demo` both use port 8000, so run one at a time.
+4. **`infra/`.** The AWS ECS scripts and templates (never deployed) and the `aws-*` Make targets.
+   The image's default backend was `openai_compatible` only so it could run on ECS; it becomes
+   `ollama`, which is what both compose services already set.
+5. **Docs.** ROADMAP.md is folded into this file and deleted (its still-useful parts: shipped
+   history goes to the CHANGELOG pointer, open items already map to steps here); README under 200
+   lines; absolute local links made relative; `pyproject.toml` description says what RCA is.
+
+Proof: full CI after each commit; `docker compose build` and a live `rca` container answering one
+`/api/chat` question for cut 3; `uv sync` from the new lock.
+
 ## 8. Questions only you can answer
 
 1. **Is the ROADMAP audience still right?** It says "AI/ML, orchestration, and agent-systems roles

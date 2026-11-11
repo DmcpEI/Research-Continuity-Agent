@@ -464,12 +464,10 @@ uv run python eval/run_ablations.py
 │   │   └── generate_flow.py    # Query rewriting → retrieval → grounded LLM answer
 │   ├── agent/                  # Agent loop, MCP client manager, tool registry, trace contracts
 │   ├── llm/                    # LLM client interface: OllamaLLMClient, EchoLLMClient
-│   ├── orchestrator/           # Routing helpers and typed state models
-│   ├── telemetry/              # Tracing and metrics instrumentation (skeletal)
+│   ├── telemetry/              # Run provenance for eval artifacts
 │   └── mcp_servers/
 │       ├── filesystem/         # MCP server: sandboxed file access and ripgrep search
-│       ├── experiments/        # MCP server: experiment run CRUD over SQLite
-│       └── arxiv/              # Reserved for the arXiv connector (#11)
+│       └── experiments/        # MCP server: experiment run CRUD over SQLite
 ├── cli/                        # Entry points: rca-ingest, rca-query
 ├── eval/                       # Golden question set, evaluation harness, and run results
 ├── tests/

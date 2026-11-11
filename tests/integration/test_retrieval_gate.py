@@ -37,7 +37,6 @@ def _settings(tmp_path: Path) -> Settings:
         event_log_path=runtime / "events.jsonl",
         telemetry_log_path=runtime / "telemetry.jsonl",
         experiment_db_path=runtime / "experiments.sqlite3",
-        tool_policy_path=Path("rca/config/tool_policies.yaml"),
         default_collection="retrieval-gate",
         chunk_size=400,
         chunk_overlap=50,
