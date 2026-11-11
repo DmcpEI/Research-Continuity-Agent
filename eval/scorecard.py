@@ -239,7 +239,11 @@ def replace_block(text: str, block: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Publish the test-split scorecard from a run.")
     parser.add_argument("run_path")
-    parser.add_argument("--root", default=".", help="Repo root: eval/scorecard.json and docs.")
+    parser.add_argument(
+        "--root",
+        default=str(Path(__file__).resolve().parents[1]),
+        help="Repo root holding eval/golden.json, eval/scorecard.json and the docs.",
+    )
     args = parser.parse_args(argv)
 
     run = json.loads(Path(args.run_path).read_text(encoding="utf-8"))

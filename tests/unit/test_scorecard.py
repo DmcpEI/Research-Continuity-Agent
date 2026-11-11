@@ -254,3 +254,14 @@ def test_build_scorecard_does_not_modify_the_run() -> None:
     snapshot = copy.deepcopy(run)
     _load().build_scorecard(run)
     assert run == snapshot
+
+
+def test_main_finds_the_repo_from_any_working_directory(tmp_path: Path, monkeypatch) -> None:
+    """Default --root is the repo, not the cwd: a refused run prints why instead of crashing."""
+    sc = _load()
+    run = _run()
+    run["split"] = "dev"
+    run_path = tmp_path / "run.json"
+    run_path.write_text(json.dumps(run), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    assert sc.main([str(run_path)]) == 1
