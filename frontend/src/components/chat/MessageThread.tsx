@@ -11,13 +11,10 @@ type MessageThreadProps = {
   onCitationClick?: (sourceId: string) => void;
   showWelcomeEmptyState?: boolean;
   inputDisabledReason?: string | null;
+  // Questions about papers in this library (see suggestions.ts); none while it is loading.
+  suggestions?: string[];
+  libraryEmpty?: boolean;
 };
-
-const SUGGESTED_QUESTIONS = [
-  'What changed in my retrieval quality over the last week?',
-  'Summarize unresolved TODOs from recent experiments.',
-  'Which sources most strongly support my current hypothesis?',
-];
 
 export function MessageThread({
   conversationId,
@@ -28,6 +25,8 @@ export function MessageThread({
   onCitationClick,
   showWelcomeEmptyState = false,
   inputDisabledReason = null,
+  suggestions = [],
+  libraryEmpty = false,
 }: MessageThreadProps) {
   const [query, setQuery] = useState('');
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -80,8 +79,11 @@ export function MessageThread({
               RCA
             </div>
             <p className="thread-empty-title">Research Continuity Agent</p>
+            {libraryEmpty ? (
+              <p className="thread-empty-hint">Your library is empty. Add PDFs in Library, then ask about them.</p>
+            ) : null}
             <div className="thread-empty-chip-row">
-              {SUGGESTED_QUESTIONS.map((suggestion) => (
+              {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   className="thread-empty-chip"

@@ -266,7 +266,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 3 | **Ship the facts check** (#6): hedge-gated second call, one hedge definition, setting to disable. The planned `partial` outcome was dropped (see "Step 3: facts check, design"). Done: test split, unanswerable declined 6/12 → 12/12, answerable 1/28 → 2/28, +0.6 s mean (EVAL.md). | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
 | 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. Done: `eval/scorecard.json`, generated into README and EVAL.md; rerank gate unchanged (see "Step 4: one scorecard, design"). | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
 | 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. Done: dead code, the event log, Streamlit and `infra/` deleted; ROADMAP folded in; README 187 lines (see "Step 5: cut and tidy, design"). | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
-| 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
+| 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. Done: see "Step 6: first run, design". | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
 | 7 | **Vector store recovers** (#19), as in M3. | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
 | 8 | **Reranker failure is visible** (M4). | Stub test; `/status` test | Same theme: no silent mode changes |
 | 9 | **Request-scoped models, no silent agent switch** (M5); move model code out of `main.py`. | API tests incl. interleaved requests | `main.py` shrinks by a third; removes a RAM foot-gun |
@@ -472,6 +472,36 @@ alone:
 
 Proof: full CI after each commit; `docker compose build` and a live `rca` container answering one
 `/api/chat` question for cut 3; `uv sync` from the new lock.
+
+## Step 6: first run, design (2026-11-11)
+
+Scope is the step-6 row; the rest of DESIGN F8 (Settings link, textarea, title and favicon, "API
+unreachable") stays in F8.
+
+- **Badge "✓ Grounded" becomes "✓ Cited"** (decision 5): the check behind it is "cites a retrieved
+  source", not "supported". Only the label changes; `outcome` and the API are untouched. The agent
+  header's "return grounded results" goes too: the agent has no grounding check.
+- **No seeded conversations.** Correction found while building: the three fake conversations were
+  never on screen (the list hides conversations with no messages), so "three fake seeded
+  conversations" in section 2 overstated it; they were dead state in `localStorage` that also
+  hid a bug. A fresh profile now starts with one empty "New conversation". The three
+  fake ones a browser already saved (ids `conv-1` to `conv-3`, their exact titles, no messages)
+  are dropped on load; anything with messages is kept. Deleting the last conversation opens a new
+  empty one: without the hidden seeds, the deleted one stayed active and every later question went
+  to a conversation no list showed (reproduced in a test with the seeds removed). Loading never
+  deletes stored messages, even when every listed conversation was a seed (break-it review).
+- **Suggestions come from the library, not a fixed list.** The old ones ("What changed in my
+  retrieval quality over the last week?") could not be answered from papers, and fixed demo-corpus
+  questions would be refused on any other library. The empty chat shows "What problem does
+  “<title>” address, and how?" for up to three sources, titles with underscores turned into spaces,
+  preferring titles short enough to read (filenames are often cut). Checked live on the library
+  copy before building: 5 of 5 such questions answered with citations, 13–23 s each. An empty
+  library shows a pointer to Library instead.
+- **Agent examples are buttons that fill the box**, like the chat chips: one knowledge-base task
+  from a library title, "List the files in the workspace folder." and "List the recorded experiment
+  runs and their statuses.", which work on any setup (an empty list is a correct answer).
+- **Proof:** vitest for the title helpers, the seed cleanup and the chips (each failing on the old
+  code); a browser check on a fresh profile against the library copy.
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

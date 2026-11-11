@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
 import { type Message, type MessagesByConversation, useChat } from '../../hooks/useChat';
+import { useSources } from '../../hooks/useSources';
+import { chatSuggestions } from './suggestions';
 
 export type Conversation = {
   id: string;
@@ -58,32 +60,40 @@ function toPaperSourceId(sourceId: string): string {
   return sourceId.replace(/^chk:/, 'src:').replace(/:\d+$/, '');
 }
 
-const initialConversations: Conversation[] = [
-  {
-    id: 'conv-1',
-    title: 'Bin packing retrieval quality checks',
-    timestamp: new Date().toISOString(),
-    messageCount: 4,
-  },
-  {
-    id: 'conv-2',
-    title: 'Abstention calibration notes',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    messageCount: 3,
-  },
-  {
-    id: 'conv-3',
-    title: 'Agent loop follow-up actions',
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    messageCount: 6,
-  },
-];
+function makeConversation(model?: string): Conversation {
+  const now = new Date();
+  return {
+    id: `conv-${now.getTime()}`,
+    title: 'New conversation',
+    timestamp: now.toISOString(),
+    messageCount: 0,
+    model,
+  };
+}
+
+// Earlier builds seeded three made-up conversations and saved them like real ones. Drop exactly
+// those (same id and title) while they are still empty; anything with messages stays.
+const LEGACY_SEEDS: Record<string, string> = {
+  'conv-1': 'Bin packing retrieval quality checks',
+  'conv-2': 'Abstention calibration notes',
+  'conv-3': 'Agent loop follow-up actions',
+};
+
+export function dropLegacySeeds(
+  conversations: Conversation[],
+  messagesByConversation: Record<string, unknown[]>,
+): Conversation[] {
+  return conversations.filter(
+    (conversation) =>
+      LEGACY_SEEDS[conversation.id] !== conversation.title ||
+      (messagesByConversation[conversation.id]?.length ?? 0) > 0,
+  );
+}
 
 export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps) {
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [activeConversationId, setActiveConversationId] = useState<string>(
-    initialConversations[0]?.id ?? '',
-  );
+  const [conversations, setConversations] = useState<Conversation[]>(() => [makeConversation()]);
+  const [activeConversationId, setActiveConversationId] = useState<string>(() => conversations[0].id);
+  const { data: sources, isSuccess: sourcesLoaded } = useSources();
   const [messagesByConversation, setMessagesByConversation] = useState<MessagesByConversation>({});
   const [selectedSourceByConversation, setSelectedSourceByConversation] = useState<
     Record<string, string>
@@ -122,16 +132,9 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   const activeSelectedSourceId = selectedSourceByConversation[activeConversationId] ?? null;
 
   const handleNewConversation = () => {
-    const now = new Date();
-    const currentModel = window.localStorage.getItem(CHAT_MODEL_STORAGE_KEY) ?? undefined;
-    const nextConversation: Conversation = {
-      id: `conv-${now.getTime()}`,
-      title: 'New conversation',
-      timestamp: now.toISOString(),
-      messageCount: 0,
-      model: currentModel,
-    };
-
+    const nextConversation = makeConversation(
+      window.localStorage.getItem(CHAT_MODEL_STORAGE_KEY) ?? undefined,
+    );
     setConversations((previous) => [nextConversation, ...previous]);
     setActiveConversationId(nextConversation.id);
   };
@@ -149,11 +152,13 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
       return next;
     });
 
-    if (conversationId === activeConversationId) {
-      const remaining = computedConversations.filter((conversation) => conversation.id !== conversationId);
-      if (remaining.length > 0) {
-        setActiveConversationId(remaining[0].id);
-      }
+    const remaining = computedConversations.filter((conversation) => conversation.id !== conversationId);
+    if (remaining.length === 0) {
+      // Never leave zero conversations: the deleted one would stay active and new messages would
+      // land in a conversation no list shows.
+      handleNewConversation();
+    } else if (conversationId === activeConversationId) {
+      setActiveConversationId(remaining[0].id);
     }
   };
 
@@ -173,7 +178,11 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
         return;
       }
 
-      setConversations(parsed.conversations);
+      // Loading never deletes messages: they are hydrated even when no listed conversation is left.
+      const kept = dropLegacySeeds(parsed.conversations, parsed.messagesByConversation);
+      if (kept.length > 0) {
+        setConversations(kept);
+      }
 
       const hydratedMessages = Object.fromEntries(
         Object.entries(parsed.messagesByConversation).map(([conversationKey, storedMessages]) => [
@@ -189,14 +198,9 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
       setSelectedSourceByConversation(parsed.selectedSourceByConversation ?? {});
 
       const nextActiveId = parsed.activeConversationId;
-      const hasActiveConversation = parsed.conversations.some(
-        (conversation) => conversation.id === nextActiveId,
-      );
-
-      if (hasActiveConversation) {
-        setActiveConversationId(nextActiveId);
-      } else if (parsed.conversations.length > 0) {
-        setActiveConversationId(parsed.conversations[0].id);
+      if (kept.length > 0) {
+        const hasActiveConversation = kept.some((conversation) => conversation.id === nextActiveId);
+        setActiveConversationId(hasActiveConversation ? nextActiveId : kept[0].id);
       }
     } catch {
       // Ignore malformed localStorage payloads.
@@ -456,6 +460,8 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
             : null
         }
         showWelcomeEmptyState={Boolean(activeConversation && activeConversation.messageCount === 0)}
+        suggestions={chatSuggestions(sources ?? [])}
+        libraryEmpty={sourcesLoaded && (sources ?? []).length === 0}
       />
     </section>
   );

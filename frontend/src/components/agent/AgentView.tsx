@@ -8,6 +8,8 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CitationChip } from '../chat/CitationChip';
+import { agentExamples } from '../chat/suggestions';
+import { useSources } from '../../hooks/useSources';
 
 type AgentViewProps = {
   conversationId?: string;
@@ -154,6 +156,7 @@ export function AgentView({ conversationId }: AgentViewProps) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { data: sources } = useSources();
   const [activeModel, setActiveModel] = useState<string | undefined>(() =>
     window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY) ?? undefined,
   );
@@ -240,7 +243,7 @@ export function AgentView({ conversationId }: AgentViewProps) {
       <div className="agent-main-column">
         <div className="agent-task-header">
           <div className="agent-task-title">Task Runner</div>
-          <div className="agent-task-subtitle">Plan, execute tools, then return grounded results.</div>
+          <div className="agent-task-subtitle">Plans, runs tools, then answers from what they return.</div>
         </div>
         <div className="thread-body">
           {messages.length === 0 ? (
@@ -250,9 +253,11 @@ export function AgentView({ conversationId }: AgentViewProps) {
               </div>
               <p className="thread-empty-title">Describe a multi-step task</p>
               <div className="thread-empty-chip-row">
-                <span className="thread-empty-chip">Inspect experiment runs and rank best precision</span>
-                <span className="thread-empty-chip">Read notes and summarize open research questions</span>
-                <span className="thread-empty-chip">Combine local files with knowledge-base evidence</span>
+                {agentExamples(sources ?? []).map((example) => (
+                  <button className="thread-empty-chip" key={example} onClick={() => setQuery(example)} type="button">
+                    {example}
+                  </button>
+                ))}
               </div>
             </div>
           ) : null}

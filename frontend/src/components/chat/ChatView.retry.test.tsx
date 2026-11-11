@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { sendChat } from '../../api/client';
 import { ChatView } from './ChatView';
 
-vi.mock('../../api/client', () => ({ sendChat: vi.fn() }));
+vi.mock('../../api/client', () => ({ sendChat: vi.fn(), getSources: vi.fn().mockResolvedValue([]) }));
 
 describe('ChatView retry after a failed request', () => {
   // jsdom has no scrollIntoView; the thread calls it after every render.

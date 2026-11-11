@@ -7,7 +7,7 @@ import { QueryTrace } from './QueryTrace';
 type BubbleOutcome = AnswerOutcome | 'error';
 
 const BADGES: Record<BubbleOutcome, { label: string; className: string } | null> = {
-  answered: { label: '✓ Grounded', className: 'is-grounded' },
+  answered: { label: '✓ Cited', className: 'is-grounded' },
   unverified: { label: '⚠ Unverified', className: 'is-unverified' },
   not_found: { label: 'No evidence found', className: 'is-not-found' },
   conversational: null,

@@ -22,6 +22,9 @@ vi.mock('./MessageThread', () => ({
   ),
 }));
 
+// ChatView asks the library for suggestions; these tests do not render a QueryClient.
+vi.mock('../../hooks/useSources', () => ({ useSources: () => ({ data: [], isSuccess: true }) }));
+
 vi.mock('../../hooks/useChat', async () => {
   const actual = await vi.importActual('../../hooks/useChat');
   return {
@@ -41,20 +44,30 @@ describe('Conversation-scoped citation state', () => {
   it('CIT-010: keeps selected source linkage scoped by conversation', async () => {
     const user = userEvent.setup();
     const onCitationClick = vi.fn();
+    // Two saved conversations (the build used to seed conv-1..conv-3 itself).
+    const stamp = new Date().toISOString();
+    window.localStorage.setItem(
+      'rca-conversations',
+      JSON.stringify({
+        conversations: ['conv-a', 'conv-b'].map((id) => ({ id, title: id, timestamp: stamp, messageCount: 0 })),
+        messagesByConversation: {},
+        activeConversationId: 'conv-a',
+      }),
+    );
 
     render(<ChatView onCitationClick={onCitationClick} />);
 
-    await user.click(screen.getByRole('button', { name: 'cite-conv-1' }));
-    expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-1');
+    await user.click(screen.getByRole('button', { name: 'cite-conv-a' }));
+    expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-a');
 
-    await user.click(screen.getByRole('button', { name: 'conv-2' }));
+    await user.click(screen.getByRole('button', { name: 'conv-b' }));
     expect(onCitationClick).toHaveBeenLastCalledWith(null);
 
-    await user.click(screen.getByRole('button', { name: 'cite-conv-2' }));
-    expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-2');
+    await user.click(screen.getByRole('button', { name: 'cite-conv-b' }));
+    expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-b');
 
-    await user.click(screen.getByRole('button', { name: 'conv-1' }));
-    expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-1');
+    await user.click(screen.getByRole('button', { name: 'conv-a' }));
+    expect(onCitationClick).toHaveBeenLastCalledWith('src:conv-a');
   });
 
   it('CIT-011: restores graph focus from assistant active source IDs', async () => {

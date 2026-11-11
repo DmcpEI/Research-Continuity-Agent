@@ -10,9 +10,9 @@ function renderBubble(props: Partial<BubbleProps>) {
 }
 
 describe('Answer outcome badge', () => {
-  it('shows a cited answer as grounded', () => {
+  it('shows a cited answer as cited, not grounded (it checks citations, not support)', () => {
     renderBubble({ outcome: 'answered', grounded: true });
-    expect(screen.getByText('✓ Grounded')).toBeInTheDocument();
+    expect(screen.getByText('✓ Cited')).toBeInTheDocument();
   });
 
   it('shows an uncited answer as unverified', () => {
@@ -39,7 +39,7 @@ describe('Answer outcome badge', () => {
   });
 
   it.each([
-    [true, '✓ Grounded'],
+    [true, '✓ Cited'],
     [false, '⚠ Unverified'],
   ])('falls back to the grounded flag (%s) for messages saved without an outcome', (grounded, label) => {
     renderBubble({ grounded });
@@ -48,6 +48,6 @@ describe('Answer outcome badge', () => {
 
   it('falls back to the grounded flag for an outcome this build does not know', () => {
     renderBubble({ outcome: 'toString' as BubbleProps['outcome'], grounded: true });
-    expect(screen.getByText('✓ Grounded')).toBeInTheDocument();
+    expect(screen.getByText('✓ Cited')).toBeInTheDocument();
   });
 });
