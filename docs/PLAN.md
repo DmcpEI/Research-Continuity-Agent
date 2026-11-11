@@ -399,6 +399,39 @@ Found while checking (not fixed in step 1; each needs a step):
 - **Proof:** stub-LLM tests for each branch, failing first; harness on the test split with the check
   on and off; a live `/chat` check.
 
+## Step 4: one scorecard, design (2026-11-11)
+
+- **One run, one artifact.** `eval/harness.py --split test` runs the 40 test questions with the
+  shipped defaults; `eval/scorecard.py <run>` turns that run into `eval/scorecard.json` (committed)
+  and rewrites one generated block in README.md and docs/EVAL.md. A test fails if either block
+  differs from what the committed scorecard renders, so the numbers are never typed by hand.
+- **The script refuses** a run that is not the golden test split, was made from a dirty tree, had
+  the vector index degrade or start off Chroma, has an errored question, overrides the rewrite
+  model, or has a setting grounded chat uses off its code default (`facts_check_enabled` is now
+  recorded too; the agent and OpenAI model names are ignored). It also refuses a run where a
+  component fell back, which the flow only records as a trace warning or label (reranker
+  unavailable, query rewrite failed, facts check failed): the harness now copies each question's
+  trace warnings into the run, and any warning outside the normal ones (proper-noun rewrite skip,
+  rerank gate, failure labels, empty retrieval) blocks publishing. And it pins the questions: the
+  run records the golden file's SHA-256 and the question IDs, which must equal the committed
+  `eval/golden.json` and `eval/splits/test.json`, so a hand-picked file named "test" cannot pass.
+  This is the M9 rule "nothing published from a dirty or degraded run" as code. The break-it
+  review found the fallback, question-set and missing-field gaps; each has a test.
+- **What it reports:** answerable questions answered citing the expected paper (end to end, over
+  all answerable, not only the answered ones), answerable refused, unanswerable refused, citation
+  precision when it answers, retrieval hit@5, answer keyword hit rate and time per question, each
+  proportion with a Wilson 95% interval, plus the IDs of every miss.
+- **Retrieval hit@5 comes from the same run:** the harness already records the top 5 sources of
+  the final bundle (`retrieved_sources`, from the trace), which is ablation config 5 with this run's
+  `qwen3.5:4b` rewrites. No hit@10 and no separate ablation run: production uses 5. The 90-question
+  ablation table stays in EVAL.md as history, labelled with its `gemma3:12b` rewrites.
+- **Rerank gate: not recalibrated, because the rewrite model did not move it.** Retrieval features
+  on all 129 questions with `qwen3.5:4b` rewrites (commit `fb78227`, clean tree, Chroma, corpus
+  `51b6785c3405cb16`) select the same rule on dev, `rerank_max <= -3.618` (12/27 negatives at 2/62
+  false abstentions, as with `gemma3:12b`); on test it catches 5/12 at 0/28 (was 1/28).
+- **Not in the scorecard:** dev numbers (tuning only), the agent bench (a separate claim with its
+  own README line), hit@10.
+
 ## 8. Questions only you can answer
 
 1. **Is the ROADMAP audience still right?** It says "AI/ML, orchestration, and agent-systems roles

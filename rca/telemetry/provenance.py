@@ -25,6 +25,7 @@ RESULT_SETTINGS = (
     "openai_embed_model",
     "llm_think",
     "enable_reranker",
+    "facts_check_enabled",
     "reranker_model",
     "reranker_top_k",
     "retrieval_fetch_limit",

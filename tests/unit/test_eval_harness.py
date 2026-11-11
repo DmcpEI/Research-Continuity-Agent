@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -174,3 +175,95 @@ def test_harness_records_provenance_and_stamps_corpus_version_on_traces(tmp_path
     assert payload["results"][0]["error"] is None, payload["results"][0]["error"]
     trace = json.loads(Path(payload["results"][0]["trace_path"]).read_text(encoding="utf-8"))
     assert trace["corpus_version"] == version
+
+
+def _write_split_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    golden = tmp_path / "golden.json"
+    golden.write_text(
+        json.dumps(
+            [
+                {"id": f"q{i}", "question": f"Question {i}?", "difficulty": "easy"}
+                for i in range(1, 5)
+            ]
+        ),
+        encoding="utf-8",
+    )
+    splits = tmp_path / "splits"
+    splits.mkdir()
+    (splits / "test.json").write_text(json.dumps({"ids": ["q3", "q1"]}), encoding="utf-8")
+    return golden, splits
+
+
+def test_select_split_keeps_golden_order_and_rejects_unknown_or_empty_ids(tmp_path: Path) -> None:
+    harness = _load_harness_module()
+    golden, splits = _write_split_fixture(tmp_path)
+    pairs = harness.load_golden_pairs(golden)
+
+    assert [p.id for p in harness.select_split(pairs, splits / "test.json")] == ["q1", "q3"]
+
+    for bad in ({"ids": ["q1", "q9"]}, {"ids": []}, {}):
+        (splits / "bad.json").write_text(json.dumps(bad), encoding="utf-8")
+        try:
+            harness.select_split(pairs, splits / "bad.json")
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted {bad}")
+
+
+def test_harness_split_runs_only_that_split_and_records_it(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from rca.contracts.trace import QueryTrace
+    from rca.flows.generate_flow import GeneratedAnswer
+
+    harness = _load_harness_module()
+    golden, splits = _write_split_fixture(tmp_path)
+    asked: list[str] = []
+
+    class FakeFlow:
+        _resolve_source_id = harness.GenerateFlow._resolve_source_id
+
+        def __init__(self, settings) -> None:
+            self.llm = SimpleNamespace(model="fake-gen")
+            self.rewrite_llm = self.llm
+
+        def generate_answer(self, query: str) -> GeneratedAnswer:
+            asked.append(query)
+            trace = QueryTrace(query=query, warnings=[f"note for {query}"])
+            return GeneratedAnswer(query=query, answer="answer", outcome="unverified", trace=trace)
+
+    harness.GenerateFlow = FakeFlow
+    harness.validate_eval_llm = lambda flow: None
+    harness.fetch_available_ollama_models = lambda base_url: set()
+    harness.print_summary = lambda summary, total: None
+    harness.collect_provenance = lambda *args, **kwargs: {}
+    harness.finish_provenance = lambda provenance, vector_store=None: provenance
+
+    out = tmp_path / "out"
+    argv = ["--golden-path", str(golden), "--split", "test", "--splits-dir", str(splits)]
+    assert harness.main([*argv, "--output-dir", str(out)]) == 0
+
+    payload = json.loads(next(out.glob("run_*.json")).read_text(encoding="utf-8"))
+    assert asked == ["Question 1?", "Question 3?"]
+    assert payload["split"] == "test"
+    assert payload["cases"] == 2
+    # the scorecard pins the question set and refuses runs where a component fell back
+    assert payload["question_ids"] == ["q1", "q3"]
+    assert payload["golden_sha256"] == hashlib.sha256(golden.read_bytes()).hexdigest()
+    assert [r["error"] for r in payload["results"]] == [None, None]
+    assert [r["warnings"] for r in payload["results"]] == [
+        ["note for Question 1?"],
+        ["note for Question 3?"],
+    ]
+
+
+def test_harness_refuses_split_with_external_file(tmp_path: Path, capsys) -> None:
+    harness = _load_harness_module()
+    golden, splits = _write_split_fixture(tmp_path)
+    try:
+        harness.main(["--external-golden-path", str(golden), "--split", "test"])
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("--split with --external-golden-path was accepted")
+    assert "cannot be used with an external file" in capsys.readouterr().err

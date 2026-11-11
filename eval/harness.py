@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import urllib.error
@@ -71,6 +72,7 @@ class EvaluationCaseResult(BaseModel):
     retrieved_sources: list[str] = Field(default_factory=list)
     context_sources: list[str] = Field(default_factory=list)
     failure_stage: str = "ok"
+    warnings: list[str] = Field(default_factory=list)  # trace warnings, incl. fallbacks
     latency_ms: float
     trace_path: str | None = None
     error: str | None = None
@@ -92,6 +94,16 @@ def build_parser() -> argparse.ArgumentParser:
             "Optional human-authored external golden file. When supplied, the harness "
             "runs this file instead of --golden-path and labels the dataset as external."
         ),
+    )
+    parser.add_argument(
+        "--split",
+        default=None,
+        help="Run only the questions of this split (e.g. test), read from --splits-dir.",
+    )
+    parser.add_argument(
+        "--splits-dir",
+        default=str(Path("eval") / "splits"),
+        help="Directory holding <split>.json files with an `ids` list.",
     )
     parser.add_argument(
         "--output-dir",
@@ -128,6 +140,16 @@ def load_golden_pairs(path: Path) -> list[GoldenPair]:
     else:
         raise ValueError(f"Unsupported golden payload in {path}")
     return [GoldenPair.model_validate(item) for item in raw_pairs]
+
+
+def select_split(pairs: list[GoldenPair], split_path: Path) -> list[GoldenPair]:
+    """The pairs named in a split file, in golden order; every named ID must exist."""
+    ids = json.loads(split_path.read_text(encoding="utf-8")).get("ids") or []
+    missing = sorted(set(ids) - {pair.id for pair in pairs})
+    if not ids or missing:
+        raise ValueError(f"{split_path}: no ids, or ids not in the golden set: {missing}")
+    wanted = set(ids)
+    return [pair for pair in pairs if pair.id in wanted]
 
 
 def evaluate_pair(
@@ -177,6 +199,7 @@ def evaluate_pair(
                 matched_keywords=matched_keywords,
                 missing_keywords=missing_keywords,
                 failure_labels=generated.failure_labels,
+                warnings=list(generated.trace.warnings) if generated.trace else [],
                 retrieved_sources=retrieved_sources,
                 context_sources=context_sources,
                 failure_stage=classify_failure_stage(
@@ -526,13 +549,21 @@ def build_run_config(
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.split and args.external_golden_path:
+        parser.error(
+            "--split selects golden-set questions; it cannot be used with an external file"
+        )
     golden_path = Path(args.external_golden_path or args.golden_path)
     dataset_kind = "external" if args.external_golden_path else "golden"
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     golden_pairs = load_golden_pairs(golden_path)
+    if args.split:
+        golden_pairs = select_split(golden_pairs, Path(args.splits_dir) / f"{args.split}.json")
+    golden_sha256 = hashlib.sha256(golden_path.read_bytes()).hexdigest()
     settings = build_settings(args.model)
     loaded_models = (
         fetch_available_ollama_models(settings.llm_base_url)
@@ -590,6 +621,9 @@ def main(argv: list[str] | None = None) -> int:
         "timestamp": timestamp,
         "dataset_kind": dataset_kind,
         "golden_path": str(golden_path),
+        "split": args.split,
+        "golden_sha256": golden_sha256,
+        "question_ids": [pair.id for pair in golden_pairs],
         "cases": len(golden_pairs),
         "run_config": run_config,
         "provenance": finish_provenance(provenance, vector_store),

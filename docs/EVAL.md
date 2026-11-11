@@ -52,6 +52,17 @@ Metric definitions:
 uv run python eval/harness.py --model qwen3.5:4b
 ```
 
+`--split test` (or `dev`) runs only that split's questions from `eval/splits/`. The published
+scorecard is made from one such test-split run with the shipped defaults:
+
+```bash
+uv run python eval/harness.py --split test
+uv run python eval/scorecard.py eval/results/run_<timestamp>.json
+```
+
+`scorecard.py` refuses runs from a dirty tree, a degraded index, with errors or with non-default
+settings; otherwise it writes `eval/scorecard.json` and the scorecard block in README.md and here.
+
 Optional model override for direct A/B runs:
 
 ```bash
