@@ -455,7 +455,7 @@ uv run python eval/run_ablations.py
 ├── rca/                        # Main package
 │   ├── config/                 # Settings (pydantic-settings, RCA_ env prefix) and tool policies
 │   ├── contracts/              # Shared data models: node/edge types, ID rules, citations, traces
-│   ├── store/                  # Persistence only: GraphStore (SQLite), VectorStore (ChromaDB), EventLog
+│   ├── store/                  # Persistence only: GraphStore (SQLite), VectorStore (ChromaDB)
 │   │   └── migrations/         # SQL schema applied on GraphStore init
 │   ├── extractors/             # Turn files into text payloads: PDF, Markdown, Git, Experiment
 │   ├── flows/                  # Compose extractors and stores into workflows

@@ -29,7 +29,6 @@ def _settings_for(tmp_path: Path) -> Settings:
         data_dir=runtime_dir,
         graph_db_path=runtime_dir / "graph.sqlite3",
         vector_dir=runtime_dir / "vectors",
-        event_log_path=runtime_dir / "events.jsonl",
         telemetry_log_path=runtime_dir / "telemetry.jsonl",
         experiment_db_path=runtime_dir / "experiments.sqlite3",
     )

@@ -99,7 +99,6 @@ class Edge(BaseModel):
 .rca/
 ├── graph.sqlite3       # GraphStore: nodes, edges, metadata
 ├── vectors/            # VectorStore: ChromaDB persistent embeddings
-├── events.jsonl        # Event log (append-only ingest events)
 ├── telemetry.jsonl     # Telemetry log
 └── experiments.sqlite3 # MCP-backed experiment run registry
 ```

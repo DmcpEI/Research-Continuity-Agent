@@ -34,7 +34,6 @@ def _settings(tmp_path: Path) -> Settings:
         data_dir=runtime,
         graph_db_path=runtime / "graph.sqlite3",
         vector_dir=runtime / "vectors",
-        event_log_path=runtime / "events.jsonl",
         telemetry_log_path=runtime / "telemetry.jsonl",
         experiment_db_path=runtime / "experiments.sqlite3",
         default_collection="retrieval-gate",

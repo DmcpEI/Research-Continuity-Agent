@@ -72,7 +72,6 @@ services:
       RCA_DATA_DIR: /app/.rca-demo
       RCA_GRAPH_DB_PATH: /app/.rca-demo/graph.sqlite3
       RCA_VECTOR_DIR: /app/.rca-demo/vectors
-      RCA_EVENT_LOG_PATH: /app/.rca-demo/events.jsonl
       RCA_TELEMETRY_LOG_PATH: /app/.rca-demo/telemetry.jsonl
       RCA_EXPERIMENT_DB_PATH: /app/.rca-demo/experiments.sqlite3
       # Agent file tools see only the downloaded papers, not the app source.

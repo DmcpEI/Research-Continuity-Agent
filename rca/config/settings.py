@@ -49,7 +49,6 @@ class Settings(BaseSettings):
     data_dir: Path = Field(default_factory=lambda: Path(".rca"))
     graph_db_path: Path = Field(default_factory=lambda: Path(".rca/graph.sqlite3"))
     vector_dir: Path = Field(default_factory=lambda: Path(".rca/vectors"))
-    event_log_path: Path = Field(default_factory=lambda: Path(".rca/events.jsonl"))
     telemetry_log_path: Path = Field(default_factory=lambda: Path(".rca/telemetry.jsonl"))
     experiment_db_path: Path = Field(default_factory=lambda: Path(".rca/experiments.sqlite3"))
     default_collection: str = "research-continuity"
@@ -135,7 +134,6 @@ class Settings(BaseSettings):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.vector_dir.mkdir(parents=True, exist_ok=True)
         self.graph_db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.event_log_path.parent.mkdir(parents=True, exist_ok=True)
         self.telemetry_log_path.parent.mkdir(parents=True, exist_ok=True)
         self.experiment_db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -149,7 +147,6 @@ class Settings(BaseSettings):
             "RCA_DATA_DIR": "data_dir",
             "RCA_GRAPH_DB_PATH": "graph_db_path",
             "RCA_VECTOR_DIR": "vector_dir",
-            "RCA_EVENT_LOG_PATH": "event_log_path",
             "RCA_TELEMETRY_LOG_PATH": "telemetry_log_path",
             "RCA_EXPERIMENT_DB_PATH": "experiment_db_path",
             "RCA_DEFAULT_COLLECTION": "default_collection",

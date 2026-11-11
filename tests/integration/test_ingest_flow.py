@@ -18,7 +18,6 @@ def _settings_for(tmp_path: Path) -> Settings:
         data_dir=runtime_dir,
         graph_db_path=runtime_dir / "graph.sqlite3",
         vector_dir=runtime_dir / "vectors",
-        event_log_path=runtime_dir / "events.jsonl",
         telemetry_log_path=runtime_dir / "telemetry.jsonl",
         experiment_db_path=runtime_dir / "experiments.sqlite3",
         # Real cross-encoder loads hit the Hugging Face Hub (slow, network-dependent);
@@ -199,3 +198,14 @@ def test_ingest_flow_partial_failure_self_heals_on_retry(tmp_path) -> None:
     assert recovery.revision_id != first.revision_id
     revisions_after_recovery = ingest_flow.graph_store.list_source_revisions(first.source_id)
     assert len(revisions_after_recovery) == 2
+
+
+def test_ingest_writes_no_event_log(tmp_path, monkeypatch) -> None:
+    """The ingest event log was write-only (PLAN step 5); ingest must not create one."""
+    monkeypatch.chdir(tmp_path)  # any default relative path lands in tmp, never in ./.rca
+    note_path = tmp_path / "note.md"
+    note_path.write_text("# Note\n\nResearch continuity.\n", encoding="utf-8")
+
+    IngestFlow(settings=_settings_for(tmp_path)).ingest_path(note_path)
+
+    assert not list(tmp_path.rglob("events.jsonl"))

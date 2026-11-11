@@ -18,7 +18,6 @@ from rca.extractors.experiment_extractor import ExperimentExtractor
 from rca.extractors.git_extractor import GitExtractor
 from rca.extractors.note_extractor import NoteExtractor
 from rca.extractors.pdf_extractor import PDFExtractor
-from rca.store.event_log import EventLog, IngestEvent
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
 
@@ -50,7 +49,6 @@ class IngestFlow:
         settings: Settings | None = None,
         graph_store: GraphStore | None = None,
         vector_store: VectorStore | None = None,
-        event_log: EventLog | None = None,
         note_extractor: NoteExtractor | None = None,
         pdf_extractor: PDFExtractor | None = None,
         git_extractor: GitExtractor | None = None,
@@ -62,7 +60,6 @@ class IngestFlow:
         self.vector_store = vector_store or VectorStore(
             self.settings.vector_dir, self.settings.default_collection
         )
-        self.event_log = event_log or EventLog(self.settings.event_log_path)
         self.note_extractor = note_extractor or NoteExtractor()
         self.pdf_extractor = pdf_extractor or PDFExtractor()
         self.git_extractor = git_extractor or GitExtractor()
@@ -196,21 +193,6 @@ class IngestFlow:
 
         if pending_revision is not None:
             self.graph_store.insert_source_revision(pending_revision)
-
-        self.event_log.append(
-            IngestEvent(
-                event_type="ingest",
-                source_id=source_id,
-                path=str(source_path),
-                payload={
-                    "title": payload["title"],
-                    "chunk_count": len(chunk_ids),
-                    "revision_id": revision_id,
-                    "ingest_status": resolution.ingest_status.value,
-                    "matched_by": resolution.matched_by,
-                },
-            )
-        )
 
         return IngestResult(
             source_id=source_id,
