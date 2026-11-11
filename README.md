@@ -143,7 +143,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 ## Component details
 
-**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database also maintains an FTS5 virtual table, and BM25 is now the production lexical search path. The original token-wise `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the earlier design that was later outperformed in ablation. `VectorStore` wraps ChromaDB with a configurable embedding function routed through the RCA client boundary, so the default local `nomic-embed-text` path and OpenAI-compatible embedding APIs share one integration layer. When ChromaDB is unavailable or fails at runtime, it falls back to a JSON file with bag-of-words cosine scoring; the fallback is reported in `/status` (`vector_backend`, `warnings`), the React status bar, and the Streamlit sidebar.
+**Knowledge store.** Two persistent stores back the system. `GraphStore` holds typed nodes and directed edges in a local SQLite database. Node kinds are `source`, `chunk`, `note`, `paper`, `experiment`, and `digest`; edge kinds are `contains`, `derived_from`, `references`, `cites`, `related_to`, and `produced_by`. The same SQLite database also maintains an FTS5 virtual table, and BM25 is now the production lexical search path. The original token-wise `LIKE` implementation is still retained as `search_nodes_like()` for reference and regression testing because it documents the earlier design that was later outperformed in ablation. `VectorStore` wraps ChromaDB with a configurable embedding function routed through the RCA client boundary, so the default local `nomic-embed-text` path and OpenAI-compatible embedding APIs share one integration layer. When ChromaDB is unavailable or fails at runtime, it falls back to a JSON file with bag-of-words cosine scoring; the fallback is reported in `/status` (`vector_backend`, `warnings`), and the React status bar.
 
 **ID system.** All identifiers are stable and deterministic. Source nodes follow the pattern `src:namespace/name` (e.g., `src:pdf/attention-is-all-you-need`). Chunk nodes derive from their source: `chk:namespace/name:0000`. Identifiers are validated with regular expressions at the contract boundary so invalid IDs cannot enter the stores.
 
@@ -162,7 +162,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 
 **Contracts layer.** `rca/contracts/` defines the identifier rules, node/edge models, and other shared DTOs that every other layer imports. No layer other than `store` performs persistence; no persistence layer makes model calls.
 
-**UI surfaces.** `app.py` remains the local evaluation and development interface. The production UI migration now targets a Vite + React frontend backed by FastAPI. The information architecture is being consolidated so Chat is the primary landing surface, Agent is a secondary mode, and Workspace responsibilities move into a Library/Settings view plus a collapsible knowledge-map panel. Sidebar counters are being replaced by a status bar for papers, chunks, backend, and model state, plus a warning badge when vector search has fallen back to the JSON store.
+**UI.** A Vite + React frontend backed by FastAPI. The information architecture is being consolidated so Chat is the primary landing surface, Agent is a secondary mode, and Workspace responsibilities move into a Library/Settings view plus a collapsible knowledge-map panel. Sidebar counters are being replaced by a status bar for papers, chunks, backend, and model state, plus a warning badge when vector search has fallen back to the JSON store.
 
 ---
 
@@ -184,7 +184,7 @@ Golden pairs and eval outputs live as JSON artifacts under `eval/`. The graph is
 | Generation + agent | qwen3.5:4b (Ollama) | One small local model for grounded chat and tool use, so a laptop stays usable ([bake-off](docs/EVAL.md#small-model-bake-off-2026-11-09)) |
 | Vector DB | ChromaDB | Persistent, zero-infrastructure prototype |
 | Graph/metadata | SQLite | Zero-dependency, portable, easy to audit |
-| UI | React (Vite) + FastAPI | Production frontend path; Streamlit retained for local dev/eval only |
+| UI | React (Vite) + FastAPI | One UI for chat, agent and library |
 | Orchestration | Mixed | Grounded chat uses direct flow composition; agent mode uses a separate multi-turn tool loop |
 
 ---
@@ -225,7 +225,6 @@ Live metrics depend on the local Ollama/Chroma environment, so the right way to 
 - [x] Hybrid retrieval (vector + keyword search + graph expansion)
 - [x] Query rewriting before retrieval
 - [x] Grounded answer generation with citation enforcement
-- [x] Streamlit local dev/eval UI (legacy chat/agent/workspace surface)
 - [x] MCP agent loop — native knowledge-base adapter plus MCP stdio tools for filesystem and experiments
 - [x] Integration tests
 - [x] Evaluation harness with golden Q&A pairs
@@ -351,17 +350,15 @@ This is deliberately a deployment-ready package, not a promise that RCA should s
 
 ## Usage
 
-**Launch the UI**
+**Launch the app**
 
 ```bash
-uv run streamlit run app.py
+uv run uvicorn rca.api.main:create_site --factory --port 8000
 ```
 
-This Streamlit surface is now the local dev/eval interface. It is not the long-term production UI target.
+Serves the built React app (`frontend/dist`) and the API under `/api` at `http://localhost:8000`.
 
-Opens at `http://localhost:8501`. This remains the local dev/eval surface while production UX moves to Chat-first React + FastAPI information architecture.
-
-**Launch the React/FastAPI bridge**
+**Develop the frontend**
 
 ```bash
 uv run uvicorn rca.api.main:app --reload --port 8000
@@ -449,11 +446,8 @@ uv run python eval/run_ablations.py
 
 ```
 .
-├── app.py                      # Streamlit local dev/eval UI (legacy chat/agent/workspace surface)
-├── .streamlit/
-│   └── config.toml             # Theme configuration (base: dark)
 ├── rca/                        # Main package
-│   ├── config/                 # Settings (pydantic-settings, RCA_ env prefix) and tool policies
+│   ├── config/                 # Settings (pydantic-settings, RCA_ env prefix)
 │   ├── contracts/              # Shared data models: node/edge types, ID rules, citations, traces
 │   ├── store/                  # Persistence only: GraphStore (SQLite), VectorStore (ChromaDB)
 │   │   └── migrations/         # SQL schema applied on GraphStore init
@@ -481,8 +475,6 @@ uv run python eval/run_ablations.py
 ## Project context
 
 Built around research on *Structured Perception for Packing-Relevant Inventory Generation* — a system that generates machine-readable grocery inventories from RGB images for robotic bagging. RCA serves as the research memory layer: ingesting related papers, tracking design decisions, and enabling grounded retrieval over the full literature corpus.
-
-Frontend redesign is now in progress: production UI work is moving to a Vite + React frontend backed by FastAPI, with Streamlit retained for local development and evaluation workflows.
 
 ---
 

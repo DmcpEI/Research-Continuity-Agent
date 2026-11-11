@@ -30,14 +30,13 @@ ENV RCA_ENVIRONMENT=production \
     RCA_EXPERIMENT_DB_PATH=/app/.rca/experiments.sqlite3 \
     ANONYMIZED_TELEMETRY=False
 
-EXPOSE 8501
+EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5).status == 200 else 1)"
+  CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).status == 200 else 1)"
 
 # Local Docker Compose overrides the backend back to Ollama. The image defaults
 # to an external OpenAI-compatible endpoint so it can run unchanged on ECS.
-CMD ["uv", "run", "streamlit", "run", "app.py", \
-     "--server.address=0.0.0.0", \
-     "--server.port=8501", \
-     "--server.headless=true"]
+# Serves the built React app (frontend/dist) and the API under /api.
+CMD ["uv", "run", "uvicorn", "rca.api.main:create_site", "--factory", \
+     "--host", "0.0.0.0", "--port", "8000"]
