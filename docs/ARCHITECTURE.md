@@ -41,7 +41,7 @@ GenerateFlow
 Direct flow orchestration  (stateless per query)
 ```
 
-Orchestration is handled directly via `RetrieveFlow` and `GenerateFlow`. A LangGraph-based agent workflow is on the roadmap.
+Grounded chat is handled directly via `RetrieveFlow` and `GenerateFlow`. Multi-turn tool use is a separate agent loop (see "Agent loop" below).
 
 ---
 
@@ -139,6 +139,10 @@ In v2, this will be replaced by `pgvector` in Postgres for a unified store with 
 `AgentLoop` runs a multi-turn tool-calling conversation (up to 10 LLM turns). `ToolRegistry` exposes a native `search_knowledge_base` adapter, which shares chat's `RetrieveFlow` and vector store, plus read-only MCP tools: filesystem (`list_directory`, `read_text_file`, `search_text`) sandboxed to `RCA_FILESYSTEM_ROOT`, and experiments (`list_runs`, `get_run`).
 
 Path guards in `ToolRegistry.call` redirect filesystem calls that cannot work without touching the MCP server: a knowledge-base source ID used as a path (`src:...`/`chk:...`, also in `[[...]]` form) gets guidance to answer from the search excerpts and cite the source, and a `.pdf` path is pointed at `search_knowledge_base`. Both report status `error`, so the agent benchmark counts them as invalid calls; the model only sees the guidance text. Stop reasons: `final_answer`, `empty_final_answer`, `unparsed_tool_call`, `clarification_needed`, `max_iterations`, `fallback_no_tools`, `error`.
+
+### Model picker
+
+Models are read live from the backend (`/api/tags` for Ollama), so each machine sees its own list. Embedding-only names (`embed`, `bge`, `e5`, `gte`, `nomic-embed`) are excluded, the rest are ranked for text retrieval and synthesis (instruction-tuned and text families first; multimodal models stay as compatible candidates), and `RCA_MODEL_RECOMMEND_INCLUDE`, `RCA_MODEL_RECOMMEND_EXCLUDE` and `RCA_MODEL_RECOMMEND_PREFERRED` override the ranking. The picker groups them into "Recommended for RCA" and "Other compatible".
 
 ## Why two stores?
 

@@ -1,8 +1,8 @@
 # RCA Plan
 
-Written 2026-11-10 against commit `686f13b` (219 tests passing, ruff clean). This file supersedes the
-"Now / Next / Later", "Phase 2 platform path" and "v2 execution tracks" sections of
-[ROADMAP.md](ROADMAP.md); step 5 below folds the two files together.
+Written 2026-11-10 against commit `686f13b` (219 tests passing, ruff clean). This is the only plan:
+the old ROADMAP.md was folded in and deleted in step 5 (see "Kept from ROADMAP" below), and where
+an issue disagrees with this file, this file wins.
 
 Every statement about the code here was checked by reading it or running it. Where something was
 not checked, it says so.
@@ -265,7 +265,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 2 | **A refusal always has text; an error is not an answer.** Empty-reply fix in the flow; the client marks failed requests as `error`, shows a retry, and keeps them out of history. Done. | Failing test first for the empty reply; vitest for history | Small, shows root-cause habit |
 | 3 | **Ship the facts check** (#6): hedge-gated second call, one hedge definition, setting to disable. The planned `partial` outcome was dropped (see "Step 3: facts check, design"). Done: test split, unanswerable declined 6/12 → 12/12, answerable 1/28 → 2/28, +0.6 s mean (EVAL.md). | Unit tests with stub LLM; harness on test split before/after: negatives refused, false refusals, latency | "Refusals on unanswerable questions: from X to Y at +Z s" with the comparison that chose the method |
 | 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. Done: `eval/scorecard.json`, generated into README and EVAL.md; rerank gate unchanged (see "Step 4: one scorecard, design"). | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
-| 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
+| 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. Done: dead code, the event log, Streamlit and `infra/` deleted; ROADMAP folded in; README 187 lines (see "Step 5: cut and tidy, design"). | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
 | 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
 | 7 | **Vector store recovers** (#19), as in M3. | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
 | 8 | **Reranker failure is visible** (M4). | Stub test; `/status` test | Same theme: no silent mode changes |
@@ -473,9 +473,29 @@ alone:
 Proof: full CI after each commit; `docker compose build` and a live `rca` container answering one
 `/api/chat` question for cut 3; `uv sync` from the new lock.
 
+## Kept from ROADMAP (folded in 2026-11-11)
+
+ROADMAP.md was deleted in step 5. Its shipped-milestone lists are history (git log, CHANGELOG.md);
+its "Current metrics" are replaced by the scorecard; its Now/Next/Later, Phase 2 and v2 tracks are
+superseded by the steps above or listed under "Not planned". What was still worth keeping:
+
+- **Audience:** AI/ML, orchestration and agent-systems roles in robotics-adjacent teams. The
+  project is the reasoning and memory layer, not robot control (question 1 asks whether this holds).
+- **Guardrails.** RCA is a research memory and grounded QA system, not a robot controller.
+  Orchestration claims stay honest: grounded chat is direct flow composition, the agent loop is a
+  separate tool-use path. Local-first is the default; cloud and API backends are optional
+  extensions. Split-model rewriting was measured (10 s+ more latency for marginal gain) and is not
+  a recommended configuration.
+- **Hardware:** on the 18 GB M3 Pro, `phi4:14b` is at the practical memory limit; `gemma3:12b`
+  left 2–4% RAM free and was dropped; `qwen3.5:4b` serves chat and agent so one chat model is
+  loaded.
+- **Not planned, kept as ideas:** response-structure checks when onboarding a new model (citation
+  tag shape, markdown noise), useful only if the default model changes; a human-authored external
+  question subset is step 14; per-conversation request isolation is M7.
+
 ## 8. Questions only you can answer
 
-1. **Is the ROADMAP audience still right?** It says "AI/ML, orchestration, and agent-systems roles
+1. **Is the audience still right?** ROADMAP said "AI/ML, orchestration, and agent-systems roles
    in robotics-adjacent teams". If one of those matters most, say which: it changes the README's
    first paragraph and whether step 10 (agent) or step 12 (faithfulness) comes first.
 2. **The GitHub billing lock.** CI cannot run until it is cleared. Is the repo public, and can the
@@ -484,11 +504,8 @@ Proof: full CI after each commit; `docker compose build` and a live `rca` contai
    reviewed before the push.
 4. **Facts check on by default (step 3)?** My decision is yes, with a setting to turn it off. It
    costs about 3.5 s on about 40% of answers. Say no if latency matters more to you day to day.
-5. **Delete the Streamlit app?** 1,204 lines, the only user of `plotly` and `networkx`, and the
-   Dockerfile's default `CMD`. I would delete it once the React UI shows the eval views you still
-   use there, if any. Which ones do you use?
-6. **`infra/` (AWS).** Keep as an unmaintained example, or delete? I would delete: it has never
-   been live and invites questions it cannot answer.
+5. **Delete the Streamlit app?** Answered 2026-11-11: yes, deleted in step 5.
+6. **`infra/` (AWS).** Answered 2026-11-11: delete; deleted in step 5.
 7. **Who can write 20 questions about your papers** (step 14), and can someone second-label the
    `para-006` answer?
 8. **Track `CLAUDE.md` in git?** A reviewer cannot see how the project is run with coding agents

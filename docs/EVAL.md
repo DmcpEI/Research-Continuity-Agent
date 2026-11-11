@@ -10,7 +10,7 @@ This document reflects the current **129-question** evaluation corpus and the cu
 
 ## Golden Set
 
-The active golden set is [eval/golden.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/golden.json).
+The active golden set is [eval/golden.json](../eval/golden.json).
 
 - Total questions: `129`
 - Answerable: `90`
@@ -112,7 +112,7 @@ Optional model override for direct A/B runs:
 uv run python eval/harness.py --model llama3.1:8b
 ```
 
-The harness runs [GenerateFlow.generate_answer()](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/rca/flows/generate_flow.py) over all `129` questions and records:
+The harness runs [GenerateFlow.generate_answer()](../rca/flows/generate_flow.py) over all `129` questions and records:
 - `outcome` (`answered`, `unverified`, `not_found`, `conversational`, or `error` when the question raised; `grounded` and `abstained` are derived from it)
 - `grounded`
 - `abstained`
@@ -163,7 +163,7 @@ uv run python eval/harness.py --external-golden-path path/to/external_golden.jso
 Artifacts are labeled with `dataset_kind: "external"` so they can be reported separately from the self-authored golden set.
 
 Current production-baseline run:
-- [run_20260421T111146Z.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/run_20260421T111146Z.json)
+- `eval/results/run_20260421T111146Z.json` (local, not committed)
 
 Headline metrics:
 
@@ -192,7 +192,7 @@ The ablation runner evaluates retrieval only on the `90` answerable questions an
 It writes the aggregate artifact to `eval/results/ablations.json`.
 
 Current local run:
-- [ablations.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/results/ablations.json)
+- `eval/results/ablations.json` (local, not committed)
 
 Aggregate retrieval results:
 
@@ -267,7 +267,7 @@ uv run python eval/run_coefficient_sweep.py
 The held-out coefficient sweep tunes the lexical reranker used before merge and expansion.
 
 Current split behavior:
-- split files live in [eval/splits/dev.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/splits/dev.json) and [eval/splits/test.json](/Users/dmcp2003/Desktop/Universidade/Mestrado/Research-Continuity-Agent/eval/splits/test.json)
+- split files live in [eval/splits/dev.json](../eval/splits/dev.json) and [eval/splits/test.json](../eval/splits/test.json)
 - the split is stratified by category with `random.seed(42)`
 - the script now scales the held-out size with the corpus instead of hardcoding the original `45 / 20`
 - for the original 100-question corpus, the split was `69` dev / `31` test; the 29 negatives added later were appended with the same seed and ratio (`20` dev / `9` test) so existing assignments stay stable, giving `89` dev / `40` test. Rerunning the sweep regenerates the full stratified split.
