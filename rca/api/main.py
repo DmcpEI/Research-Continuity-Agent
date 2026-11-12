@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import re
 import shutil
-import time
 import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
@@ -24,7 +21,15 @@ from rca.contracts.nodes import NodeKind
 from rca.flows.generate_flow import GeneratedAnswer, GenerateFlow
 from rca.flows.ingest_flow import IngestFlow
 from rca.flows.retrieve_flow import RetrieveFlow
-from rca.llm.factory import get_llm_client
+from rca.llm.models import (
+    build_llm_for_model,
+    build_model_options,
+    fetch_available_model_names,
+    fetch_available_model_tags,
+    is_tool_capable_cached,
+    probe_and_store,
+    resolve_agent_model_selection,
+)
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore, backend_status
 
@@ -46,364 +51,6 @@ class AgentRequest(BaseModel):
 
 class ModelSelectionRequest(BaseModel):
     model: str
-
-
-class ModelOption(BaseModel):
-    name: str
-    recommended: bool
-    score: int
-    reasons: list[str]
-
-
-_EMBEDDING_PATTERNS = (
-    "embed",
-    "embedding",
-    "bge",
-    "e5",
-    "gte",
-    "jina-embeddings",
-    "nomic-embed",
-)
-_VISION_PATTERNS = ("vision", "vl", "llava", "minicpm-v", "internvl")
-_TEXT_FAMILY_PATTERNS = (
-    "qwen",
-    "llama",
-    "mistral",
-    "gemma",
-    "phi",
-    "deepseek",
-    "mixtral",
-    "yi",
-    "nemotron",
-)
-_CODING_SPECIALIZED_PATTERNS = ("coder", "code", "starcoder", "codestral")
-
-
-def _split_tokens(name: str) -> set[str]:
-    return {token for token in re.split(r"[^a-z0-9]+", name.lower()) if token}
-
-
-def _contains_any(name: str, patterns: tuple[str, ...]) -> bool:
-    lowered = name.lower()
-    return any(pattern in lowered for pattern in patterns)
-
-
-def _rank_model(name: str, preferred: list[str]) -> tuple[int, list[str]]:
-    lowered = name.lower()
-    reasons: list[str] = []
-    score = 0
-
-    for index, preferred_name in enumerate(preferred):
-        if lowered == preferred_name.lower():
-            boost = max(50 - index * 10, 20)
-            score += boost
-            reasons.append("preferred")
-            break
-
-    if _contains_any(name, _TEXT_FAMILY_PATTERNS):
-        score += 30
-        reasons.append("strong text family")
-
-    if any(tag in lowered for tag in ("instruct", "chat")):
-        score += 15
-        reasons.append("instruction tuned")
-
-    if _contains_any(name, _VISION_PATTERNS):
-        score -= 18
-        reasons.append("multimodal")
-
-    if _contains_any(name, _CODING_SPECIALIZED_PATTERNS):
-        score -= 20
-        reasons.append("code oriented")
-
-    if ":" in name and "b" in lowered:
-        size_match = re.search(r"(\d+(?:\.\d+)?)b", lowered)
-        if size_match is not None:
-            try:
-                size_b = float(size_match.group(1))
-                if size_b < 3:
-                    score -= 12
-                    reasons.append("small capacity")
-                elif 6 <= size_b <= 20:
-                    score += 8
-                    reasons.append("good local size")
-            except ValueError:
-                pass
-
-    return score, reasons
-
-
-def _build_model_options(
-    settings: Settings, model_names: list[str], current: str
-) -> list[ModelOption]:
-    include_set = {value.lower() for value in settings.model_recommend_include}
-    exclude_set = {value.lower() for value in settings.model_recommend_exclude}
-    preferred = settings.model_recommend_preferred
-
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for name in model_names:
-        normalized = name.strip()
-        if not normalized:
-            continue
-        lowered = normalized.lower()
-        if lowered in seen:
-            continue
-        seen.add(lowered)
-        deduped.append(normalized)
-
-    if current and current.lower() not in seen:
-        deduped.insert(0, current)
-
-    options: list[ModelOption] = []
-    for name in deduped:
-        lowered = name.lower()
-        if lowered in exclude_set:
-            continue
-
-        forced_include = lowered in include_set or lowered == current.lower()
-        if not forced_include and _contains_any(name, _EMBEDDING_PATTERNS):
-            continue
-
-        score, reasons = _rank_model(name, preferred)
-        recommended = forced_include or score >= 10
-        options.append(
-            ModelOption(
-                name=name,
-                recommended=recommended,
-                score=score,
-                reasons=reasons,
-            )
-        )
-
-    options.sort(key=lambda option: (-int(option.recommended), -option.score, option.name.lower()))
-    return options
-
-
-def _build_llm_for_model(settings: Settings, model_name: str):
-    return get_llm_client(
-        settings.model_copy(
-            update={
-                "generation_model": model_name,
-                "openai_chat_model": model_name,
-            }
-        )
-    )
-
-
-def _fetch_available_model_names(settings: Settings, current_model: str) -> list[str]:
-    names: list[str] = []
-    if settings.llm_backend != "ollama":
-        return [current_model] if current_model else []
-
-    tags_url = settings.llm_base_url.rstrip("/") + "/api/tags"
-    try:
-        with urllib.request.urlopen(tags_url, timeout=2.0) as response:
-            payload = response.read().decode("utf-8")
-            parsed = json.loads(payload)
-            models = parsed.get("models", [])
-            if isinstance(models, list):
-                for model in models:
-                    if isinstance(model, dict) and isinstance(model.get("name"), str):
-                        names.append(model["name"])
-    except Exception:
-        names = []
-
-    if current_model and current_model not in names:
-        names.insert(0, current_model)
-    return names
-
-
-def _fetch_available_model_tags(settings: Settings) -> list[dict[str, Any]]:
-    if settings.llm_backend != "ollama":
-        return []
-
-    tags_url = settings.llm_base_url.rstrip("/") + "/api/tags"
-    try:
-        with urllib.request.urlopen(tags_url, timeout=2.0) as response:
-            payload = response.read().decode("utf-8")
-            parsed = json.loads(payload)
-            models = parsed.get("models", [])
-            if isinstance(models, list):
-                return [model for model in models if isinstance(model, dict)]
-    except Exception:
-        return []
-
-    return []
-
-
-def _tag_aliases(model_name: str) -> list[str]:
-    aliases = [model_name]
-    if ":" not in model_name:
-        aliases.append(f"{model_name}:latest")
-    return aliases
-
-
-def _probe_tool_calling_capability(settings: Settings, model_name: str) -> bool:
-    return bool(_probe_tool_calling_capability_detailed(settings, model_name)["capable"])
-
-
-def _probe_tool_calling_capability_detailed(settings: Settings, model_name: str) -> dict[str, Any]:
-    if settings.llm_backend != "ollama":
-        return {
-            "capable": True,
-            "probed_tag": model_name,
-            "http_status": 200,
-            "error_body": "",
-            "error_message": "",
-            "probe_path": "skipped_non_ollama",
-        }
-
-    last_error: dict[str, Any] = {
-        "capable": False,
-        "probed_tag": model_name,
-        "http_status": None,
-        "error_body": "",
-        "error_message": "probe_failed_without_detail",
-        "probe_path": "tool_probe",
-    }
-
-    for tag in _tag_aliases(model_name):
-        payload = {
-            "model": tag,
-            "messages": [{"role": "user", "content": "ping"}],
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "noop",
-                        "description": "No-op tool capability probe",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {"value": {"type": "string"}},
-                        },
-                    },
-                }
-            ],
-            "stream": False,
-            "options": {"temperature": 0, "num_predict": 1},
-            # Unload right away: probing every installed model would otherwise hold
-            # each one in RAM for Ollama's default 5 minutes.
-            "keep_alive": 0,
-        }
-
-        for timeout_seconds in (5.0, 60.0):
-            request = urllib.request.Request(
-                settings.llm_base_url.rstrip("/") + "/api/chat",
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-            )
-
-            try:
-                with urllib.request.urlopen(request, timeout=timeout_seconds):
-                    return {
-                        "capable": True,
-                        "probed_tag": tag,
-                        "http_status": 200,
-                        "error_body": "",
-                        "error_message": "",
-                        "probe_path": "tool_probe",
-                    }
-            except urllib.error.HTTPError as exc:
-                raw_body = ""
-                try:
-                    raw_body = exc.read().decode("utf-8")
-                except Exception:
-                    raw_body = ""
-
-                last_error = {
-                    "capable": False,
-                    "probed_tag": tag,
-                    "http_status": exc.code,
-                    "error_body": raw_body,
-                    "error_message": str(exc),
-                    "probe_path": "tool_probe",
-                }
-                break
-            except TimeoutError as exc:
-                last_error = {
-                    "capable": False,
-                    "probed_tag": tag,
-                    "http_status": None,
-                    "error_body": "",
-                    "error_message": str(exc) or "timed out",
-                    "probe_path": f"tool_probe_timeout_{int(timeout_seconds)}s",
-                }
-                # Retry once with a slower timeout for large models.
-                continue
-            except Exception as exc:
-                last_error = {
-                    "capable": False,
-                    "probed_tag": tag,
-                    "http_status": None,
-                    "error_body": "",
-                    "error_message": str(exc),
-                    "probe_path": "tool_probe",
-                }
-                break
-
-    return last_error
-
-
-def _is_tool_capable_cached(
-    settings: Settings,
-    cache: dict[str, dict[str, Any]],
-    model_name: str,
-) -> bool:
-    cached = cache.get(model_name)
-    if isinstance(cached, dict) and "capable" in cached:
-        return bool(cached.get("capable"))
-
-    detailed = _probe_tool_calling_capability_detailed(settings, model_name)
-    cache[model_name] = {
-        **detailed,
-        "cached": False,
-        "cached_at_unix": time.time(),
-    }
-    return bool(detailed["capable"])
-
-
-def _probe_and_store(
-    settings: Settings,
-    cache: dict[str, dict[str, Any]],
-    model_name: str,
-) -> dict[str, Any]:
-    detailed = _probe_tool_calling_capability_detailed(settings, model_name)
-    enriched = {
-        **detailed,
-        "cached": False,
-        "cached_at_unix": time.time(),
-    }
-    cache[model_name] = enriched
-    return enriched
-
-
-def _resolve_agent_model_selection(
-    settings: Settings,
-    agent: AgentLoop,
-    cache: dict[str, dict[str, Any]],
-    force_reprobe: bool = False,
-) -> tuple[list[str], str]:
-    current_model = settings.agent_model
-    names = _fetch_available_model_names(settings, current_model)
-
-    capable_models: list[str] = []
-    for model_name in names:
-        if force_reprobe:
-            probe = _probe_and_store(settings, cache, model_name)
-            if probe.get("capable"):
-                capable_models.append(model_name)
-            continue
-
-        if _is_tool_capable_cached(settings, cache, model_name):
-            capable_models.append(model_name)
-
-    if capable_models and current_model not in capable_models:
-        settings.agent_model = capable_models[0]
-        agent.llm = _build_llm_for_model(settings, settings.agent_model)
-        current_model = settings.agent_model
-
-    return capable_models, current_model
 
 
 def create_app(
@@ -605,7 +252,7 @@ def create_app(
                 cfg.openai_chat_model = payload.model
             else:
                 cfg.generation_model = payload.model
-            generator.llm = _build_llm_for_model(cfg, payload.model)
+            generator.llm = build_llm_for_model(cfg, payload.model)
 
         model = payload.model or (
             cfg.openai_chat_model
@@ -639,7 +286,7 @@ def create_app(
             raise HTTPException(status_code=400, detail="Query must not be empty")
 
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        _resolve_agent_model_selection(cfg, agent, cache)
+        resolve_agent_model_selection(cfg, agent, cache)
 
         result = agent.run(payload.query)
         return {
@@ -656,8 +303,8 @@ def create_app(
             if cfg.llm_backend == "openai_compatible"
             else cfg.generation_model
         )
-        names = _fetch_available_model_names(cfg, current_model)
-        options = _build_model_options(cfg, names, current_model)
+        names = fetch_available_model_names(cfg, current_model)
+        options = build_model_options(cfg, names, current_model)
         return {
             "models": [option.name for option in options],
             "current": current_model,
@@ -685,7 +332,7 @@ def create_app(
             cfg.openai_chat_model = selected
         else:
             cfg.generation_model = selected
-        generator.llm = _build_llm_for_model(cfg, selected)
+        generator.llm = build_llm_for_model(cfg, selected)
 
         current = (
             cfg.openai_chat_model
@@ -698,7 +345,7 @@ def create_app(
     @router.get("/agent/models")
     def list_agent_models(refresh: bool = False) -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        capable_models, current_model = _resolve_agent_model_selection(
+        capable_models, current_model = resolve_agent_model_selection(
             cfg,
             agent,
             cache,
@@ -713,14 +360,14 @@ def create_app(
     @router.get("/agent/models/diagnostics")
     def list_agent_models_diagnostics(refresh: bool = False) -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        capable_models, current_model = _resolve_agent_model_selection(
+        capable_models, current_model = resolve_agent_model_selection(
             cfg,
             agent,
             cache,
             force_reprobe=refresh,
         )
 
-        tag_entries = _fetch_available_model_tags(cfg)
+        tag_entries = fetch_available_model_tags(cfg)
         tag_map: dict[str, dict[str, Any]] = {}
         for entry in tag_entries:
             name = entry.get("name")
@@ -731,12 +378,12 @@ def create_app(
                     "modified_at": entry.get("modified_at"),
                 }
 
-        names = _fetch_available_model_names(cfg, cfg.agent_model)
+        names = fetch_available_model_names(cfg, cfg.agent_model)
         records: list[dict[str, Any]] = []
         for name in names:
             cached = cache.get(name)
             if cached is None:
-                cached = _probe_and_store(cfg, cache, name)
+                cached = probe_and_store(cfg, cache, name)
 
             records.append(
                 {
@@ -765,7 +412,7 @@ def create_app(
     def reprobe_agent_models() -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
         cache.clear()
-        capable_models, current_model = _resolve_agent_model_selection(
+        capable_models, current_model = resolve_agent_model_selection(
             cfg,
             agent,
             cache,
@@ -787,14 +434,14 @@ def create_app(
         previous = cfg.agent_model
 
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        if not _is_tool_capable_cached(cfg, cache, selected):
+        if not is_tool_capable_cached(cfg, cache, selected):
             raise HTTPException(
                 status_code=400,
                 detail="Selected model is not tool-calling capable for agent mode",
             )
 
         cfg.agent_model = selected
-        agent.llm = _build_llm_for_model(cfg, selected)
+        agent.llm = build_llm_for_model(cfg, selected)
 
         _log_ollama_processes(cfg, f"agent/models/select {previous} -> {cfg.agent_model}")
 
@@ -803,7 +450,7 @@ def create_app(
     @router.get("/agent/status")
     def agent_status() -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        capable_models, current_model = _resolve_agent_model_selection(cfg, agent, cache)
+        capable_models, current_model = resolve_agent_model_selection(cfg, agent, cache)
         capability = current_model in capable_models if capable_models else False
 
         return {

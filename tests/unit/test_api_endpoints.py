@@ -814,7 +814,9 @@ def test_tool_calling_probe_unloads_the_model_right_away(monkeypatch) -> None:
         return io.BytesIO(b"{}")
 
     monkeypatch.setattr(api_main.urllib.request, "urlopen", fake_urlopen)
-    result = api_main._probe_tool_calling_capability_detailed(
+    from rca.llm.models import probe_tool_calling_capability_detailed
+
+    result = probe_tool_calling_capability_detailed(
         Settings(llm_base_url="http://localhost:11434"), "qwen3:4b"
     )
 
