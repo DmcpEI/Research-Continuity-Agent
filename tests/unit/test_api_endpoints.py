@@ -1001,3 +1001,24 @@ def test_the_refusal_reason_is_the_current_digests(tmp_path: Path, monkeypatch) 
     ollama.tags = [{"name": "m:latest", "digest": "sha256:d2"}]  # pulled since
     assert tool_capability(settings, cache, "m:latest") is False
     assert tool_refusal_reason(settings, cache, "m:latest") == "does not support tools"
+
+
+def test_selecting_the_default_model_also_moves_query_rewriting(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Otherwise rewrites stay on the startup model: two models in RAM, unlike the scorecard."""
+    from types import SimpleNamespace
+
+    from rca.flows.generate_flow import GenerateFlow
+
+    monkeypatch.setattr(
+        "rca.api.main.build_llm_for_model", lambda settings, name: SimpleNamespace(model=name)
+    )
+    settings = _settings_for(tmp_path)
+    generator = GenerateFlow(
+        settings=settings, retrieve_flow=object(), llm_client=SimpleNamespace(model="a")
+    )
+    client = TestClient(create_app(settings=settings, generate_flow=generator))
+
+    assert client.post("/models/select", json={"model": "b"}).status_code == 200
+    assert generator.llm.model == generator.rewrite_llm.model == "b"

@@ -261,7 +261,7 @@ def create_app(
             # default model changes, and an overlapping request keeps its own model.
             flow = copy.copy(generator)
             flow.llm = build_llm_for_model(cfg, payload.model)
-            if generator.rewrite_llm is generator.llm:
+            if getattr(generator, "rewrite_llm", None) is generator.llm:
                 flow.rewrite_llm = flow.llm
         try:
             result = flow.generate_answer(
@@ -346,7 +346,12 @@ def create_app(
             cfg.openai_chat_model = selected
         else:
             cfg.generation_model = selected
+        # Rewrites follow the answer model unless a separate rewrite model was set up;
+        # otherwise the startup model stays loaded beside the new one.
+        rewrites_follow = getattr(generator, "rewrite_llm", None) is generator.llm
         generator.llm = build_llm_for_model(cfg, selected)
+        if rewrites_follow:
+            generator.rewrite_llm = generator.llm
 
         current = (
             cfg.openai_chat_model
