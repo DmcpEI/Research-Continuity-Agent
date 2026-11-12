@@ -3,6 +3,7 @@ import {
   type ApiAgentResponse,
   type ApiAgentToolCall,
   type ApiAgentTrace,
+  ApiError,
   sendAgent,
 } from '../../api/client';
 import ReactMarkdown from 'react-markdown';
@@ -211,14 +212,20 @@ export function AgentView({ conversationId }: AgentViewProps) {
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
+      // 409: the selected model cannot call tools. Say so and open the picker; never switch.
+      const needsModel = error instanceof ApiError && error.status === 409;
+      const message = needsModel ? error.detail : `Agent request failed: ${String(error)}`;
+      if (needsModel) {
+        window.dispatchEvent(new CustomEvent('rca-open-model-picker'));
+      }
       setMessages((prev) => [
         ...prev,
         {
           id: `agent-error-${Date.now()}`,
           role: 'assistant',
-          content: `Agent request failed: ${String(error)}`,
+          content: message,
           trace: null,
-          error: String(error),
+          error: needsModel ? null : String(error),
         },
       ]);
     } finally {

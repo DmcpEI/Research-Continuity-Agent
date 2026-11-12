@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import type { NavigateFunction } from 'react-router-dom';
 import { StatusBar } from './StatusBar';
 
 const FALLBACK_MESSAGE = 'VectorStore using JSON fallback after Chroma failure: RuntimeError: down';
@@ -55,5 +56,129 @@ describe('StatusBar vector-store warning', () => {
     await waitFor(() => expect(screen.getByText('● Ollama connected')).toBeInTheDocument());
     // Live region always exists (so later warnings are announced) but stays empty.
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+});
+
+describe('StatusBar agent model picker', () => {
+  const NOT_CAPABLE = 'Selected model is not tool-calling capable for agent mode';
+  let selectCalls: string[] = [];
+
+  function renderAgentRoute() {
+    selectCalls = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/agent/models/select') {
+          selectCalls.push(JSON.parse(String(init?.body)).model);
+          return new Response(JSON.stringify({ detail: NOT_CAPABLE }), { status: 400 });
+        }
+        const bodies: Record<string, unknown> = {
+          '/api/status': { ...baseStatus, warnings: [] },
+          '/api/agent/models': { models: ['qwen3.5:4b', 'gemma3:12b'], current: 'qwen3.5:4b', current_capable: true },
+          '/api/agent/status': { model: 'qwen3.5:4b', tool_calling_capable: true, backend: 'ollama', ollama_connected: true },
+          '/api/models': {
+            models: ['qwen3.5:4b', 'gemma3:12b'],
+            current: 'qwen3.5:4b',
+            recommended: [
+              { name: 'qwen3.5:4b', recommended: true, score: 30, reasons: [] },
+              { name: 'gemma3:12b', recommended: true, score: 30, reasons: [] },
+            ],
+            other: [],
+          },
+        };
+        return new Response(JSON.stringify(bodies[url] ?? {}), { status: 200 });
+      }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/agent']}>
+          <StatusBar />
+          <NavigateGrabber />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  let navigate: NavigateFunction = () => undefined;
+  function NavigateGrabber() {
+    navigate = useNavigate();
+    return null;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
+  });
+
+  it('does not keep re-selecting a saved agent model the server refuses', async () => {
+    window.localStorage.setItem('rca-current-agent-model', 'gemma3:12b');
+    renderAgentRoute();
+    await waitFor(() => expect(selectCalls).toEqual(['gemma3:12b']));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(selectCalls).toEqual(['gemma3:12b']);
+    expect(window.localStorage.getItem('rca-current-agent-model')).toBeNull();
+  });
+
+  it('opens on request and shows why a model was refused', async () => {
+    renderAgentRoute();
+    await screen.findByText('qwen3.5:4b');
+    window.dispatchEvent(new CustomEvent('rca-open-model-picker'));
+    const option = await screen.findByRole('button', { name: 'gemma3:12b' });
+    option.click();
+    expect(await screen.findByText(`gemma3:12b: ${NOT_CAPABLE}`)).toBeInTheDocument();
+  });
+
+  it('forgets a refusal when the route changes', async () => {
+    const { act } = await import('@testing-library/react');
+    renderAgentRoute();
+    await screen.findByText('qwen3.5:4b');
+    window.dispatchEvent(new CustomEvent('rca-open-model-picker'));
+    (await screen.findByRole('button', { name: 'gemma3:12b' })).click();
+    await screen.findByText(`gemma3:12b: ${NOT_CAPABLE}`);
+    act(() => navigate('/'));
+    act(() => navigate('/agent'));
+    window.dispatchEvent(new CustomEvent('rca-open-model-picker'));
+    await screen.findByRole('button', { name: 'gemma3:12b' });
+    expect(screen.queryByText(`gemma3:12b: ${NOT_CAPABLE}`)).not.toBeInTheDocument();
+  });
+});
+
+describe('StatusBar agent model restore', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
+  });
+
+  it('does not re-select a saved agent model the server already uses', async () => {
+    const selects: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/agent/models/select') {
+          selects.push(JSON.parse(String(init?.body)).model);
+          return new Response(JSON.stringify({ model: 'qwen3.5:4b' }), { status: 200 });
+        }
+        const bodies: Record<string, unknown> = {
+          '/api/status': { ...baseStatus, warnings: [] },
+          '/api/agent/models': { models: ['qwen3.5:4b'], current: 'qwen3.5:4b', current_capable: true },
+          '/api/agent/status': { model: 'qwen3.5:4b', tool_calling_capable: true, backend: 'ollama', ollama_connected: true },
+          '/api/models': { models: ['qwen3.5:4b'], current: 'qwen3.5:4b', recommended: [], other: [] },
+        };
+        return new Response(JSON.stringify(bodies[url] ?? {}), { status: 200 });
+      }),
+    );
+    window.localStorage.setItem('rca-current-agent-model', 'qwen3.5:4b');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/agent']}>
+          <StatusBar />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByText('qwen3.5:4b');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(selects).toEqual([]);
   });
 });

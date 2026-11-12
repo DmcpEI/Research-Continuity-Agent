@@ -269,7 +269,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. Done: see "Step 6: first run, design". | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
 | 7 | **Vector store recovers** (#19), as in M3. Done: see "Step 7: vector store recovers, design". | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
 | 8 | **Reranker failure is visible** (M4). Done: see "Step 8: reranker failure is visible, design". | Stub test; `/status` test | Same theme: no silent mode changes |
-| 9 | **Request-scoped models, no silent agent switch** (M5); move model code out of `main.py`. | API tests incl. interleaved requests | `main.py` shrinks by a third; removes a RAM foot-gun |
+| 9 | **Request-scoped models, no silent agent switch** (M5); move model code out of `main.py`. Done: see "Step 9: request-scoped models, no silent agent switch, design". | API tests incl. interleaved requests | `main.py` shrinks by a third; removes a RAM foot-gun |
 | 10 | **Agent contract** (M6): `StopReason`, citeable search results, no `pic2`, honest single-shot. | Unit tests; 20-task bench rerun | Agent answers can cite; bench number is for the shipped tool |
 | 11 | **Progress and cancel** (#16, M8): stage events first, tokens second. | Event-sequence API test; live | The daily-use fix people notice |
 | 12 | **"Cited" becomes "Supported"** (#7 reframed): per-sentence support check validated on ~50 hand labels; the badge changes from "Cited" to "Supported" only when it passes. | Label file; classifier comparison as in #6 | The second measured claim |
@@ -576,6 +576,48 @@ old code.
   after copying the model into the scratch folder, the same question was refused by the no-match
   gate (`low_rerank_score`) and `/status` was clear, with no restart. Rerun after the review
   fixes: inside the minute the answer was still unranked, after it the gate refused again.
+
+## Step 9: request-scoped models, no silent agent switch, design (2026-11-12)
+
+As decided in M5, in three commits so the move can be reviewed apart from the behaviour changes:
+
+1. **Move** model listing, ranking and tool probes to `rca/llm/models.py` (no behaviour change;
+   two helpers nothing called are dropped). `main.py` goes from 977 to 624 lines.
+2. **`/chat` model per request.** Reproduced first: an overlapping request for `model-a` was
+   answered by `model-b`, because `/chat` rewrote the shared settings and client. The request now
+   runs on a shallow copy of the flow with its own client (`GenerateFlow` keeps no per-call state
+   on `self`); the default changes only through `/models/select`.
+3. **No silent agent switch, probe only the selected model.**
+   - Before, opening the agent tab probed every installed model (each one loaded into RAM), and
+     `/agent/models`, `/agent/status` and `/agent` switched to "the first capable model" without
+     telling anyone.
+   - Now `/agent/models` lists installed models without probing them and reports whether the
+     current one can call tools; `/agent/status` does the same. `/agent` answers 409 with
+     Ollama's own reason when the current model cannot call tools, and the UI shows that sentence
+     and opens the model picker.
+   - Probes are cached by model digest, so a re-pulled model is probed again. Only an answer
+     about tools is cached: success, a 400 refusing tools, or a 404 for a missing model. An
+     unreachable Ollama or any other error (a 5xx such as "not enough memory") is unknown
+     (`tool_calling_capable: null`) and retried, never read as "no tools" (break-it review).
+   - `/agent/models/diagnostics` still probes everything, on request only.
+   - The picker shows why a select was refused, and forgets it on a route change. A saved agent
+     model the server refuses is forgotten instead of being re-selected in a loop (reproduced:
+     twice in 50 ms), and the saved model is restored once per visit to the Agent tab, only after
+     the server's current model is known (before, it was re-sent on every entry, even when equal).
+   - Rewritten on purpose, as M5 said: the auto-reconcile test, and the test that expected
+     `/agent/models` to list only probed-capable models.
+- **Proof:** the tests above, each failing on the old code. Live, on the library copy:
+  - With the agent model set to a model that is not installed, `/agent/models` listed eight
+    models and loaded none into RAM (`/api/ps` before and after).
+  - `/agent` answered 409 with "model 'no-such-model:latest' not found"; in the browser the
+    sentence appeared and the picker opened, with the status bar still on the configured model.
+  - Picking `qwen3.5:4b` made it capable and the agent ran `list_runs`.
+  - `/chat` with `qwen3.5:2b` was answered by it while `/status` kept `qwen3.5:4b`.
+- **The unexplained select, explained by the review:** the only code that selects by itself was
+  the saved-model restore, which fired on every entry to the Agent tab (and twice under React's
+  dev-mode double effects) because the current model reads `--` while loading. No path fires on
+  the 409 itself. Fixed as above, with a test that a saved model equal to the server's sends no
+  select.
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

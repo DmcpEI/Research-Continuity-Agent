@@ -416,67 +416,6 @@ def test_create_app_shares_retrieve_flow_with_default_agent(tmp_path: Path, monk
     assert captured["retrieve_flow"] is retrieve
 
 
-def test_agent_models_filters_out_non_tool_calling_models(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_for(tmp_path)
-    settings.llm_backend = "ollama"
-    settings.llm_base_url = "http://ollama.local"
-    settings.agent_model = "tool-ok:latest"
-    settings.generation_model = "chat-default:latest"
-
-    class _FakeResponse:
-        def __init__(self, payload: dict[str, object]) -> None:
-            self._payload = payload
-
-        def read(self) -> bytes:
-            return json.dumps(self._payload).encode("utf-8")
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> bool:
-            return False
-
-    def _fake_urlopen(request, timeout=0):
-        if isinstance(request, str):
-            if request.endswith("/api/tags"):
-                return _FakeResponse(
-                    {"models": [{"name": "tool-ok:latest"}, {"name": "tool-bad:latest"}]}
-                )
-            if request.endswith("/api/version"):
-                return _FakeResponse({"version": "0.0.0"})
-
-        url = request.full_url
-        if url.endswith("/api/chat"):
-            body = json.loads(request.data.decode("utf-8"))
-            if body.get("model") == "tool-bad:latest":
-                raise urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(b"{}"))
-            return _FakeResponse({"message": {"content": "ok"}})
-
-        raise AssertionError(f"Unexpected request: {request}")
-
-    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", _fake_urlopen)
-
-    class FakeAgentLoop:
-        def run(self, query: str) -> AgentResult:
-            return AgentResult(
-                query=query,
-                answer="ok",
-                trace=AgentTrace(query=query, iterations=1, tool_calls=[]),
-                error=None,
-            )
-
-        def close(self) -> None:
-            return None
-
-    client = TestClient(create_app(settings=settings, agent_loop=FakeAgentLoop()))
-    response = client.get("/agent/models")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["models"] == ["tool-ok:latest"]
-    assert payload["current"] == "tool-ok:latest"
-
-
 def test_model_selection_keeps_chat_and_agent_models_separate(tmp_path: Path) -> None:
     settings = _settings_for(tmp_path)
     settings.llm_backend = "openai_compatible"
@@ -537,73 +476,6 @@ def test_model_selection_keeps_chat_and_agent_models_separate(tmp_path: Path) ->
     assert status_response.json()["model"] == "chat-model-b"
 
 
-def test_agent_models_auto_reconciles_invalid_current_model(tmp_path: Path, monkeypatch) -> None:
-    settings = _settings_for(tmp_path)
-    settings.llm_backend = "ollama"
-    settings.llm_base_url = "http://ollama.local"
-    settings.agent_model = "missing-model:latest"
-
-    class _FakeResponse:
-        def __init__(self, payload: dict[str, object]) -> None:
-            self._payload = payload
-
-        def read(self) -> bytes:
-            return json.dumps(self._payload).encode("utf-8")
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> bool:
-            return False
-
-    def _fake_urlopen(request, timeout=0):
-        if isinstance(request, str):
-            if request.endswith("/api/tags"):
-                return _FakeResponse(
-                    {"models": [{"name": "tool-ok:latest"}, {"name": "tool-bad:latest"}]}
-                )
-            if request.endswith("/api/version"):
-                return _FakeResponse({"version": "0.0.0"})
-
-        url = request.full_url
-        if url.endswith("/api/chat"):
-            body = json.loads(request.data.decode("utf-8"))
-            if body.get("model") in {"tool-bad:latest", "missing-model:latest"}:
-                raise urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(b"{}"))
-            return _FakeResponse({"message": {"content": "ok"}})
-
-        raise AssertionError(f"Unexpected request: {request}")
-
-    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", _fake_urlopen)
-
-    class FakeAgentLoop:
-        def __init__(self) -> None:
-            self.llm = object()
-
-        def run(self, query: str) -> AgentResult:
-            return AgentResult(
-                query=query,
-                answer="ok",
-                trace=AgentTrace(query=query, iterations=1, tool_calls=[]),
-                error=None,
-            )
-
-        def close(self) -> None:
-            return None
-
-    client = TestClient(create_app(settings=settings, agent_loop=FakeAgentLoop()))
-
-    response = client.get("/agent/models")
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["models"] == ["tool-ok:latest"]
-    assert payload["current"] == "tool-ok:latest"
-
-    status_response = client.get("/agent/status")
-    assert status_response.status_code == 200
-    assert status_response.json()["model"] == "tool-ok:latest"
-
-
 def test_agent_model_selection_rejects_non_tool_capable_model(tmp_path: Path, monkeypatch) -> None:
     settings = _settings_for(tmp_path)
     settings.llm_backend = "ollama"
@@ -636,7 +508,11 @@ def test_agent_model_selection_rejects_non_tool_capable_model(tmp_path: Path, mo
         if url.endswith("/api/chat"):
             body = json.loads(request.data.decode("utf-8"))
             if body.get("model") == "tool-bad:latest":
-                raise urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(b"{}"))
+                # Ollama's real refusal names tools; other 400s say nothing about them.
+                body = (
+                    b'{"error":"registry.ollama.ai/library/tool-bad:latest does not support tools"}'
+                )
+                raise urllib.error.HTTPError(url, 400, "Bad Request", {}, io.BytesIO(body))
             return _FakeResponse({"message": {"content": "ok"}})
 
         raise AssertionError(f"Unexpected request: {request}")
@@ -963,3 +839,165 @@ def test_chat_model_is_per_request_and_changes_nothing_shared(tmp_path: Path, mo
     assert generator.llm.model == "default-model"
     plain = client.post("/chat", json={"query": "What is JamPacker?"}).json()
     assert plain["answer"].startswith("Answer from default-model")
+
+
+class _FakeOllama:
+    """Fake Ollama HTTP API: /api/tags lists `tags`; /api/chat probes fail for `no_tools`."""
+
+    def __init__(self, monkeypatch, tags: list[dict], no_tools: set[str] = frozenset()) -> None:
+        self.tags = tags
+        self.no_tools = set(no_tools)
+        self.down = False
+        self.probes: list[str] = []
+        monkeypatch.setattr("rca.api.main.urllib.request.urlopen", self.urlopen)
+
+    def urlopen(self, request, timeout=0):
+        url = request if isinstance(request, str) else request.full_url
+        if self.down:
+            raise urllib.error.URLError("connection refused")
+        if url.endswith("/api/tags"):
+            return io.BytesIO(json.dumps({"models": self.tags}).encode())
+        if url.endswith("/api/version"):
+            return io.BytesIO(b'{"version": "0.0.0"}')
+        if url.endswith("/api/chat"):
+            model = json.loads(request.data)["model"]
+            self.probes.append(model)
+            if model in self.no_tools:
+                raise urllib.error.HTTPError(
+                    url, 400, "Bad Request", {}, io.BytesIO(b'{"error":"does not support tools"}')
+                )
+            return io.BytesIO(b'{"message": {"content": "ok"}}')
+        raise AssertionError(f"Unexpected request: {url}")
+
+
+class _CountingAgentLoop:
+    def __init__(self) -> None:
+        self.llm = object()
+        self.runs = 0
+
+    def run(self, query: str) -> AgentResult:
+        self.runs += 1
+        return AgentResult(
+            query=query, answer="ok", trace=AgentTrace(query=query, iterations=1), error=None
+        )
+
+    def close(self) -> None:
+        return None
+
+
+def _ollama_settings(tmp_path: Path, agent_model: str) -> Settings:
+    settings = _settings_for(tmp_path)
+    settings.llm_backend = "ollama"
+    settings.llm_base_url = "http://ollama.local"
+    settings.agent_model = agent_model
+    return settings
+
+
+TWO_MODELS = [
+    {"name": "tool-ok:latest", "digest": "sha256:ok"},
+    {"name": "tool-bad:latest", "digest": "sha256:bad"},
+]
+
+
+def test_agent_models_lists_installed_models_and_probes_only_the_current_one(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Opening the picker used to load every installed model into RAM to probe it."""
+    ollama = _FakeOllama(monkeypatch, TWO_MODELS, no_tools={"tool-bad:latest"})
+    settings = _ollama_settings(tmp_path, "tool-ok:latest")
+    client = TestClient(create_app(settings=settings, agent_loop=_CountingAgentLoop()))
+
+    payload = client.get("/agent/models").json()
+    assert payload["models"] == ["tool-ok:latest", "tool-bad:latest"]
+    assert payload["current"] == "tool-ok:latest"
+    assert payload["current_capable"] is True
+    client.get("/agent/status")
+    assert ollama.probes == ["tool-ok:latest"]
+
+
+def test_agent_model_is_never_switched_silently(tmp_path: Path, monkeypatch) -> None:
+    """Replaces the old auto-reconcile test (PLAN M5): no switch, /agent says what to do."""
+    _FakeOllama(monkeypatch, TWO_MODELS, no_tools={"tool-bad:latest"})
+    settings = _ollama_settings(tmp_path, "tool-bad:latest")
+    agent = _CountingAgentLoop()
+    original_llm = agent.llm
+    client = TestClient(create_app(settings=settings, agent_loop=agent))
+
+    models = client.get("/agent/models").json()
+    assert models["current"] == "tool-bad:latest" and models["current_capable"] is False
+    status = client.get("/agent/status").json()
+    assert status["model"] == "tool-bad:latest" and status["tool_calling_capable"] is False
+
+    response = client.post("/agent", json={"query": "List the files."})
+    assert response.status_code == 409
+    assert "tool-bad:latest" in response.json()["detail"]
+    assert "cannot call tools (Ollama: does not support tools)" in response.json()["detail"]
+    assert agent.runs == 0
+    assert settings.agent_model == "tool-bad:latest" and agent.llm is original_llm
+
+
+def test_tool_probe_is_cached_by_model_digest(tmp_path: Path, monkeypatch) -> None:
+    ollama = _FakeOllama(monkeypatch, [{"name": "tool-ok:latest", "digest": "sha256:v1"}])
+    settings = _ollama_settings(tmp_path, "tool-ok:latest")
+    client = TestClient(create_app(settings=settings, agent_loop=_CountingAgentLoop()))
+
+    client.get("/agent/status")
+    client.get("/agent/status")
+    assert ollama.probes == ["tool-ok:latest"]
+    ollama.tags = [{"name": "tool-ok:latest", "digest": "sha256:v2"}]  # re-pulled
+    client.get("/agent/status")
+    assert ollama.probes == ["tool-ok:latest", "tool-ok:latest"]
+
+
+def test_an_unreachable_ollama_is_not_taken_for_a_model_without_tools(
+    tmp_path: Path, monkeypatch
+) -> None:
+    ollama = _FakeOllama(monkeypatch, TWO_MODELS)
+    settings = _ollama_settings(tmp_path, "tool-ok:latest")
+    agent = _CountingAgentLoop()
+    client = TestClient(create_app(settings=settings, agent_loop=agent))
+
+    ollama.down = True
+    assert client.get("/agent/status").json()["tool_calling_capable"] is None
+    assert client.post("/agent", json={"query": "List the files."}).status_code == 200
+    ollama.down = False
+    assert client.get("/agent/status").json()["tool_calling_capable"] is True
+
+
+def test_only_a_refusal_about_tools_is_cached_as_no_tools(tmp_path: Path, monkeypatch) -> None:
+    """A 5xx (e.g. not enough memory to load it) says nothing about tools; retry next time."""
+    from rca.llm.models import tool_capability
+
+    ollama = _FakeOllama(monkeypatch, [{"name": "qwen3.5:4b", "digest": "sha256:d1"}])
+    settings = _ollama_settings(tmp_path, "qwen3.5:4b")
+    cache: dict = {}
+    original = ollama.urlopen
+
+    def out_of_memory(request, timeout=0):
+        url = request if isinstance(request, str) else request.full_url
+        if url.endswith("/api/chat"):
+            raise urllib.error.HTTPError(
+                url,
+                500,
+                "Internal",
+                {},
+                io.BytesIO(b'{"error":"model requires more system memory"}'),
+            )
+        return original(request, timeout)
+
+    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", out_of_memory)
+    assert tool_capability(settings, cache, "qwen3.5:4b") is None
+    assert cache == {}
+    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", original)
+    assert tool_capability(settings, cache, "qwen3.5:4b") is True
+
+
+def test_the_refusal_reason_is_the_current_digests(tmp_path: Path, monkeypatch) -> None:
+    from rca.llm.models import tool_capability, tool_refusal_reason
+
+    ollama = _FakeOllama(monkeypatch, [], no_tools={"m:latest"})
+    settings = _ollama_settings(tmp_path, "m:latest")
+    cache: dict = {"m:latest": {"capable": False, "error_body": '{"error":"model not found"}'}}
+    ollama.tags = [{"name": "m:latest", "digest": "sha256:d2"}]  # pulled since
+    assert tool_capability(settings, cache, "m:latest") is False
+    assert tool_refusal_reason(settings, cache, "m:latest") == "does not support tools"

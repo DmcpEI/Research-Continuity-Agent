@@ -23,13 +23,14 @@ from rca.flows.generate_flow import GeneratedAnswer, GenerateFlow
 from rca.flows.ingest_flow import IngestFlow
 from rca.flows.retrieve_flow import RetrieveFlow
 from rca.llm.models import (
+    agent_model_choices,
     build_llm_for_model,
     build_model_options,
     fetch_available_model_names,
     fetch_available_model_tags,
-    is_tool_capable_cached,
-    probe_and_store,
-    resolve_agent_model_selection,
+    probe_tool_calling_capability_detailed,
+    tool_capability,
+    tool_refusal_reason,
 )
 from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore, backend_status
@@ -289,7 +290,17 @@ def create_app(
             raise HTTPException(status_code=400, detail="Query must not be empty")
 
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        resolve_agent_model_selection(cfg, agent, cache)
+        # Never switch models behind the user's back: say what is wrong and let them pick.
+        if tool_capability(cfg, cache, cfg.agent_model) is False:
+            reason = tool_refusal_reason(cfg, cache, cfg.agent_model)
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"The agent model {cfg.agent_model} cannot call tools"
+                    f"{f' (Ollama: {reason})' if reason else ''}. "
+                    "Pick another model in the model picker."
+                ),
+            )
 
         result = agent.run(payload.query)
         return {
@@ -348,31 +359,19 @@ def create_app(
     @router.get("/agent/models")
     def list_agent_models(refresh: bool = False) -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        capable_models, current_model = resolve_agent_model_selection(
-            cfg,
-            agent,
-            cache,
-            force_reprobe=refresh,
-        )
-
+        if refresh:
+            cache.clear()
         return {
-            "models": capable_models,
-            "current": current_model,
+            "models": agent_model_choices(cfg),
+            "current": cfg.agent_model,
+            "current_capable": tool_capability(cfg, cache, cfg.agent_model),
         }
 
     @router.get("/agent/models/diagnostics")
-    def list_agent_models_diagnostics(refresh: bool = False) -> dict[str, Any]:
-        cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        capable_models, current_model = resolve_agent_model_selection(
-            cfg,
-            agent,
-            cache,
-            force_reprobe=refresh,
-        )
-
-        tag_entries = fetch_available_model_tags(cfg)
+    def list_agent_models_diagnostics() -> dict[str, Any]:
+        # Probes every installed model on request; the pickers never do this.
         tag_map: dict[str, dict[str, Any]] = {}
-        for entry in tag_entries:
+        for entry in fetch_available_model_tags(cfg):
             name = entry.get("name")
             if isinstance(name, str):
                 tag_map[name] = {
@@ -381,33 +380,28 @@ def create_app(
                     "modified_at": entry.get("modified_at"),
                 }
 
-        names = fetch_available_model_names(cfg, cfg.agent_model)
         records: list[dict[str, Any]] = []
-        for name in names:
-            cached = cache.get(name)
-            if cached is None:
-                cached = probe_and_store(cfg, cache, name)
-
+        for name in agent_model_choices(cfg):
+            probe = probe_tool_calling_capability_detailed(cfg, name)
             records.append(
                 {
                     "name": name,
                     "present_in_ollama_tags": name in tag_map,
                     "ollama_tag": tag_map.get(name, {}),
-                    "capable": bool(cached.get("capable")),
-                    "probed_tag": cached.get("probed_tag"),
-                    "http_status": cached.get("http_status"),
-                    "error_message": cached.get("error_message", ""),
-                    "error_body": cached.get("error_body", ""),
-                    "cached": True,
-                    "cached_at_unix": cached.get("cached_at_unix"),
-                    "probe_path": cached.get("probe_path", "tool_probe"),
+                    "capable": bool(probe.get("capable")),
+                    "probed_tag": probe.get("probed_tag"),
+                    "http_status": probe.get("http_status"),
+                    "error_message": probe.get("error_message", ""),
+                    "error_body": probe.get("error_body", ""),
+                    "cached": False,
+                    "probe_path": probe.get("probe_path", "tool_probe"),
                 }
             )
 
         return {
             "backend": cfg.llm_backend,
-            "current_model": current_model,
-            "tool_capable_models": capable_models,
+            "current_model": cfg.agent_model,
+            "tool_capable_models": [record["name"] for record in records if record["capable"]],
             "records": records,
         }
 
@@ -415,17 +409,11 @@ def create_app(
     def reprobe_agent_models() -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
         cache.clear()
-        capable_models, current_model = resolve_agent_model_selection(
-            cfg,
-            agent,
-            cache,
-            force_reprobe=True,
-        )
-
         return {
-            "current": current_model,
-            "models": capable_models,
-            "reprobed": list(cache.keys()),
+            "current": cfg.agent_model,
+            "current_capable": tool_capability(cfg, cache, cfg.agent_model),
+            "models": agent_model_choices(cfg),
+            "reprobed": [cfg.agent_model],
         }
 
     @router.post("/agent/models/select")
@@ -437,7 +425,7 @@ def create_app(
         previous = cfg.agent_model
 
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        if not is_tool_capable_cached(cfg, cache, selected):
+        if tool_capability(cfg, cache, selected) is False:
             raise HTTPException(
                 status_code=400,
                 detail="Selected model is not tool-calling capable for agent mode",
@@ -453,12 +441,10 @@ def create_app(
     @router.get("/agent/status")
     def agent_status() -> dict[str, Any]:
         cache: dict[str, dict[str, Any]] = app.state.agent_tool_capability_cache
-        capable_models, current_model = resolve_agent_model_selection(cfg, agent, cache)
-        capability = current_model in capable_models if capable_models else False
-
         return {
-            "model": current_model,
-            "tool_calling_capable": capability,
+            "model": cfg.agent_model,
+            # None: Ollama could not be asked right now.
+            "tool_calling_capable": tool_capability(cfg, cache, cfg.agent_model),
             "backend": cfg.llm_backend,
             "ollama_connected": _is_ollama_connected(cfg),
         }

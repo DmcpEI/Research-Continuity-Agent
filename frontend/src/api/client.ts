@@ -53,11 +53,13 @@ export type ApiAgentResponse = {
 export type ApiAgentModelsResponse = {
   models: string[];
   current: string;
+  // null: Ollama could not be asked whether the current model can call tools.
+  current_capable?: boolean | null;
 };
 
 export type ApiAgentStatus = {
   model: string;
-  tool_calling_capable: boolean;
+  tool_calling_capable: boolean | null;
   backend: string;
   ollama_connected: boolean;
 };
@@ -132,10 +134,31 @@ export type ApiIngestResult = {
   metadata: Record<string, unknown>;
 };
 
+// A failed API call: `detail` is the server's own message (FastAPI's `detail`), for showing to people.
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly detail: string,
+    body: string,
+  ) {
+    super(`API ${status}: ${body}`);
+    this.name = 'ApiError';
+  }
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`API ${response.status}: ${text}`);
+    let detail = text;
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && typeof (parsed as { detail?: unknown }).detail === 'string') {
+        detail = (parsed as { detail: string }).detail;
+      }
+    } catch {
+      // Not JSON: keep the raw text.
+    }
+    throw new ApiError(response.status, detail, text);
   }
   return (await response.json()) as T;
 }

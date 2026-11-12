@@ -417,6 +417,13 @@ input {
   padding: var(--s-1) var(--s-2) var(--s-half);
 }
 
+.status-model-error {
+  padding: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
 .status-model-empty {
   color: var(--text-2);
   font-family: var(--font-mono);

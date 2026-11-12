@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
-import { getAgentModels, getAgentStatus, getModels, selectAgentModel, selectModel } from '../../api/client';
+import {
+  ApiError,
+  getAgentModels,
+  getAgentStatus,
+  getModels,
+  selectAgentModel,
+  selectModel,
+} from '../../api/client';
 import { useStatus } from '../../hooks/useStatus';
 import { statusWarning } from './statusWarning';
 
@@ -28,6 +35,7 @@ export function StatusBar() {
   const [isPickerOpen, setPickerOpen] = useState(false);
   const [selectedModelOverride, setSelectedModelOverride] = useState<string | null>(null);
   const [chatIsLoading, setChatIsLoading] = useState(false);
+  const [selectError, setSelectError] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement | null>(null);
 
   const modelsQuery = useQuery({
@@ -52,7 +60,15 @@ export function StatusBar() {
 
   const selectMutation = useMutation({
     mutationFn: (model: string) => (isAgentRoute ? selectAgentModel(model) : selectModel(model)),
+    onError: (error, model) => {
+      // A saved agent model the server refuses would otherwise be re-selected in a loop.
+      if (isAgentRoute && window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY) === model) {
+        window.localStorage.removeItem(AGENT_MODEL_STORAGE_KEY);
+      }
+      setSelectError(`${model}: ${error instanceof ApiError ? error.detail : String(error)}`);
+    },
     onSuccess: (result) => {
+      setSelectError(null);
       setSelectedModelOverride(result.model);
       if (isChatRoute) {
         window.localStorage.setItem(CHAT_MODEL_STORAGE_KEY, result.model);
@@ -82,6 +98,7 @@ export function StatusBar() {
   useEffect(() => {
     setSelectedModelOverride(null);
     setPickerOpen(false);
+    setSelectError(null);
   }, [isAgentRoute, isLibraryRoute, showModelPicker]);
 
   useEffect(() => {
@@ -95,6 +112,13 @@ export function StatusBar() {
     window.addEventListener('rca-chat-loading', handleChatLoading as EventListener);
     return () =>
       window.removeEventListener('rca-chat-loading', handleChatLoading as EventListener);
+  }, []);
+
+  useEffect(() => {
+    // The agent asks for the picker when its model cannot call tools.
+    const open = () => setPickerOpen(true);
+    window.addEventListener('rca-open-model-picker', open);
+    return () => window.removeEventListener('rca-open-model-picker', open);
   }, []);
 
   useEffect(() => {
@@ -200,13 +224,20 @@ export function StatusBar() {
     }
   }, [currentModel, isChatRoute]);
 
+  // Restore this browser's agent model once per visit, and only once the server's current model
+  // is known: while it loads, currentModel is '--' and every stored model looked different.
+  const restoredAgentModel = useRef(false);
   useEffect(() => {
     if (!isAgentRoute) {
+      restoredAgentModel.current = false;
       return;
     }
-
+    if (restoredAgentModel.current || currentModel === '--' || selectMutation.isPending) {
+      return;
+    }
+    restoredAgentModel.current = true;
     const storedModel = window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY);
-    if (storedModel && storedModel !== currentModel && !selectMutation.isPending) {
+    if (storedModel && storedModel !== currentModel) {
       selectMutation.mutate(storedModel);
     }
   }, [currentModel, isAgentRoute, selectMutation.isPending]);
@@ -246,6 +277,11 @@ export function StatusBar() {
 
         {isPickerOpen && showModelPicker ? (
           <div className="status-model-picker">
+            {selectError ? (
+              <div className="status-model-error" role="alert">
+                {selectError}
+              </div>
+            ) : null}
             {modelChoices.length === 0 ? (
               <div className="status-model-empty">No models found</div>
             ) : (

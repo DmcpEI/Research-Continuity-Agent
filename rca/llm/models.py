@@ -304,62 +304,67 @@ def probe_tool_calling_capability_detailed(settings: Settings, model_name: str) 
     return last_error
 
 
-def is_tool_capable_cached(
-    settings: Settings,
-    cache: dict[str, dict[str, Any]],
-    model_name: str,
-) -> bool:
-    cached = cache.get(model_name)
-    if isinstance(cached, dict) and "capable" in cached:
-        return bool(cached.get("capable"))
-
-    detailed = probe_tool_calling_capability_detailed(settings, model_name)
-    cache[model_name] = {
-        **detailed,
-        "cached": False,
-        "cached_at_unix": time.time(),
-    }
-    return bool(detailed["capable"])
+def _capability_key(settings: Settings, model_name: str) -> str:
+    """Cache key: the model plus its digest, so a re-pulled model is probed again."""
+    aliases = _tag_aliases(model_name)
+    digest = next(
+        (
+            tag.get("digest")
+            for tag in fetch_available_model_tags(settings)
+            if tag.get("name") in aliases and tag.get("digest")
+        ),
+        None,
+    )
+    return f"{model_name}@{digest}" if digest else model_name
 
 
-def probe_and_store(
-    settings: Settings,
-    cache: dict[str, dict[str, Any]],
-    model_name: str,
-) -> dict[str, Any]:
-    detailed = probe_tool_calling_capability_detailed(settings, model_name)
-    enriched = {
-        **detailed,
-        "cached": False,
-        "cached_at_unix": time.time(),
-    }
-    cache[model_name] = enriched
-    return enriched
+def _ollama_error(record: dict[str, Any]) -> str:
+    try:
+        return str(json.loads(record.get("error_body") or "{}").get("error") or "")
+    except (ValueError, AttributeError):
+        return str(record.get("error_body") or "")
 
 
-def resolve_agent_model_selection(
-    settings: Settings,
-    agent: Any,
-    cache: dict[str, dict[str, Any]],
-    force_reprobe: bool = False,
-) -> tuple[list[str], str]:
-    current_model = settings.agent_model
-    names = fetch_available_model_names(settings, current_model)
+def _is_a_tools_answer(probe: dict[str, Any]) -> bool:
+    """Only these say anything about tools: success, a 400 refusing tools, or a missing model.
+    Anything else (5xx such as "not enough memory", timeouts, a down server) is unknown."""
+    if probe["capable"]:
+        return True
+    status = probe.get("http_status")
+    if status == 404:
+        return True
+    return status == 400 and "tools" in _ollama_error(probe).lower()
 
-    capable_models: list[str] = []
-    for model_name in names:
-        if force_reprobe:
-            probe = probe_and_store(settings, cache, model_name)
-            if probe.get("capable"):
-                capable_models.append(model_name)
-            continue
 
-        if is_tool_capable_cached(settings, cache, model_name):
-            capable_models.append(model_name)
+def tool_capability(
+    settings: Settings, cache: dict[str, dict[str, Any]], model_name: str
+) -> bool | None:
+    """Whether `model_name` can call tools: True/False when known, None when unknown.
+    Probes only this model, cached by its digest; an unknown answer is never cached."""
+    if settings.llm_backend != "ollama":
+        return True
+    key = _capability_key(settings, model_name)
+    cached = cache.get(key)
+    if cached is None:
+        probe = probe_tool_calling_capability_detailed(settings, model_name)
+        if not _is_a_tools_answer(probe):
+            return None
+        cached = cache[key] = {**probe, "cached_at_unix": time.time()}
+    return bool(cached["capable"])
 
-    if capable_models and current_model not in capable_models:
-        settings.agent_model = capable_models[0]
-        agent.llm = build_llm_for_model(settings, settings.agent_model)
-        current_model = settings.agent_model
 
-    return capable_models, current_model
+def tool_refusal_reason(
+    settings: Settings, cache: dict[str, dict[str, Any]], model_name: str
+) -> str:
+    """Ollama's own words for the cached refusal of the current version of `model_name`."""
+    record = cache.get(_capability_key(settings, model_name)) or {}
+    return "" if record.get("capable", True) else _ollama_error(record)
+
+
+def agent_model_choices(settings: Settings) -> list[str]:
+    """Installed models the agent could use (embedding-only models left out), not probed."""
+    return [
+        name
+        for name in fetch_available_model_names(settings, settings.agent_model)
+        if name == settings.agent_model or not _contains_any(name, _EMBEDDING_PATTERNS)
+    ]
