@@ -18,6 +18,18 @@ class ToolCallStatus(StrEnum):
     error = "error"
 
 
+class StopReason(StrEnum):
+    """Why an agent run ended. Values are the strings traces and eval artifacts always used."""
+
+    final_answer = "final_answer"
+    empty_final_answer = "empty_final_answer"  # the model's last turn had no text
+    unparsed_tool_call = "unparsed_tool_call"  # it asked for a tool in a form RCA cannot read
+    clarification_needed = "clarification_needed"
+    max_iterations = "max_iterations"
+    error = "error"
+    fallback_no_tools = "fallback_no_tools"  # no tool calling: one search, then an answer
+
+
 class ToolCallTrace(BaseModel):
     tool_name: str
     input: dict[str, Any] = Field(default_factory=dict)
@@ -35,7 +47,7 @@ class AgentTrace(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_latency_ms: float = 0.0
-    stopped_reason: str = ""
+    stopped_reason: StopReason | None = None
     warnings: list[str] = Field(default_factory=list)
 
 

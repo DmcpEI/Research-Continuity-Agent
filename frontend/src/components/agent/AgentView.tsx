@@ -12,6 +12,24 @@ import { CitationChip } from '../chat/CitationChip';
 import { agentExamples } from '../chat/suggestions';
 import { useSources } from '../../hooks/useSources';
 
+const STOP_REASONS: Record<string, string> = {
+  final_answer: 'Finished with an answer.',
+  empty_final_answer: 'The model ended without writing an answer.',
+  unparsed_tool_call: 'The model asked for a tool in a form RCA could not read.',
+  clarification_needed: 'Stopped to ask for a clearer title or author.',
+  max_iterations: 'Stopped after the maximum of 10 steps, before a final answer.',
+  error: 'Stopped on an error.',
+  fallback_no_tools: 'The model could not call tools, so RCA searched once and answered from that.',
+};
+
+/** One sentence for a trace's stop reason; an unknown (newer server) reason is shown as is. */
+export function stopReasonText(reason: string | null | undefined): string {
+  if (!reason) {
+    return '--';
+  }
+  return STOP_REASONS[reason] ?? `Stopped: ${reason}`;
+}
+
 type AgentViewProps = {
   conversationId?: string;
 };
@@ -138,7 +156,7 @@ function TracePanel({ trace }: { trace: ApiAgentTrace }) {
       <div className="agent-trace-kv">Iterations: {trace.iterations}</div>
       <div className="agent-trace-kv">Model: {trace.model || '--'}</div>
       <div className="agent-trace-kv">Latency: {(trace.total_latency_ms / 1000).toFixed(1)} s</div>
-      <div className="agent-trace-kv">Stop reason: {trace.stopped_reason || '--'}</div>
+      <div className="agent-trace-kv">{stopReasonText(trace.stopped_reason)}</div>
       <div className="agent-trace-kv">Tool calls: {trace.tool_calls.length}</div>
       {trace.warnings.length > 0 ? (
         <div className="agent-trace-warning-list">
@@ -297,6 +315,9 @@ export function AgentView({ conversationId }: AgentViewProps) {
                     </>
                   );
                 })()}
+                {message.trace?.stopped_reason && message.trace.stopped_reason !== 'final_answer' ? (
+                  <div className="agent-error-line">{stopReasonText(message.trace.stopped_reason)}</div>
+                ) : null}
                 {message.error ? <div className="agent-error-line">{message.error}</div> : null}
                 {message.trace ? (
                   <div className="agent-tool-call-list">

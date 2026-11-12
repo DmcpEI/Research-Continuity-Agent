@@ -39,7 +39,7 @@ export type ApiAgentTrace = {
   prompt_tokens: number;
   completion_tokens: number;
   total_latency_ms: number;
-  stopped_reason: string;
+  stopped_reason: string | null;
   warnings: string[];
 };
 

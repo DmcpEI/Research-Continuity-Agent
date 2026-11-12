@@ -624,3 +624,25 @@ def test_non_object_tool_arguments_are_rejected_not_crashing() -> None:
 
     assert result.trace.tool_calls == []
     assert any("not a JSON object" in warning for warning in result.trace.warnings)
+
+
+def test_stop_reason_is_a_fixed_set_and_serialises_as_before() -> None:
+    """A typo in a stop reason used to be just another string; now it fails at the source."""
+    import pytest
+    from pydantic import ValidationError
+
+    from rca.agent.contracts import AgentTrace, StopReason
+
+    assert {reason.value for reason in StopReason} == {
+        "final_answer",
+        "empty_final_answer",
+        "unparsed_tool_call",
+        "clarification_needed",
+        "max_iterations",
+        "error",
+        "fallback_no_tools",
+    }
+    trace = AgentTrace(query="q", stopped_reason=StopReason.max_iterations)
+    assert trace.model_dump(mode="json")["stopped_reason"] == "max_iterations"
+    with pytest.raises(ValidationError):
+        AgentTrace(query="q", stopped_reason="max_iteration")

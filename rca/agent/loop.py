@@ -7,7 +7,7 @@ import re
 from time import perf_counter
 from typing import Any
 
-from rca.agent.contracts import AgentResult, AgentTrace, ToolCallTrace
+from rca.agent.contracts import AgentResult, AgentTrace, StopReason, ToolCallTrace
 from rca.agent.tools import ToolRegistry
 from rca.config.settings import Settings, get_settings
 from rca.flows.retrieve_flow import RetrieveFlow
@@ -97,7 +97,9 @@ class AgentLoop:
 
                 if not tool_calls and not decoded_calls:
                     # An empty final turn is a model failure, not an answer.
-                    trace.stopped_reason = "final_answer" if content else "empty_final_answer"
+                    trace.stopped_reason = (
+                        StopReason.final_answer if content else StopReason.empty_final_answer
+                    )
                     if not content:
                         self._note_empty_answer(response.raw, trace)
                     trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
@@ -112,7 +114,9 @@ class AgentLoop:
                 messages.append(assistant_message)
 
                 if not decoded_calls:
-                    trace.stopped_reason = "final_answer" if content else "unparsed_tool_call"
+                    trace.stopped_reason = (
+                        StopReason.final_answer if content else StopReason.unparsed_tool_call
+                    )
                     trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
                     fallback = (
                         content or "I could not parse the tool request produced by the model."
@@ -136,11 +140,11 @@ class AgentLoop:
                         tool_trace.output,
                     )
                     if clarification is not None:
-                        trace.stopped_reason = "clarification_needed"
+                        trace.stopped_reason = StopReason.clarification_needed
                         trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
                         return AgentResult(query=query, answer=clarification, trace=trace)
 
-            trace.stopped_reason = "max_iterations"
+            trace.stopped_reason = StopReason.max_iterations
             trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
             return AgentResult(
                 query=query,
@@ -153,7 +157,7 @@ class AgentLoop:
             )
         except Exception as exc:
             if self._is_tool_calling_unsupported(exc):
-                trace.stopped_reason = "error"
+                trace.stopped_reason = StopReason.error
                 trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
                 trace.warnings.append(f"tool-calling unsupported for model: {exc}")
                 return AgentResult(
@@ -170,7 +174,7 @@ class AgentLoop:
             if fallback_result is not None:
                 return fallback_result
 
-            trace.stopped_reason = "error"
+            trace.stopped_reason = StopReason.error
             trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
             return AgentResult(
                 query=query,
@@ -414,7 +418,7 @@ class AgentLoop:
                 f"{kb_trace.output}"
             )
 
-        trace.stopped_reason = "fallback_no_tools"
+        trace.stopped_reason = StopReason.fallback_no_tools
         trace.total_latency_ms = (perf_counter() - started_total) * 1000.0
         trace.iterations = max(trace.iterations, 1)
         return AgentResult(query=query, answer=answer, trace=trace, error=None)
