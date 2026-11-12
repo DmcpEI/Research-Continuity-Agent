@@ -6,9 +6,11 @@ import json
 import logging
 import math
 import re
+import threading
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,15 +21,18 @@ except ImportError:
 
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+# Chunks copied into Chroma per successful call after an outage, so a large backlog never holds
+# the store (and a user's request) for one long embedding run.
+RESYNC_BATCH = 64
 LOGGER = logging.getLogger(__name__)
 
 
 def backend_status(stores: Iterable[Any]) -> tuple[str, list[str]]:
     """Summarize distinct vector stores as (backend, unique warnings).
 
-    Backend is "json" if any store has fallen back, "chroma" if all are healthy,
-    "unknown" if there are none. Each warning is read before its backend: a store only
-    ever moves chroma -> json, so a warning read first can never pair with "chroma".
+    Backend is "json" if any store is on its fallback, "chroma" if all are healthy,
+    "unknown" if there are none. A store can change state between the two reads while a
+    call is running; the next /status poll shows the settled state.
     """
     unique = list({id(store): store for store in stores if store is not None}.values())
     warnings = [store.backend_warning for store in unique]
@@ -36,6 +41,10 @@ def backend_status(stores: Iterable[Any]) -> tuple[str, list[str]]:
         return "unknown", []
     backend = "json" if "json" in backends else "chroma"
     return backend, list(dict.fromkeys(warning for warning in warnings if warning))
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 @dataclass(slots=True)
@@ -47,7 +56,21 @@ class VectorQueryResult:
 
 
 class VectorStore:
-    """Persist text chunks in Chroma when available, otherwise use a JSON fallback."""
+    """Persist text chunks in Chroma when available, otherwise use a JSON fallback.
+
+    Chroma is tried on every call. A failed call is served from the JSON store and the store
+    reports itself degraded until the next successful Chroma call. With Chroma installed, the
+    JSON file holds only chunks written while degraded; the next success copies them into Chroma
+    and empties it. Without Chroma, the JSON file is the whole index.
+    """
+
+    # Class defaults keep stores built with object.__new__ (tests) valid.
+    _chroma_error: str | None = None  # last failure, while degraded
+    _degraded_since: str | None = None
+    fallback_events: int = (
+        0  # calls served from JSON after a Chroma failure; provenance compares it
+    )
+    _lock = threading.RLock()
 
     def __init__(self, persist_dir: str | Path, collection_name: str) -> None:
         self.persist_dir = Path(persist_dir)
@@ -56,7 +79,7 @@ class VectorStore:
         self._fallback_path = self.persist_dir / f"{self.collection_name}.json"
         self._documents = self._load_fallback_documents()
         self._collection = None
-        self._chroma_error: str | None = None
+        self._lock = threading.RLock()
 
         if chromadb is not None:
             from rca.config.settings import get_settings
@@ -78,15 +101,25 @@ class VectorStore:
 
     @property
     def backend(self) -> str:
-        return "chroma" if self._collection is not None else "json"
+        return "chroma" if self._collection is not None and self._chroma_error is None else "json"
 
     @property
     def backend_warning(self) -> str | None:
-        if self.backend != "json":
-            return None
-        if self._chroma_error:
-            return f"VectorStore using JSON fallback after Chroma failure: {self._chroma_error}"
-        return "VectorStore using JSON fallback backend."
+        error = self._chroma_error
+        if self._collection is None:
+            return "VectorStore using JSON fallback backend."
+        if error:
+            return (
+                f"VectorStore using JSON fallback after Chroma failure since "
+                f"{self._degraded_since}: {error}"
+            )
+        waiting = len(self._documents)
+        if waiting:
+            return (
+                f"VectorStore copying {waiting} chunks written during a Chroma outage into the "
+                "index; until then vector search does not see them."
+            )
+        return None
 
     def upsert_texts(
         self,
@@ -103,11 +136,14 @@ class VectorStore:
                 payload["embeddings"] = embeddings
             try:
                 self._collection.upsert(**payload)
-                return
             except Exception as exc:
-                self._disable_chroma(exc, operation="upsert")
+                self._fall_back(exc, operation="upsert")
+            else:
+                self._chroma_succeeded()
+                return
 
-        self._upsert_fallback(ids, documents, metadatas)
+        with self._lock:
+            self._upsert_fallback(ids, documents, metadatas)
 
     def query(self, query_text: str, limit: int = 5) -> list[VectorQueryResult]:
         if self._collection is not None:
@@ -121,7 +157,7 @@ class VectorStore:
                 documents = result.get("documents", [[]])[0]
                 metadatas = result.get("metadatas", [[]])[0]
                 distances = result.get("distances", [[]])[0]
-                return [
+                results = [
                     VectorQueryResult(
                         id=record_id,
                         score=1.0 - float(distance),
@@ -133,7 +169,10 @@ class VectorStore:
                     )
                 ]
             except Exception as exc:
-                self._disable_chroma(exc, operation="query")
+                self._fall_back(exc, operation="query")
+            else:
+                self._chroma_succeeded()
+                return results
 
         return self._query_fallback(query_text, limit)
 
@@ -141,12 +180,14 @@ class VectorStore:
         if not ids:
             return
 
-        if self._collection is not None:
-            # Fail closed on Chroma delete failures to avoid serving stale vectors.
-            self._collection.delete(ids=ids)
-            return
-
-        self._delete_fallback(ids)
+        # Under the lock, so a resync cannot copy a chunk into Chroma after it was deleted there.
+        with self._lock:
+            # Pending copies go first: if the Chroma delete fails, no resync may bring them back.
+            self._delete_fallback(ids)
+            if self._collection is not None:
+                # Fail closed on Chroma delete failures to avoid serving stale vectors. Delete
+                # needs no embeddings, so this also runs while queries are degraded.
+                self._collection.delete(ids=ids)
 
     def _load_fallback_documents(self) -> dict[str, dict[str, Any]]:
         if not self._fallback_path.exists():
@@ -171,7 +212,9 @@ class VectorStore:
             if record_id in self._documents:
                 removed = True
                 del self._documents[record_id]
-        if removed or self._fallback_path.exists():
+        # ponytail: the file is rewritten from this process's copy, so two processes writing to
+        # one library while degraded can overwrite each other; write only when something changed.
+        if removed:
             self._fallback_path.write_text(
                 json.dumps(self._documents, indent=2, sort_keys=True), encoding="utf-8"
             )
@@ -194,14 +237,81 @@ class VectorStore:
         results.sort(key=lambda item: item.score, reverse=True)
         return results[:limit]
 
-    def _disable_chroma(self, exc: Exception, operation: str) -> None:
+    def _fall_back(self, exc: Exception, operation: str) -> None:
         self._chroma_error = f"{type(exc).__name__}: {exc}"
+        self._degraded_since = self._degraded_since or _utc_now()
+        self.fallback_events += 1
         LOGGER.warning(
-            "Disabling Chroma backend during %s; falling back to JSON store (%s)",
+            "Chroma failed during %s; serving this call from the JSON store (%s)",
             operation,
             self._chroma_error,
         )
-        self._collection = None
+
+    def _chroma_succeeded(self) -> None:
+        """Chroma just worked: copy the next batch of pending chunks into it, then report healthy."""
+        if self._chroma_error is None and not self._documents:
+            return
+        with self._lock:
+            batch = dict(list(self._documents.items())[:RESYNC_BATCH])
+            if batch:
+                try:
+                    synced, rejected = self._resync(batch)
+                except Exception as exc:
+                    self._chroma_error = f"{type(exc).__name__}: {exc}"
+                    self._degraded_since = self._degraded_since or _utc_now()
+                    self.fallback_events += 1
+                    LOGGER.warning(
+                        "Copying pending chunks into Chroma failed; will retry (%s)", exc
+                    )
+                    return
+                if rejected:
+                    self._set_aside(rejected)
+                self._delete_fallback([*synced, *rejected])
+            if self._chroma_error is not None:
+                LOGGER.warning("Chroma is back after failing since %s", self._degraded_since)
+            self._chroma_error = None
+            self._degraded_since = None
+
+    def _resync(self, batch: dict[str, dict[str, Any]]) -> tuple[list[str], dict[str, Any]]:
+        """Upsert a batch; on a validation error, find and return the chunks Chroma rejects.
+
+        Other errors (the embedding server, timeouts) propagate: the batch stays pending.
+        """
+
+        def upsert(items: dict[str, dict[str, Any]]) -> None:
+            self._collection.upsert(  # type: ignore[union-attr]
+                ids=list(items),
+                documents=[payload["document"] for payload in items.values()],
+                metadatas=[payload["metadata"] or None for payload in items.values()],
+            )
+
+        try:
+            upsert(batch)
+            return list(batch), {}
+        except (ValueError, TypeError):
+            pass
+        synced: list[str] = []
+        rejected: dict[str, Any] = {}
+        for record_id, payload in batch.items():
+            try:
+                upsert({record_id: payload})
+            except (ValueError, TypeError) as exc:
+                rejected[record_id] = payload | {"error": f"{type(exc).__name__}: {exc}"}
+            else:
+                synced.append(record_id)
+        return synced, rejected
+
+    def _set_aside(self, rejected: dict[str, Any]) -> None:
+        """Keep chunks Chroma refuses in a side file instead of retrying them forever."""
+        path = self.persist_dir / f"{self.collection_name}.rejected.json"
+        existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        path.write_text(json.dumps(existing | rejected, indent=2, sort_keys=True), encoding="utf-8")
+        LOGGER.warning(
+            "Chroma rejected %d pending chunks; set aside in %s: %s",
+            len(rejected),
+            path,
+            sorted(rejected),
+        )
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:

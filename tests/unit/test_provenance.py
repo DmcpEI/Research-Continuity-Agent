@@ -77,6 +77,22 @@ def test_finish_provenance_flags_a_mid_run_vector_fallback() -> None:
     assert finished["index_end"]["backend"] == "json"
 
 
+def test_finish_provenance_flags_a_fallback_that_recovered_before_the_run_ended(tmp_path) -> None:
+    """Backend and warning look the same at start and end; only the fallback count shows it."""
+    from tests.unit.test_vector_store import _flaky_store
+
+    store, collection = _flaky_store(tmp_path)
+    started = {"index_start": provenance.index_snapshot(store)}
+    collection.down = True
+    store.query("anything", limit=3)
+    collection.down = False
+    store.query("anything", limit=3)
+
+    finished = provenance.finish_provenance(started, store)
+    assert finished["index_end"]["backend"] == started["index_start"]["backend"] == "chroma"
+    assert finished["index_degraded_during_run"] is True
+
+
 def test_git_state_reports_commit_of_this_repo() -> None:
     state = provenance.git_state()
     assert state["commit"] and len(state["commit"]) == 40

@@ -498,7 +498,7 @@ Every eval artifact (harness `run_*.json`, `ablations.json`, `retrieval_features
 | `settings` | retrieval/generation settings that change results (reranker, limits, reserve slot, chunking) |
 | `code` | git commit, whether the tree was dirty, and a hash of the uncommitted diff |
 | `index_start` / `index_end` | vector backend and record count at run start and end |
-| `index_degraded_during_run` | `true` if the backend or its warning changed between start and end (a run that started on the JSON fallback shows that in `index_start` instead) |
+| `index_degraded_during_run` | `true` if the backend, its warning or its count of fallback calls changed between start and end, so a store that fell back and recovered mid-run still counts (a run that started on the JSON fallback shows that in `index_start` instead) |
 
 Compare two runs only when `corpus_version`, the model digests, the reranker revision, and `settings` match; treat any run with `index_degraded_during_run: true`, or `index_start.backend` other than `chroma`, as invalid. The fingerprint hashes node content instead of `source_revisions` because sources ingested before revision tracking have no revision rows (24 of the current 25).
 

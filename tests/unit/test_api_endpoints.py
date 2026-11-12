@@ -349,6 +349,29 @@ def test_status_endpoint_reports_vector_fallback_after_chroma_failure(tmp_path: 
     assert degraded["papers"] == 0  # existing fields unchanged
 
 
+def test_status_endpoint_clears_the_fallback_warning_once_chroma_works_again(
+    tmp_path: Path,
+) -> None:
+    from tests.unit.test_vector_store import FlakyCollection
+
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    client = TestClient(create_app(settings=settings, graph_store=store, vector_store=vectors))
+    flaky = FlakyCollection()
+    vectors._collection = flaky
+
+    flaky.down = True
+    vectors.query("anything", limit=3)
+    assert client.get("/status").json()["vector_backend"] == "json"
+
+    flaky.down = False
+    vectors.query("anything", limit=3)  # no restart
+    recovered = client.get("/status").json()
+    assert recovered["vector_backend"] == "chroma"
+    assert recovered["warnings"] == []
+
+
 def test_status_endpoint_reports_fallback_of_injected_retrieve_flow_store(tmp_path: Path) -> None:
     settings = _settings_for(tmp_path)
     store = GraphStore(settings.graph_db_path)

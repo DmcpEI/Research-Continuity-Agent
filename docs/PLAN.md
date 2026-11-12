@@ -267,7 +267,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 4 | **One scorecard** (#5): harness on the test split with shipped defaults; retrieval hit@k with `qwen3.5:4b` rewrites; Wilson intervals; README table replaced by it. Recalibrate the rerank gate on dev if the rewrite model moved the scores. Done: `eval/scorecard.json`, generated into README and EVAL.md; rerank gate unchanged (see "Step 4: one scorecard, design"). | The run itself, with provenance; numbers copied by script, not by hand | The headline sentence in section 1, with numbers |
 | 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. Done: dead code, the event log, Streamlit and `infra/` deleted; ROADMAP folded in; README 187 lines (see "Step 5: cut and tidy, design"). | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
 | 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. Done: see "Step 6: first run, design". | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
-| 7 | **Vector store recovers** (#19), as in M3. | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
+| 7 | **Vector store recovers** (#19), as in M3. Done: see "Step 7: vector store recovers, design". | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
 | 8 | **Reranker failure is visible** (M4). | Stub test; `/status` test | Same theme: no silent mode changes |
 | 9 | **Request-scoped models, no silent agent switch** (M5); move model code out of `main.py`. | API tests incl. interleaved requests | `main.py` shrinks by a third; removes a RAM foot-gun |
 | 10 | **Agent contract** (M6): `StopReason`, citeable search results, no `pic2`, honest single-shot. | Unit tests; 20-task bench rerun | Agent answers can cite; bench number is for the shipped tool |
@@ -502,6 +502,47 @@ unreachable") stays in F8.
   runs and their statuses.", which work on any setup (an empty list is a correct answer).
 - **Proof:** vitest for the title helpers, the seed cleanup and the chips (each failing on the old
   code); a browser check on a fresh profile against the library copy.
+
+## Step 7: vector store recovers, design (2026-11-12)
+
+As decided in M3: no latch and no cooldown until a slow failure is measured.
+
+- **Reproduced first** with a fake collection that fails, then works (no sleeps): on the old code
+  the store stays on JSON after Chroma is back (queries return nothing from the index), chunks
+  written while degraded never reach Chroma, and a chunk deleted while degraded stays in Chroma,
+  because a degraded store skipped Chroma on delete.
+- **Every call tries Chroma.** A failure serves that call from the JSON store and records the
+  error and the time it started; the next success clears both. `_collection = None` keeps its old
+  meaning only for "Chroma not installed".
+- **The JSON file is the pending list.** With Chroma installed, it holds exactly the chunks written
+  while degraded, and it is on disk, so a restart does not lose them. After any successful Chroma
+  call, its contents are upserted into Chroma and removed from the file, under a lock so a
+  concurrent degraded write cannot be dropped. If that upsert fails, the store stays degraded and
+  keeps the file. After the break-it review: the copy runs 64 chunks per successful call, so a big
+  backlog never holds a request for one long embedding run, and `/status` says how many are
+  waiting; a chunk Chroma rejects as invalid (`ValueError`/`TypeError`, checked against real
+  chromadb 0.6.3: list or `None` metadata values) is moved to `<collection>.rejected.json` instead
+  of blocking recovery forever, while any other error (an unreachable embedding server raises
+  `URLError`) keeps it pending.
+- **Deletes always go to Chroma** (still fail closed) and also remove the chunk from the pending
+  file, so a resync cannot bring a deleted chunk back. Both happen under the copy's lock, pending
+  copy first: the review showed a delete racing the copy, or a failed Chroma delete, could
+  otherwise put the chunk back. Delete needs no embeddings, so it works
+  while Ollama is down.
+- **Provenance counts fallbacks.** With recovery, a run that degrades and recovers would look the
+  same at start and end, so the store counts fallback events and `index_degraded_during_run`
+  compares that count too; the scorecard's refusal of degraded runs keeps working.
+- **Proof:** the fake-collection tests above, failing on the old code. Live, on the library copy,
+  with the API's Ollama traffic sent through a small local proxy instead of stopping your Ollama:
+  proxy up, cited answer, `chroma`; proxy down, the query failed in 0.6 s (so no cooldown is
+  needed), `/status` showed `json` with the warning, and a PDF ingested meanwhile landed in the
+  JSON file; proxy up again, the next question was answered, `/status` was `chroma` with no
+  warning, the log said one chunk was resynced, and that chunk came back from the vector stage at
+  rank 1. The probe source was deleted afterwards and the copy matches the real library again.
+- **Known limits:** two processes writing to one library while degraded (the API and a CLI ingest)
+  can overwrite each other's pending file; the store now rewrites it only when it changed.
+  Found on the way, not fixed here: `RCA_EMBEDDING_BASE_URL` is never read (embeddings use
+  `RCA_LLM_BASE_URL`), so the compose files set it to no effect.
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

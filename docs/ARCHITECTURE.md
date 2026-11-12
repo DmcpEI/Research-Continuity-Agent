@@ -130,7 +130,7 @@ See [DATA_MODEL.md](DATA_MODEL.md) for node kinds, edge kinds, and ID patterns.
 
 ChromaDB-backed dense retrieval index. Stores chunk embeddings with chunk IDs as document keys. Queried by the RetrieveFlow for approximate nearest-neighbour search. Embeddings now flow through a small configurable wrapper, so the same store boundary can use the default local Ollama models or an OpenAI-compatible embedding endpoint.
 
-In v2, this will be replaced by `pgvector` in Postgres for a unified store with better production operability.
+Failure and recovery: every call tries Chroma. If a call fails (usually the embedding server is down), that call is served from a JSON bag-of-words store and the store reports `json` with a warning in `/status` and the UI; the next successful call clears it, with no restart. Chunks written while degraded go to the JSON file, which is on disk and survives a restart, and are copied into Chroma 64 per successful call (`/status` reports how many are waiting); a chunk Chroma rejects as invalid (`ValueError`/`TypeError`) is moved to `<collection>.rejected.json`, while any other error keeps it pending. Deletes drop pending copies first and then go to Chroma (failing closed), under the same lock as the copy. Without `chromadb` installed, the JSON file is the whole index. `fallback_events` counts degraded calls; eval provenance uses it to flag runs that degraded and recovered.
 
 ---
 

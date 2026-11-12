@@ -87,9 +87,14 @@ def index_snapshot(vector_store: Any) -> dict[str, Any]:
         )
     except Exception as exc:  # a broken Chroma handle should not abort an eval run
         count = f"error: {type(exc).__name__}: {exc}"
-    # read warning before backend: a store only ever falls back chroma -> json
-    warning = getattr(vector_store, "backend_warning", None)
-    return {"backend": getattr(vector_store, "backend", None), "records": count, "warning": warning}
+    return {
+        "backend": getattr(vector_store, "backend", None),
+        "records": count,
+        "warning": getattr(vector_store, "backend_warning", None),
+        # The store recovers on its own, so a mid-run fallback can leave backend and warning
+        # unchanged by the end; the count of fallbacks cannot go back down.
+        "fallback_events": getattr(vector_store, "fallback_events", None),
+    }
 
 
 def ollama_models(base_url: str, names: list[str], timeout: float = 3.0) -> dict[str, Any]:
@@ -191,5 +196,9 @@ def finish_provenance(provenance: dict[str, Any], vector_store: Any = None) -> d
     end = index_snapshot(vector_store)
     start = provenance.get("index_start") or {}
     # A change during the run, not a state the run started in (index_start shows that).
-    degraded = end["backend"] != start.get("backend") or end["warning"] != start.get("warning")
+    degraded = (
+        end["backend"] != start.get("backend")
+        or end["warning"] != start.get("warning")
+        or end["fallback_events"] != start.get("fallback_events")
+    )
     return provenance | {"index_end": end, "index_degraded_during_run": degraded}
