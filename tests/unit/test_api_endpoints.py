@@ -1058,3 +1058,19 @@ def test_a_missing_model_is_probed_again_once_pulled_even_if_tags_hiccup(
 
     monkeypatch.setattr("rca.api.main.urllib.request.urlopen", tags_timeout)
     assert tool_capability(settings, cache, "m:7b") is True
+
+
+def test_agent_accepts_an_old_client_payload_and_runs_the_task_alone(tmp_path: Path) -> None:
+    agent = _CountingAgentLoop()
+    client = TestClient(create_app(settings=_settings_for(tmp_path), agent_loop=agent))
+    response = client.post(
+        "/agent",
+        json={
+            "query": "List the files.",
+            "conversation_id": "agent-main",
+            "model": "qwen3.5:4b",
+            "messages": [{"role": "user", "content": "earlier task"}],
+        },
+    )
+    assert response.status_code == 200
+    assert agent.runs == 1

@@ -207,23 +207,13 @@ export async function sendChat(
   return parseJson<ApiChatResponse>(response);
 }
 
-export async function sendAgent(
-  query: string,
-  conversationId?: string,
-  model?: string,
-  messages: ApiChatMessage[] = [],
-): Promise<ApiAgentResponse> {
+export async function sendAgent(query: string): Promise<ApiAgentResponse> {
   const response = await fetch('/api/agent', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      query,
-      conversation_id: conversationId ?? null,
-      model: model ?? null,
-      messages,
-    }),
+    body: JSON.stringify({ query }),
   });
 
   return parseJson<ApiAgentResponse>(response);

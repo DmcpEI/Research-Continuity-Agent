@@ -77,7 +77,7 @@ with twelve features and a mixed table of numbers.
 | `CLAUDE.md` is described as checked in | `/CLAUDE.md` is in `.gitignore` |
 | ROADMAP "Current metrics": 146 tests, 20.5% keyword hit, 3/10 negatives | 219 tests; those metrics are from 2026-04-21 on a different set and model |
 | ROADMAP: Streamlit is "the supported local demo surface" | README and the Docker demo lead with the React UI; the Dockerfile default `CMD` runs Streamlit |
-| Frontend sends `model` and `history` to `/agent` | `AgentRequest` has no `model`; `agent.run(payload.query)` ignores `messages` |
+| Frontend sends `model` and `history` to `/agent` | `AgentRequest` has no `model`; `agent.run(payload.query)` ignores `messages` (resolved in step 10: the client sends only the task and the view says tasks are independent) |
 | `/chat` clients are told an answer is `grounded` or not | The flow also knows `abstained`; the API did not return it (fixed in step 1) |
 
 ## 3. Decisions, ranked

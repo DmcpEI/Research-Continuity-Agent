@@ -46,9 +46,9 @@ class ChatRequest(BaseModel):
 
 
 class AgentRequest(BaseModel):
+    # Single-shot: each task runs on its own. Older clients also sent `messages` and `model`;
+    # they were always ignored, and extra fields still are.
     query: str
-    conversation_id: str | None = None
-    messages: list[dict[str, str]] = Field(default_factory=list)
 
 
 class ModelSelectionRequest(BaseModel):

@@ -36,10 +36,6 @@ type AgentViewProps = {
 
 const AGENT_MODEL_STORAGE_KEY = 'rca-current-agent-model';
 
-type AgentModelSelectedEventDetail = {
-  model: string;
-};
-
 type AgentMessage = {
   id: string;
   role: 'user' | 'assistant';
@@ -171,14 +167,11 @@ function TracePanel({ trace }: { trace: ApiAgentTrace }) {
   );
 }
 
-export function AgentView({ conversationId }: AgentViewProps) {
+export function AgentView(_props: AgentViewProps) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { data: sources } = useSources();
-  const [activeModel, setActiveModel] = useState<string | undefined>(() =>
-    window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY) ?? undefined,
-  );
 
   const latestTrace = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -201,25 +194,15 @@ export function AgentView({ conversationId }: AgentViewProps) {
       role: 'user',
       content: trimmed,
     };
-    const history = [...messages, userMessage].map((message) => ({
-      role: message.role,
-      content: message.content,
-    }));
-
     setQuery('');
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
     try {
-      const response: ApiAgentResponse = await sendAgent(
-        trimmed,
-        conversationId,
-        activeModel,
-        history,
-      );
+      // Single-shot: the agent sees only this task (the server runs each one on its own).
+      const response: ApiAgentResponse = await sendAgent(trimmed);
       if (response.model) {
         window.localStorage.setItem(AGENT_MODEL_STORAGE_KEY, response.model);
-        setActiveModel(response.model);
       }
       const assistantMessage: AgentMessage = {
         id: `agent-assistant-${Date.now()}`,
@@ -251,24 +234,16 @@ export function AgentView({ conversationId }: AgentViewProps) {
     }
   };
 
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const model = (event as CustomEvent<AgentModelSelectedEventDetail>).detail?.model;
-      if (model) {
-        setActiveModel(model);
-      }
-    };
-
-    window.addEventListener('rca-agent-model-selected', handler as EventListener);
-    return () => window.removeEventListener('rca-agent-model-selected', handler as EventListener);
-  }, []);
 
   return (
     <section className="agent-view">
       <div className="agent-main-column">
         <div className="agent-task-header">
           <div className="agent-task-title">Task Runner</div>
-          <div className="agent-task-subtitle">Plans, runs tools, then answers from what they return.</div>
+          <div className="agent-task-subtitle">
+            Plans, runs tools, then answers from what they return. Each task runs on its own: the
+            agent does not see earlier tasks.
+          </div>
         </div>
         <div className="thread-body">
           {messages.length === 0 ? (
