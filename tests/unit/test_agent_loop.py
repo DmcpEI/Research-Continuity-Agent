@@ -699,3 +699,21 @@ def test_the_clarification_heuristic_names_no_paper_from_one_library() -> None:
         AgentLoop._looks_like_specific_query("pic2 safety attributes in grocery bagging") is False
     )
     assert AgentLoop._looks_like_specific_query("the AutoBag paper") is True  # generic words stay
+
+
+def test_clarification_reads_the_result_score_not_numbers_in_the_passage() -> None:
+    """Passages now carry ~1,200 characters; a paper's "F1 score: 0.91" must not pass as the
+    search score and hide a weak match (step 10 review)."""
+    output = (
+        "RESULT 1\n"
+        "cite_as: [[chk:pdf/a:0001]]\n"
+        "source_id: src:pdf/a\n"
+        "title: A\n"
+        "score: 0.212\n"
+        "text: We report an F1 score: 0.91 and a recall score = 0.88 on the benchmark."
+    )
+    assert AgentLoop._extract_max_score(output) == 0.212
+    clarification = AgentLoop._build_clarification_if_needed(
+        "search_knowledge_base", {"query": "my thesis results"}, output
+    )
+    assert clarification is not None

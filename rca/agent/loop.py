@@ -351,7 +351,8 @@ class AgentLoop:
 
     @staticmethod
     def _extract_max_score(tool_output: str) -> float | None:
-        matches = re.findall(r"score\s*[:=]\s*([0-9]*\.?[0-9]+)", tool_output)
+        # Only the result's own "score:" line; passage text may report scores of its own.
+        matches = re.findall(r"^score: ([0-9]*\.?[0-9]+)$", tool_output, re.MULTILINE)
         if not matches:
             return None
 
