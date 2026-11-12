@@ -24,7 +24,7 @@ describe('Agent tasks are single-shot', () => {
   it('says so, and sends only the task: no history the server would ignore', async () => {
     vi.mocked(sendAgent).mockResolvedValueOnce(reply('First.')).mockResolvedValueOnce(reply('Second.'));
     const user = userEvent.setup();
-    render(<AgentView conversationId="agent-main" />);
+    render(<AgentView />);
     expect(screen.getByText(/Each task runs on its own/)).toBeInTheDocument();
 
     const box = screen.getByRole('textbox', { name: 'Describe a task' });

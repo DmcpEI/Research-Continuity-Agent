@@ -81,11 +81,6 @@ export function StatusBar() {
         }
       } else if (isAgentRoute) {
         window.localStorage.setItem(AGENT_MODEL_STORAGE_KEY, result.model);
-        window.dispatchEvent(
-          new CustomEvent('rca-agent-model-selected', {
-            detail: { model: result.model },
-          }),
-        );
       }
       void queryClient.invalidateQueries({ queryKey: ['status'] });
       void queryClient.invalidateQueries({ queryKey: ['models'] });

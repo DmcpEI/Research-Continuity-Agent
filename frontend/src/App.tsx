@@ -51,7 +51,7 @@ export default function App() {
         />
       </div>
       <div className={`app-route-pane ${pathname === '/agent' ? 'is-visible' : 'is-hidden'}`}>
-        <AgentView conversationId="agent-main" />
+        <AgentView />
       </div>
       <div className={`app-route-pane ${pathname === '/settings' ? 'is-visible' : 'is-hidden'}`}>
         <section className="view-placeholder" aria-label="Settings">

@@ -30,10 +30,6 @@ export function stopReasonText(reason: string | null | undefined): string {
   return STOP_REASONS[reason] ?? `Stopped: ${reason}`;
 }
 
-type AgentViewProps = {
-  conversationId?: string;
-};
-
 const AGENT_MODEL_STORAGE_KEY = 'rca-current-agent-model';
 
 type AgentMessage = {
@@ -167,7 +163,7 @@ function TracePanel({ trace }: { trace: ApiAgentTrace }) {
   );
 }
 
-export function AgentView(_props: AgentViewProps) {
+export function AgentView() {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
