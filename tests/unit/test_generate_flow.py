@@ -774,3 +774,22 @@ def test_hedge_rule_covers_the_earlier_phrase_list(phrase) -> None:
     from rca.flows.facts_check import is_hedged
 
     assert is_hedged(f"Sorry, the answer {phrase} the sources.")
+
+
+def test_an_answer_built_without_the_reranker_says_so() -> None:
+    """Without rerank scores the no-match gate cannot fire; the answer must carry that."""
+
+    class UnrankedRetrieveFlow(StubRetrieveFlow):
+        def retrieve(self, query, limit=10, trace=None, query_type=None):
+            bundle = super().retrieve(query, limit=limit, trace=trace, query_type=query_type)
+            return bundle.model_copy(update={"rerank_error": "OSError: offline"})
+
+    flow = GenerateFlow(retrieve_flow=UnrankedRetrieveFlow(), llm_client=StubLLMClient())
+    answer = flow.generate_answer("How does JamPacker plan?")
+    assert "rerank_unavailable" in answer.failure_labels
+
+    healthy = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=StubLLMClient())
+    assert (
+        "rerank_unavailable"
+        not in healthy.generate_answer("How does JamPacker plan?").failure_labels
+    )

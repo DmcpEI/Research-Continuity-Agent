@@ -380,6 +380,15 @@ def main() -> None:
         bundle4_at5 = retrieve_flow.retrieve(rewritten, limit=5)
         bundle5_at5 = retrieve_flow.retrieve(production_query, limit=5, query_type=query_type)
 
+        unranked = [
+            bundle.rerank_error
+            for bundle in (bundle3, bundle4, bundle5, bundle3_at5, bundle4_at5, bundle5_at5)
+            if bundle.rerank_error
+        ]
+        if unranked:
+            # Configs 3-5 are defined as reranked; unranked numbers would be silently different.
+            raise SystemExit(f"{pair['id']}: reranker failed ({unranked[0]}); stopping the run")
+
         # flag jampacker-001 specifically
         if pair["id"] == "jampacker-001":
             print(f"  [jampacker-001 rewrite] → {rewritten!r}")

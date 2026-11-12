@@ -27,6 +27,8 @@ services:
       # Persist the knowledge store (SQLite graph + ChromaDB vectors) across restarts.
       # The host path is relative to this file; create it if it doesn't exist.
       - ./.rca:/app/.rca
+      # The reranker model loads at startup; keep it across container rebuilds.
+      - hf-cache:/root/.cache/huggingface
     env_file:
       - path: .env
         required: false
@@ -54,7 +56,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      # the first start downloads the reranker model before the server is up
+      start_period: 120s
 
   demo:
     build: .

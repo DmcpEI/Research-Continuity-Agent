@@ -148,7 +148,7 @@ Important caveat:
 - if Ollama or another configured endpoint is unavailable, the run is not comparable to a normal local run
 - after changing the corpus, the right source of truth is a fresh local rerun, not an older checked-in artifact
 
-Failure labels are compact diagnostics emitted by the generation flow and carried into eval output. Current labels include `missing_citation`, `invalid_citation`, `unsupported_claim`, `low_retrieval_confidence`, `low_rerank_score` (pre-generation rerank gate), `llm_abstained`, and runtime labels such as `empty_retrieval` or `error`.
+Failure labels are compact diagnostics emitted by the generation flow and carried into eval output. Current labels include `missing_citation`, `invalid_citation`, `unsupported_claim`, `low_retrieval_confidence`, `low_rerank_score` (pre-generation rerank gate), `rerank_unavailable` (the reranker failed, so that gate could not run), `llm_abstained`, and runtime labels such as `empty_retrieval` or `error`.
 
 ### External eval files
 

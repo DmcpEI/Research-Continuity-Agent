@@ -820,3 +820,76 @@ def test_tool_calling_probe_unloads_the_model_right_away(monkeypatch) -> None:
 
     assert result["capable"] is True
     assert sent and all(payload["keep_alive"] == 0 for payload in sent)
+
+
+class _SwitchableReranker:
+    """Reranker stub whose model can be broken and repaired, like CrossEncoderReranker."""
+
+    def __init__(self, broken: bool) -> None:
+        self.broken = broken
+        self.error: str | None = None
+        self.loads = 0
+
+    def load(self) -> bool:
+        self.loads += 1
+        # Hugging Face errors span lines and end in a period; /status shows one clean sentence.
+        self.error = (
+            "OSError: no cached model, offline.\nSee the offline-mode docs."
+            if self.broken
+            else None
+        )
+        return not self.broken
+
+    def rerank(self, query, hits, top_k=None):
+        if self.broken:
+            self.error = "OSError: no cached model, offline"
+            raise OSError("no cached model, offline")
+        self.error = None
+        return hits
+
+
+def _app_with_reranker(tmp_path: Path, reranker: _SwitchableReranker):
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    retrieve = RetrieveFlow(settings=settings, graph_store=store, vector_store=vectors)
+    retrieve._reranker = reranker
+    return create_app(
+        settings=settings, graph_store=store, vector_store=vectors, retrieve_flow=retrieve
+    ), retrieve
+
+
+def test_status_reports_a_reranker_that_failed_to_load_at_startup(tmp_path: Path) -> None:
+    reranker = _SwitchableReranker(broken=True)
+    app, _ = _app_with_reranker(tmp_path, reranker)
+    with TestClient(app) as client:  # runs startup, before any question
+        assert reranker.loads == 1
+        warnings = client.get("/status").json()["warnings"]
+    assert (
+        "Cross-encoder reranker unavailable: OSError: no cached model, offline. Results are not reranked and the no-match gate is off."
+        in warnings
+    )
+
+
+def test_status_reranker_warning_clears_after_a_successful_rerank(tmp_path: Path) -> None:
+    reranker = _SwitchableReranker(broken=True)
+    app, retrieve = _app_with_reranker(tmp_path, reranker)
+    client = TestClient(app)
+    retrieve.retrieve("anything", limit=3)
+    assert any("reranker unavailable" in w for w in client.get("/status").json()["warnings"])
+
+    reranker.broken = False
+    retrieve.retrieve("anything", limit=3)
+    assert not any("reranker" in w for w in client.get("/status").json()["warnings"])
+
+
+def test_site_startup_also_loads_the_reranker(tmp_path: Path) -> None:
+    from rca.api.main import create_site
+
+    reranker = _SwitchableReranker(broken=False)
+    app, _ = _app_with_reranker(tmp_path, reranker)
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<html></html>", encoding="utf-8")
+    with TestClient(create_site(app, frontend_dist=dist)):
+        assert reranker.loads == 1

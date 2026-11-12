@@ -54,6 +54,9 @@ def collect_row(flow: GenerateFlow, pair: dict) -> dict:
         bundle = flow.retrieve_flow.retrieve(query, limit=LIMIT, trace=trace, query_type=query_type)
         used_fallback = True
 
+    if bundle.rerank_error:
+        # The rerank gate is calibrated on these rows; unranked ones would read as "no match".
+        raise SystemExit(f"{pair['id']}: reranker failed ({bundle.rerank_error}); not recording")
     scores = [hit.score for hit in bundle.hits]
     ce = [hit.metadata["rerank_score"] for hit in bundle.hits if "rerank_score" in hit.metadata]
     sources = [to_source_id(hit.node_id) for hit in bundle.hits]

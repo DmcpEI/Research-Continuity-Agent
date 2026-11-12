@@ -104,6 +104,8 @@ class RetrievalBundle(BaseModel):
     hits: list[RetrievalHit] = Field(default_factory=list)
     related_edges: list[Edge] = Field(default_factory=list)
     trace: QueryTrace | None = None
+    # Set when the reranker was enabled but failed: hits are unranked and carry no rerank score.
+    rerank_error: str | None = None
 
 
 class RetrieveFlow:
@@ -239,12 +241,14 @@ class RetrieveFlow:
         def truncate(hits: list[RetrievalHit], n: int) -> list[RetrievalHit]:
             return reserve_new_source(hits, n, reserve_floor) if reserve else hits[:n]
 
+        rerank_error: str | None = None
         if reranker is not None:
             try:
                 # Rerank the whole pool so the reserved slot can come from below the cut.
                 ranked = reranker.rerank(query, final_hits, top_k=None)
             except Exception as exc:
                 ranked = final_hits
+                rerank_error = f"{type(exc).__name__}: {exc}"
                 if trace is not None:
                     self._append_warning(
                         trace,
@@ -283,7 +287,11 @@ class RetrieveFlow:
             trace.total_latency_ms = sum(stage.duration_ms for stage in trace.stages)
 
         return RetrievalBundle(
-            query=query, hits=final_hits, related_edges=related_edges, trace=trace
+            query=query,
+            hits=final_hits,
+            related_edges=related_edges,
+            trace=trace,
+            rerank_error=rerank_error,
         )
 
     def _merge_vector_hit(

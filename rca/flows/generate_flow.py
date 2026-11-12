@@ -201,7 +201,8 @@ Rules:
                 query=query,
                 answer="No relevant context found in your knowledge base.",
                 outcome=AnswerOutcome.not_found,
-                failure_labels=["empty_retrieval", "low_retrieval_confidence"],
+                failure_labels=["empty_retrieval", "low_retrieval_confidence"]
+                + self._rerank_labels(bundle),
                 trace=trace,
             )
 
@@ -229,7 +230,8 @@ Rules:
                 query=query,
                 answer="No relevant context found in your knowledge base.",
                 outcome=AnswerOutcome.not_found,
-                failure_labels=["empty_context", "low_retrieval_confidence"],
+                failure_labels=["empty_context", "low_retrieval_confidence"]
+                + self._rerank_labels(bundle),
                 trace=trace,
             )
 
@@ -291,7 +293,7 @@ Rules:
                 answer=abstention.answer or self.NO_EVIDENCE_ANSWER,
                 outcome=AnswerOutcome.not_found,
                 citations=[],
-                failure_labels=abstention.failure_labels,
+                failure_labels=abstention.failure_labels + self._rerank_labels(bundle),
                 trace=trace,
             )
 
@@ -328,9 +330,15 @@ Rules:
             outcome=AnswerOutcome.answered if grounded else AnswerOutcome.unverified,
             citations=citations,
             failure_labels=grounding.failure_labels
-            + (["facts_check_failed"] if facts_failed else []),
+            + (["facts_check_failed"] if facts_failed else [])
+            + self._rerank_labels(bundle),
             trace=trace,
         )
+
+    @staticmethod
+    def _rerank_labels(bundle: RetrievalBundle) -> list[str]:
+        # Without rerank scores the no-match gate above cannot fire, so the answer says so.
+        return ["rerank_unavailable"] if bundle.rerank_error else []
 
     def _check_facts(self, query: str, answer_text: str, trace: QueryTrace) -> FactsStatus | None:
         """Ask the chat model what the hedged reply gives; None when the check fails."""

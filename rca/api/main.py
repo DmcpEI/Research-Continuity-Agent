@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -9,6 +10,7 @@ import shutil
 import time
 import urllib.error
 import urllib.request
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -434,7 +436,29 @@ def create_app(
     )
     agent = agent_loop or AgentLoop(settings=cfg, retrieve_flow=retrieve)
 
-    app = FastAPI(title="Research Continuity Agent API")
+    def rerankers() -> list[Any]:
+        found = {}
+        for flow in (retrieve, getattr(generator, "retrieve_flow", None)):
+            reranker = getattr(flow, "_reranker", None)
+            if reranker is not None:
+                found[id(reranker)] = reranker
+        return list(found.values())
+
+    def load_rerankers() -> None:
+        # At startup, so a missing model shows in /status before the first question.
+        for reranker in rerankers():
+            load = getattr(reranker, "load", None)
+            if callable(load):
+                load()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        await asyncio.to_thread(load_rerankers)
+        yield
+
+    app = FastAPI(title="Research Continuity Agent API", lifespan=lifespan)
+    # create_site mounts this app, and a mounted app's startup does not run; it calls this.
+    app.state.load_rerankers = load_rerankers
     app.state.agent_tool_capability_cache = {}
     router = APIRouter()
 
@@ -839,6 +863,14 @@ def create_app(
             ]
         )
 
+        warnings += [
+            f"Cross-encoder reranker unavailable: {reranker.error.splitlines()[0].rstrip('.')}. "
+            "Results are not reranked "
+            "and the no-match gate is off."
+            for reranker in rerankers()
+            if getattr(reranker, "error", None)
+        ]
+
         return {
             "papers": papers,
             "chunks": chunks,
@@ -916,8 +948,19 @@ def create_site(api: FastAPI | None = None, frontend_dist: Path | None = None) -
     dist = (frontend_dist or get_settings().frontend_dist).resolve()
     if not (dist / "index.html").is_file():
         raise FileNotFoundError(f"frontend build not found at {dist}; run `npm run build`")
-    site = FastAPI(title="Research Continuity Agent", docs_url=None, openapi_url=None)
-    site.mount("/api", api or app)
+    target = api or app
+
+    @asynccontextmanager
+    async def lifespan(_site: FastAPI):
+        load = getattr(target.state, "load_rerankers", None)
+        if callable(load):
+            await asyncio.to_thread(load)
+        yield
+
+    site = FastAPI(
+        title="Research Continuity Agent", docs_url=None, openapi_url=None, lifespan=lifespan
+    )
+    site.mount("/api", target)
 
     @site.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def frontend(path: str) -> FileResponse:

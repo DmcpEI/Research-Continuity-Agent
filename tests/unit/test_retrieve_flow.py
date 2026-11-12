@@ -548,3 +548,37 @@ def test_hits_carry_full_node_text_while_excerpt_stays_short() -> None:
     for node_id, full_text in expected.items():
         assert by_id[node_id].text == full_text
         assert by_id[node_id].excerpt == full_text[:240]
+
+
+def test_a_reranker_failure_is_reported_on_the_bundle() -> None:
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query_text: str, limit: int = 5) -> list[VectorQueryResult]:
+            return [
+                VectorQueryResult(id="chk:pdf/a:0000", score=0.9, document="alpha", metadata={})
+            ]
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return []
+
+        def get_node(self, node_id: str) -> Node | None:
+            return Node(id=node_id, kind=NodeKind.chunk, title=node_id, text="alpha", metadata={})
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            return []
+
+    class BrokenReranker:
+        def rerank(self, query, hits, top_k=None):
+            raise RuntimeError("model not loaded")
+
+    flow = object.__new__(RetrieveFlow)
+    flow.settings = SimpleNamespace(retrieval_fetch_limit=20, reranker_top_k=5)
+    flow.graph_store = StubGraphStore()
+    flow.vector_store = StubVectorStore()
+    flow._reranker = BrokenReranker()
+
+    bundle = flow.retrieve("alpha", limit=3, trace=QueryTrace(query="alpha"))
+    assert bundle.hits  # still answers, unranked
+    assert bundle.rerank_error == "RuntimeError: model not loaded"

@@ -268,7 +268,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 5 | **Cut and tidy.** Delete `rca/orchestrator/`, `telemetry/metrics.py`, `telemetry/tracing.py`, `mcp_servers/arxiv/`, `PyJWT`, the event log; decide Streamlit and `infra/` (open questions); merge ROADMAP into this file; README under 200 lines; fix absolute links and the `pyproject.toml` description. Consider no longer tracking `frontend/dist` (every UI change rewrites hashed files and the push hook blocks until the rebuild is committed); build it in CI and the Docker image instead. Done: dead code, the event log, Streamlit and `infra/` deleted; ROADMAP folded in; README 187 lines (see "Step 5: cut and tidy, design"). | Full suite; `uv sync`; `docker compose build demo`; link check | A reviewer finds the claim in the first screen |
 | 6 | **First run.** Badge "Grounded" renamed "Cited"; no seeded conversations; suggested questions that work on the demo corpus; clickable agent examples. Done: see "Step 6: first run, design". | vitest; browser check on a fresh profile | The 60-second demo does not embarrass |
 | 7 | **Vector store recovers** (#19), as in M3. Done: see "Step 7: vector store recovers, design". | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
-| 8 | **Reranker failure is visible** (M4). | Stub test; `/status` test | Same theme: no silent mode changes |
+| 8 | **Reranker failure is visible** (M4). Done: see "Step 8: reranker failure is visible, design". | Stub test; `/status` test | Same theme: no silent mode changes |
 | 9 | **Request-scoped models, no silent agent switch** (M5); move model code out of `main.py`. | API tests incl. interleaved requests | `main.py` shrinks by a third; removes a RAM foot-gun |
 | 10 | **Agent contract** (M6): `StopReason`, citeable search results, no `pic2`, honest single-shot. | Unit tests; 20-task bench rerun | Agent answers can cite; bench number is for the shipped tool |
 | 11 | **Progress and cancel** (#16, M8): stage events first, tokens second. | Event-sequence API test; live | The daily-use fix people notice |
@@ -543,6 +543,39 @@ As decided in M3: no latch and no cooldown until a slow failure is measured.
   can overwrite each other's pending file; the store now rewrites it only when it changed.
   Found on the way, not fixed here: `RCA_EMBEDDING_BASE_URL` is never read (embeddings use
   `RCA_LLM_BASE_URL`), so the compose files set it to no effect.
+
+## Step 8: reranker failure is visible, design (2026-11-12)
+
+As decided in M4. Today a reranker that cannot load or run leaves only a trace warning: answers
+come back unranked and the pre-generation "no strong match" gate silently stops refusing, with
+nothing in `/status`, the UI or the answer. Reproduced with stubs: all seven new tests fail on the
+old code.
+
+- **Load at startup.** `CrossEncoderReranker.load()` loads the model and records the error instead
+  of raising; the API app's startup (and the site's, which mounts the API and would otherwise skip
+  it) calls it for each distinct retrieve flow, off the event loop. So a missing model shows at
+  boot, not on the first question. Tests do not run startup, so they never load the real model.
+- **Same recovery rule as the vector store.** `rerank()` records the error when it fails and
+  clears it on the next success; nothing latches. After the break-it review: a failed load is
+  retried at most once a minute (an offline Hugging Face lookup can be slow, and every request
+  would pay it), loads happen under a lock (`cached_property` has none from Python 3.12), errors
+  are stored as one short line, the `rca` compose service gets the `hf-cache` volume and a 120 s
+  healthcheck start, and the calibration and ablation scripts stop on an unranked bundle instead
+  of recording it (the calibration guard has a test; the ablation guard sits in the script's main
+  loop and has none).
+- **`/status`** adds "Cross-encoder reranker unavailable: <error>. Results are not reranked and
+  the no-match gate is off." to `warnings`; the status bar already shows any warning as a badge.
+- **The answer says it.** `RetrievalBundle.rerank_error` carries the failure to `GenerateFlow`,
+  which adds the failure label `rerank_unavailable` on every path after retrieval. The eval
+  scorecard already refuses runs with this trace warning.
+- **Proof:** stub tests for load, rerank, bundle, label and `/status` (startup, failure, recovery,
+  the site's startup), all failing on the old code. Live, on the library copy: the API started
+  with `HF_HOME` pointed at an empty scratch folder and `HF_HUB_OFFLINE=1` (your model cache was
+  only read, never changed); the boot log and `/status` showed the warning before any question;
+  "What is the capital of Australia?" reached the model and came back with `rerank_unavailable`;
+  after copying the model into the scratch folder, the same question was refused by the no-match
+  gate (`low_rerank_score`) and `/status` was clear, with no restart. Rerun after the review
+  fixes: inside the minute the answer was still unranked, after it the gate refused again.
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

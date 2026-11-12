@@ -310,3 +310,30 @@ def test_coefficient_sweep_splits_exist_and_cover_golden_set() -> None:
     assert not (dev_ids & test_ids)
     assert dev_ids | test_ids == golden_ids
     assert dev["count"] + test["count"] == len(golden)
+
+
+def test_feature_collection_refuses_a_bundle_the_reranker_did_not_rank() -> None:
+    """The rerank gate is calibrated on these rows; unranked ones would look like no-match."""
+    import pytest
+
+    from rca.flows.retrieve_flow import RetrievalBundle
+
+    features = load_module(ROOT / "eval" / "collect_retrieval_features.py", "eval_collect_features")
+
+    class StubRetrieve:
+        def retrieve(self, query, limit=5, trace=None, query_type=None):
+            hit = RetrievalHit(node_id="chk:pdf/a:0000", score=0.9, title="A", excerpt="a")
+            return RetrievalBundle(query=query, hits=[hit], rerank_error="OSError: offline")
+
+    class StubFlow:
+        retrieve_flow = StubRetrieve()
+
+        def _rewrite_query(self, query, trace):
+            return query
+
+        def _select_context_hits(self, bundle):
+            return bundle.hits
+
+    pair = {"id": "q1", "question": "What is JamPacker?", "difficulty": "easy"}
+    with pytest.raises(SystemExit, match="reranker"):
+        features.collect_row(StubFlow(), pair)
