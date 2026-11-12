@@ -895,3 +895,71 @@ def test_site_startup_also_loads_the_reranker(tmp_path: Path) -> None:
     (dist / "index.html").write_text("<html></html>", encoding="utf-8")
     with TestClient(create_site(app, frontend_dist=dist)):
         assert reranker.loads == 1
+
+
+def test_chat_model_is_per_request_and_changes_nothing_shared(tmp_path: Path, monkeypatch) -> None:
+    """Two overlapping /chat requests with different models must not answer with each other's."""
+    import threading
+
+    from rca.flows.generate_flow import GenerateFlow
+    from rca.flows.retrieve_flow import RetrievalBundle, RetrievalHit
+    from rca.llm.client import ChatResponse, LLMClient
+
+    class NamedLLM(LLMClient):
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def chat(self, messages):
+            return ChatResponse(text=f"Answer from {self.model} [[src:pdf/jampacker]]", raw={})
+
+        def embed(self, texts, dimensions=32):
+            raise NotImplementedError
+
+    first_entered, release_first = threading.Event(), threading.Event()
+
+    class BlockingRetrieve:
+        graph_store = None
+        calls = 0
+
+        def retrieve(self, query, limit=10, trace=None, query_type=None):
+            BlockingRetrieve.calls += 1
+            if BlockingRetrieve.calls == 1:  # hold the first request inside retrieval
+                first_entered.set()
+                release_first.wait(timeout=5)
+            hit = RetrievalHit(
+                node_id="src:pdf/jampacker", score=0.9, title="JamPacker", excerpt="JamPacker packs"
+            )
+            return RetrievalBundle(query=query, hits=[hit], trace=trace)
+
+    monkeypatch.setattr("rca.api.main.build_llm_for_model", lambda settings, name: NamedLLM(name))
+    settings = _settings_for(tmp_path)
+    settings.generation_model = "default-model"
+    settings.openai_chat_model = "default-model"
+    generator = GenerateFlow(
+        settings=settings, retrieve_flow=BlockingRetrieve(), llm_client=NamedLLM("default-model")
+    )
+    client = TestClient(create_app(settings=settings, generate_flow=generator))
+
+    answers: dict[str, dict] = {}
+    first = threading.Thread(
+        target=lambda: answers.__setitem__(
+            "a",
+            client.post("/chat", json={"query": "What is JamPacker?", "model": "model-a"}).json(),
+        )
+    )
+    first.start()
+    assert first_entered.wait(timeout=5)
+    answers["b"] = client.post(
+        "/chat", json={"query": "What is JamPacker?", "model": "model-b"}
+    ).json()
+    release_first.set()
+    first.join(timeout=5)
+
+    assert answers["a"]["answer"].startswith("Answer from model-a")
+    assert answers["b"]["answer"].startswith("Answer from model-b")
+    assert answers["a"]["model"] == "model-a"
+    # Nothing shared moved: the default model and the shared client are unchanged.
+    assert settings.openai_chat_model == settings.generation_model == "default-model"
+    assert generator.llm.model == "default-model"
+    plain = client.post("/chat", json={"query": "What is JamPacker?"}).json()
+    assert plain["answer"].startswith("Answer from default-model")

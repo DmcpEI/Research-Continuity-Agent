@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import shutil
 import urllib.error
@@ -247,20 +248,22 @@ def create_app(
         if not payload.query.strip():
             raise HTTPException(status_code=400, detail="Query must not be empty")
 
-        if payload.model:
-            if cfg.llm_backend == "openai_compatible":
-                cfg.openai_chat_model = payload.model
-            else:
-                cfg.generation_model = payload.model
-            generator.llm = build_llm_for_model(cfg, payload.model)
-
-        model = payload.model or (
+        default_model = (
             cfg.openai_chat_model
             if cfg.llm_backend == "openai_compatible"
             else cfg.generation_model
         )
+        model = payload.model or default_model
+        flow = generator
+        if payload.model and payload.model != default_model:
+            # Request-scoped: a copy with its own client, so neither the shared flow nor the
+            # default model changes, and an overlapping request keeps its own model.
+            flow = copy.copy(generator)
+            flow.llm = build_llm_for_model(cfg, payload.model)
+            if generator.rewrite_llm is generator.llm:
+                flow.rewrite_llm = flow.llm
         try:
-            result = generator.generate_answer(
+            result = flow.generate_answer(
                 payload.query,
                 conversation_messages=payload.messages,
             )
