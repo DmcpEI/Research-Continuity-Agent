@@ -326,14 +326,11 @@ def _ollama_error(record: dict[str, Any]) -> str:
 
 
 def _is_a_tools_answer(probe: dict[str, Any]) -> bool:
-    """Only these say anything about tools: success, a 400 refusing tools, or a missing model.
-    Anything else (5xx such as "not enough memory", timeouts, a down server) is unknown."""
+    """Only these say anything about tools: success, or a 400 refusing tools. Anything else
+    (5xx such as "not enough memory", timeouts, a down server) is unknown."""
     if probe["capable"]:
         return True
-    status = probe.get("http_status")
-    if status == 404:
-        return True
-    return status == 400 and "tools" in _ollama_error(probe).lower()
+    return probe.get("http_status") == 400 and "tools" in _ollama_error(probe).lower()
 
 
 def tool_capability(
@@ -347,6 +344,11 @@ def tool_capability(
     cached = cache.get(key)
     if cached is None:
         probe = probe_tool_calling_capability_detailed(settings, model_name)
+        if probe.get("http_status") == 404:
+            # Not installed. Never cached as a capability: once pulled it must be probed again,
+            # even if the tag list (and so the digest) is briefly unavailable. Kept for the reason.
+            cache[f"{model_name}@missing"] = probe
+            return False
         if not _is_a_tools_answer(probe):
             return None
         cached = cache[key] = {**probe, "cached_at_unix": time.time()}
@@ -357,8 +359,8 @@ def tool_refusal_reason(
     settings: Settings, cache: dict[str, dict[str, Any]], model_name: str
 ) -> str:
     """Ollama's own words for the cached refusal of the current version of `model_name`."""
-    record = cache.get(_capability_key(settings, model_name)) or {}
-    return "" if record.get("capable", True) else _ollama_error(record)
+    record = cache.get(_capability_key(settings, model_name)) or cache.get(f"{model_name}@missing")
+    return "" if not record or record.get("capable", True) else _ollama_error(record)
 
 
 def agent_model_choices(settings: Settings) -> list[str]:

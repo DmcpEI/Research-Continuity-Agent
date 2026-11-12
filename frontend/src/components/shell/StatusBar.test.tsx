@@ -182,3 +182,48 @@ describe('StatusBar agent model restore', () => {
     expect(selects).toEqual([]);
   });
 });
+
+describe('StatusBar agent model restore after a server restart', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
+  });
+
+  it('restores the saved model when the server comes back on another one', async () => {
+    let serverModel = 'qwen3.5:9b';
+    const selects: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/agent/models/select') {
+          const model = JSON.parse(String(init?.body)).model;
+          selects.push(model);
+          serverModel = model;
+          return new Response(JSON.stringify({ model }), { status: 200 });
+        }
+        const bodies: Record<string, unknown> = {
+          '/api/status': { ...baseStatus, warnings: [] },
+          '/api/agent/models': { models: ['qwen3.5:4b', 'qwen3.5:9b'], current: serverModel, current_capable: true },
+          '/api/agent/status': { model: serverModel, tool_calling_capable: true, backend: 'ollama', ollama_connected: true },
+          '/api/models': { models: [], current: '', recommended: [], other: [] },
+        };
+        return new Response(JSON.stringify(bodies[url] ?? {}), { status: 200 });
+      }),
+    );
+    window.localStorage.setItem('rca-current-agent-model', 'qwen3.5:9b');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/agent']}>
+          <StatusBar />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByText('qwen3.5:9b');
+    expect(selects).toEqual([]);
+
+    serverModel = 'qwen3.5:4b'; // API restarted on its default
+    await client.invalidateQueries();
+    await waitFor(() => expect(selects).toEqual(['qwen3.5:9b']));
+  });
+});

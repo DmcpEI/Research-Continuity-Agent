@@ -596,14 +596,16 @@ As decided in M5, in three commits so the move can be reviewed apart from the be
      Ollama's own reason when the current model cannot call tools, and the UI shows that sentence
      and opens the model picker.
    - Probes are cached by model digest, so a re-pulled model is probed again. Only an answer
-     about tools is cached: success, a 400 refusing tools, or a 404 for a missing model. An
+     about tools is cached: success, or a 400 refusing tools; a 404 (not installed) is reported
+     but never cached, so a pulled model is probed again even if the tag list hiccups. An
      unreachable Ollama or any other error (a 5xx such as "not enough memory") is unknown
      (`tool_calling_capable: null`) and retried, never read as "no tools" (break-it review).
    - `/agent/models/diagnostics` still probes everything, on request only.
    - The picker shows why a select was refused, and forgets it on a route change. A saved agent
      model the server refuses is forgotten instead of being re-selected in a loop (reproduced:
-     twice in 50 ms), and the saved model is restored once per visit to the Agent tab, only after
-     the server's current model is known (before, it was re-sent on every entry, even when equal).
+     twice in 50 ms), and the saved model is restored once for each model the server reports,
+     only after it is known (before, it was re-sent on every entry, even when equal; the second
+     review showed a once-per-visit rule missed an API restart).
    - Rewritten on purpose, as M5 said: the auto-reconcile test, and the test that expected
      `/agent/models` to list only probed-capable models.
 - **Proof:** the tests above, each failing on the old code. Live, on the library copy:

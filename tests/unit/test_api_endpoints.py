@@ -1022,3 +1022,39 @@ def test_selecting_the_default_model_also_moves_query_rewriting(
 
     assert client.post("/models/select", json={"model": "b"}).status_code == 200
     assert generator.llm.model == generator.rewrite_llm.model == "b"
+
+
+def test_a_missing_model_is_probed_again_once_pulled_even_if_tags_hiccup(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from rca.llm.models import tool_capability, tool_refusal_reason
+
+    ollama = _FakeOllama(monkeypatch, [])
+    settings = _ollama_settings(tmp_path, "m:7b")
+    cache: dict = {}
+    original = ollama.urlopen
+
+    def missing(request, timeout=0):
+        url = request if isinstance(request, str) else request.full_url
+        if url.endswith("/api/chat"):
+            raise urllib.error.HTTPError(
+                url, 404, "Not Found", {}, io.BytesIO(b'{"error":"model m:7b not found"}')
+            )
+        return original(request, timeout)
+
+    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", missing)
+    assert tool_capability(settings, cache, "m:7b") is False
+    assert "not found" in tool_refusal_reason(settings, cache, "m:7b")
+
+    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", original)  # pulled
+    ollama.tags = [{"name": "m:7b", "digest": "sha256:d1"}]
+    assert tool_capability(settings, cache, "m:7b") is True
+
+    def tags_timeout(request, timeout=0):
+        url = request if isinstance(request, str) else request.full_url
+        if url.endswith("/api/tags"):
+            raise TimeoutError("timed out")
+        return original(request, timeout)
+
+    monkeypatch.setattr("rca.api.main.urllib.request.urlopen", tags_timeout)
+    assert tool_capability(settings, cache, "m:7b") is True

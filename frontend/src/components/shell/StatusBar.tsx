@@ -224,23 +224,25 @@ export function StatusBar() {
     }
   }, [currentModel, isChatRoute]);
 
-  // Restore this browser's agent model once per visit, and only once the server's current model
-  // is known: while it loads, currentModel is '--' and every stored model looked different.
-  const restoredAgentModel = useRef(false);
+  // Restore this browser's agent model once for each model the server reports, and only once it
+  // is known: while it loads, the model reads '--' and every stored model looked different. A
+  // server that restarts on another model reports a new value, so the restore runs again.
+  const serverAgentModel = agentModelsQuery.data?.current ?? agentStatusQuery.data?.model;
+  const restoredForServerModel = useRef<string | null>(null);
   useEffect(() => {
     if (!isAgentRoute) {
-      restoredAgentModel.current = false;
+      restoredForServerModel.current = null;
       return;
     }
-    if (restoredAgentModel.current || currentModel === '--' || selectMutation.isPending) {
+    if (!serverAgentModel || serverAgentModel === restoredForServerModel.current || selectMutation.isPending) {
       return;
     }
-    restoredAgentModel.current = true;
+    restoredForServerModel.current = serverAgentModel;
     const storedModel = window.localStorage.getItem(AGENT_MODEL_STORAGE_KEY);
-    if (storedModel && storedModel !== currentModel) {
+    if (storedModel && storedModel !== serverAgentModel) {
       selectMutation.mutate(storedModel);
     }
-  }, [currentModel, isAgentRoute, selectMutation.isPending]);
+  }, [serverAgentModel, isAgentRoute, selectMutation.isPending]);
 
   const rightLabel =
     ollamaConnected === null
