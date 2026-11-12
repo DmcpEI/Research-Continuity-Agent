@@ -27,13 +27,13 @@ Rules:
 - For research questions, search the knowledge base before answering
 - Use filesystem tools for local file inspection and text search
 - Use experiment tools only for existing run inspection in this v1
-- When using knowledge-base evidence, cite source IDs exactly as they appear, using [[source_id]]
+- When using knowledge-base evidence, cite each passage with its cite_as tag, exactly as given
 - Source IDs (src:..., chk:...) are citations, not files; never pass them to filesystem tools
 - If tools do not provide enough evidence, say so clearly instead of guessing
 - Be concise, useful, and grounded in the retrieved evidence
 - Do not answer with only a tool call string; execute tools, then provide a final answer
 - For search-style requests, return a ranked list with one bullet per source
-- Each ranked bullet must include: title, relevance summary, score when available, and [[source_id]]
+- Each ranked bullet must include: title, relevance summary, score when available, and its cite_as tag
 - Put caveats or uncertainty after the ranked findings, never before them
 - Do not ask the user to rephrase unless no relevant results were found"""
 

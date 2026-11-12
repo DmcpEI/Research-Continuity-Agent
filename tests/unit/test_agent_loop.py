@@ -646,3 +646,48 @@ def test_stop_reason_is_a_fixed_set_and_serialises_as_before() -> None:
     assert trace.model_dump(mode="json")["stopped_reason"] == "max_iterations"
     with pytest.raises(ValidationError):
         AgentTrace(query="q", stopped_reason="max_iteration")
+
+
+def test_knowledge_base_search_returns_citeable_chunks_with_their_text() -> None:
+    """The agent got one 300-character excerpt per paper and no chunk ID, so it could not cite
+    or read the passage that answers (PLAN M6)."""
+    from types import SimpleNamespace
+
+    from rca.agent.tools import KnowledgeBaseAdapter
+    from rca.flows.retrieve_flow import RetrievalBundle, RetrievalHit
+
+    long_text = "JamPacker packs cuboid objects. " * 60  # ~1,900 characters
+    hits = [
+        RetrievalHit(
+            node_id="chk:pdf/jampacker:0003",
+            score=0.9,
+            title="JamPacker",
+            excerpt="JamPacker packs",
+            text=long_text,
+        ),
+        RetrievalHit(
+            node_id="chk:pdf/jampacker:0007",
+            score=0.8,
+            title="JamPacker",
+            excerpt="recovery",
+            text="Recovery module.",
+        ),
+        RetrievalHit(
+            node_id="src:pdf/autobag",
+            score=0.7,
+            title="AutoBag",
+            excerpt="bags",
+            text="AutoBag opens bags.",
+        ),
+    ]
+    flow = SimpleNamespace(retrieve=lambda query, limit=5: RetrievalBundle(query=query, hits=hits))
+    output = KnowledgeBaseAdapter(settings=SimpleNamespace(), retrieve_flow=flow).search(
+        "jampacker"
+    )
+
+    assert "cite_as: [[chk:pdf/jampacker:0003]]" in output
+    assert "cite_as: [[chk:pdf/jampacker:0007]]" in output  # two passages of one paper, both kept
+    assert "cite_as: [[src:pdf/autobag]]" in output
+    assert "source_id: src:pdf/jampacker" in output
+    assert long_text[:1000] in output and long_text not in output  # full text, bounded
+    assert "Recovery module." in output

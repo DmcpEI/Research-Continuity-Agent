@@ -15,6 +15,9 @@ from rca.agent.mcp import MCPClientManager
 from rca.config.settings import Settings, get_settings
 from rca.flows.retrieve_flow import RetrieveFlow
 
+# About one chunk; keeps five results within a small model's context across a few tool turns.
+PASSAGE_CHARS = 1200
+
 
 class KnowledgeBaseAdapter:
     """Native adapter around RetrieveFlow for agent tool use."""
@@ -28,31 +31,22 @@ class KnowledgeBaseAdapter:
         self.retrieve_flow = retrieve_flow or RetrieveFlow(settings=self.settings)
 
     def search(self, query: str, limit: int = 5) -> str:
+        """Top passages with the ID to cite and their text (bounded), like the chat prompt gets."""
         bundle = self.retrieve_flow.retrieve(query, limit=limit)
         if not bundle.hits:
             return "No relevant documents found."
 
-        best_hit_by_source: dict[str, Any] = {}
-        for hit in bundle.hits:
-            source_id = self._to_source_id(hit.node_id)
-            current = best_hit_by_source.get(source_id)
-            if current is None or hit.score > current.score:
-                best_hit_by_source[source_id] = hit
-
-        unique_hits = sorted(
-            best_hit_by_source.values(),
-            key=lambda item: item.score,
-            reverse=True,
-        )[:limit]
-
         lines: list[str] = []
-        for index, hit in enumerate(unique_hits, start=1):
-            source_id = self._to_source_id(hit.node_id)
+        for index, hit in enumerate(bundle.hits[:limit], start=1):
+            text = (hit.text or hit.excerpt).strip()
+            if len(text) > PASSAGE_CHARS:
+                text = text[:PASSAGE_CHARS].rstrip() + "…"
             lines.append(f"RESULT {index}")
-            lines.append(f"source_id: {source_id}")
+            lines.append(f"cite_as: [[{hit.node_id}]]")
+            lines.append(f"source_id: {self._to_source_id(hit.node_id)}")
             lines.append(f"title: {hit.title}")
             lines.append(f"score: {hit.score:.3f}")
-            lines.append(f"excerpt: {hit.excerpt[:300]}")
+            lines.append(f"text: {text}")
             lines.append("")
         return "\n".join(lines).strip()
 
@@ -127,7 +121,7 @@ class ToolRegistry:
                     input=arguments,
                     output=(
                         f"'{source_id}' is a knowledge-base source ID, not a file path. "
-                        "Answer from the `search_knowledge_base` excerpts and cite it as "
+                        "Answer from the `search_knowledge_base` passages and cite it as "
                         f"[[{cite}]]; run another `search_knowledge_base` query for more detail."
                     ),
                     status=ToolCallStatus.error,
@@ -184,10 +178,10 @@ class ToolRegistry:
             "function": {
                 "name": "search_knowledge_base",
                 "description": (
-                    "Search the RCA research knowledge base for relevant papers and excerpts. "
-                    "Use this before answering research questions. Results carry source_id "
-                    "values (src:...) that are citation IDs, not file paths: answer from the "
-                    "excerpts and cite them as [[source_id]]."
+                    "Search the RCA research knowledge base for relevant passages. "
+                    "Use this before answering research questions. Each result has the passage "
+                    "text and a cite_as tag ([[chk:...]] or [[src:...]]): answer from the text "
+                    "and cite with that tag. These IDs are citations, not file paths."
                 ),
                 "parameters": {
                     "type": "object",
