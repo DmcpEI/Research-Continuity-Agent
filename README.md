@@ -28,7 +28,7 @@ Measured separately, not part of the scorecard:
 
 | What | Result | Details |
 |---|---|---|
-| Agent benchmark (`qwen3.5:9b`, 20 sandboxed tasks; default `qwen3.5:4b`: `17/20`) | `19/20` tasks, right tool `18/18` | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
+| Agent benchmark, 20 sandboxed tasks, default `qwen3.5:4b` (2026-11-12, two runs) | `18/20` tasks both runs, invalid tool calls `2` (was `11`) | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
 | Retrieval regression gate in CI | fails the build when any fixture question ranks worse | [EVAL.md → CI Retrieval Gate](docs/EVAL.md#ci-retrieval-gate) |
 
 Golden set: 129 questions, 39 of them unanswerable, split 89 dev (tuning) / 40 test (reported above). Known gaps: [Known Limitations](docs/EVAL.md#known-limitations).
@@ -49,7 +49,7 @@ Things to try:
 - *What does JSONSchemaBench measure?* should answer with `[[chk:...]]` chunk citations; click one to open the PDF. The default `qwen3.5:4b` sometimes answers without citation tags (see [Known Limitations](docs/EVAL.md#known-limitations)).
 - *How does the planner use the scene graph to guide search?* answers from the scene-graph planning paper.
 - *What is the capital of Australia?* is out of corpus, so RCA says nothing relevant was found instead of generating an answer.
-- The Agent tab uses the same `qwen3.5:4b` (17/20 agent tasks); it can search the knowledge base and list the downloaded papers.
+- The Agent tab uses the same `qwen3.5:4b` (18/20 agent tasks); it can search the knowledge base, cite the passages it found and list the downloaded papers. Each task runs on its own.
 
 ## How it works
 

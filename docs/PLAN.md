@@ -270,7 +270,7 @@ Each step is one commit, leaves `main` shippable, and is independent of the ones
 | 7 | **Vector store recovers** (#19), as in M3. Done: see "Step 7: vector store recovers, design". | Fake collection test; live Ollama stop/start | "Degrades and recovers without a restart" |
 | 8 | **Reranker failure is visible** (M4). Done: see "Step 8: reranker failure is visible, design". | Stub test; `/status` test | Same theme: no silent mode changes |
 | 9 | **Request-scoped models, no silent agent switch** (M5); move model code out of `main.py`. Done: see "Step 9: request-scoped models, no silent agent switch, design". | API tests incl. interleaved requests | `main.py` shrinks by a third; removes a RAM foot-gun |
-| 10 | **Agent contract** (M6): `StopReason`, citeable search results, no `pic2`, honest single-shot. | Unit tests; 20-task bench rerun | Agent answers can cite; bench number is for the shipped tool |
+| 10 | **Agent contract** (M6): `StopReason`, citeable search results, no `pic2`, honest single-shot. Done: see "Step 10: agent contract, design"; bench `18/20` (was `16/20`–`17/20`). | Unit tests; 20-task bench rerun | Agent answers can cite; bench number is for the shipped tool |
 | 11 | **Progress and cancel** (#16, M8): stage events first, tokens second. | Event-sequence API test; live | The daily-use fix people notice |
 | 12 | **"Cited" becomes "Supported"** (#7 reframed): per-sentence support check validated on ~50 hand labels; the badge changes from "Cited" to "Supported" only when it passes. | Label file; classifier comparison as in #6 | The second measured claim |
 | 13 | **Ingest consistency** (M2): commit-record comment, incomplete flag, upload hash check. | Mid-ingest failure test | Shows the two-store trade-off was understood |
@@ -620,6 +620,27 @@ As decided in M5, in three commits so the move can be reviewed apart from the be
   dev-mode double effects) because the current model reads `--` while loading. No path fires on
   the 409 itself. Fixed as above, with a test that a saved model equal to the server's sends no
   select.
+
+## Step 10: agent contract, design (2026-11-12)
+
+As decided in M6, one commit per part:
+
+- **`StopReason` enum** (same pattern as M1): the seven existing values, unchanged in JSON; an
+  unknown value fails validation. The Agent tab turns each into a sentence and shows it under any
+  answer whose run did not end with a final answer.
+- **Citeable search results:** each result carries `cite_as: [[chk:...]]`, the paper ID, title,
+  score and the passage text bounded to 1,200 characters (about one chunk); passages of the same
+  paper are no longer collapsed. Retrieval caps a call at 10 results, so about 12,000 characters.
+- **`pic2` removed** from the clarification heuristic.
+- **Honest single-shot:** the client sends only the task and the view says tasks are independent;
+  `AgentRequest` drops its ignored fields (old clients still work).
+- **Review fixes:** the clarification rule read any `score:` in the output, including scores quoted
+  inside passages, so a weak match could look strong; it now reads only result score lines. Two
+  unused leftovers removed.
+- **Proof:** unit and vitest tests, each failing on the old code; two paired bench runs on
+  `qwen3.5:4b` (EVAL.md, "Agent contract, step 10"): `17/20` and `16/20` before, `18/20` both
+  after, invalid tool calls `11` to `2`. Model timeouts from other load on the machine cost 0 to 2
+  tasks per run, on both sides.
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

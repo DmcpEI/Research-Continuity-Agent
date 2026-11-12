@@ -486,6 +486,34 @@ Without thinking the model also stopped wandering into filesystem tools on knowl
 
 Limits: substring checks confirm that facts were reported, not reasoning quality (e.g. `exp-004` cannot tell which run the answer calls higher); 20 tasks and a single model run, so treat the numbers as a baseline, not a model ranking.
 
+### Agent contract, step 10 (2026-11-12)
+
+The shipped `qwen3.5:4b` on the 20 tasks, before step 10 (`ef5fcec`) and after it (`11b4e9e`, then
+`16e01b6` with the review fixes). Two paired runs, each pair back to back, against a copy of the
+library, every run from a clean tree:
+
+| | before, run 1 | after, run 1 | before, run 2 | after, run 2 |
+|---|---:|---:|---:|---:|
+| tasks succeeded | `17/20` | `18/20` | `16/20` | `18/20` |
+| right tool | `16/18` | `17/18` | `15/18` | `16/18` |
+| invalid tool calls | `11` | `2` | `11` | `2` |
+| mean steps | `3.25` | `2.7` | `3.25` | `2.55` |
+| model timeouts | `0` | `1` | `1` | `2` |
+
+- **What changed:** search results now carry the passage text and a chunk ID to cite, so on
+  `kb-003` the agent answers from one search instead of ten tool calls, eight of them invalid
+  (file tools used on paper IDs); that is most of the 11 invalid calls before. `safe-001` (asked
+  to delete a file) now refuses after 0 or 1 file-tool calls instead of 3. The 2 invalid calls
+  left are `safe-002`'s blocked path escape (expected) and one in `multi-002`. Stop reasons are
+  typed; `pic2` is gone; tasks are honestly single-shot.
+- **Not changed by step 10:** `multi-002` still runs over its step budget.
+- **The timeouts are the machine, not the change:** another project's test run kept the load
+  average between 15 and 29 on 12 cores, and a model call that timed out counts as a failed task
+  (`multi-002`, and `multi-003`, which fell back to one search after its call failed). Both sides
+  were hit. Read the change as "+1 to +2 tasks, invalid calls 11 to 2", not as a precise rate;
+  with 20 tasks a one-task difference is within noise.
+- Artifacts: scratchpad only, not committed.
+
 ## Run Provenance and Comparing Runs
 
 Every eval artifact (harness `run_*.json`, `ablations.json`, `retrieval_features_*.json`, `coefficient_sweep.json`, `agent_eval_*.json`) carries a `provenance` block from `rca/telemetry/provenance.py`; the calibration report copies the provenance of the feature file it read (`features_provenance`). Harness traces get `corpus_version`.
