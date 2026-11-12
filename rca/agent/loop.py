@@ -38,7 +38,7 @@ Rules:
 - Do not ask the user to rephrase unless no relevant results were found"""
 
 TEXT_TOOL_CALL_PATTERN = re.compile(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\((\{.*\})\)\s*$", re.DOTALL)
-SPECIFIC_QUERY_PATTERN = re.compile(r"\b(my|paper|thesis|pic2)\b", re.IGNORECASE)
+SPECIFIC_QUERY_PATTERN = re.compile(r"\b(my|paper|thesis)\b", re.IGNORECASE)
 
 
 class AgentLoop:

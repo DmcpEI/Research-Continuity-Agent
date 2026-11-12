@@ -691,3 +691,11 @@ def test_knowledge_base_search_returns_citeable_chunks_with_their_text() -> None
     assert "source_id: src:pdf/jampacker" in output
     assert long_text[:1000] in output and long_text not in output  # full text, bounded
     assert "Recovery module." in output
+
+
+def test_the_clarification_heuristic_names_no_paper_from_one_library() -> None:
+    """`pic2` was one corpus's paper name hard-coded into the agent (PLAN M6)."""
+    assert (
+        AgentLoop._looks_like_specific_query("pic2 safety attributes in grocery bagging") is False
+    )
+    assert AgentLoop._looks_like_specific_query("the AutoBag paper") is True  # generic words stay
