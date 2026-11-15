@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ApiCitation, ChatStage } from '../../api/client';
-import { AnswerBubble, dropUnfinishedMarker, stripCitationMarkers } from './AnswerBubble';
+import { AnswerBubble, stripCitationMarkers } from './AnswerBubble';
 import { isFailedRequest, type Message } from '../../hooks/useChat';
 
 type MessageThreadProps = {
@@ -41,7 +41,7 @@ function PendingBlock({ stage, startedAt, draft }: { stage: ChatStage | null; st
     return () => window.clearInterval(timer);
   }, []);
   const seconds = startedAt === null ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000));
-  const shown = stripCitationMarkers(dropUnfinishedMarker(draft));
+  const shown = stripCitationMarkers(draft);
   return (
     <>
       <div className="thread-pending" aria-live="polite">

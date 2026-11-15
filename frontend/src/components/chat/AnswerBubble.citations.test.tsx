@@ -106,3 +106,26 @@ describe('Citation rendering conformance', () => {
     expect(onCitationClick).toHaveBeenCalledWith('src:pdf/paper_a');
   });
 });
+
+describe('A reply cut off by the length limit', () => {
+  it('does not show the half-written marker it ends with', () => {
+    const { container } = render(
+      <AnswerBubble
+        content="Bags fail when grasped twice. [[chk:pdf/bag_all_you_need:0002]] Another failure\n[[chk:pdf/bag_all_you_need_learning_a_gen"
+        citations={[]}
+        grounded={false}
+        trace={null}
+      />,
+    );
+    const prose = container.querySelector('.answer-prose') as HTMLElement;
+    expect(prose).toHaveTextContent('Bags fail when grasped twice. Another failure');
+    expect(prose.textContent).not.toContain('chk:');
+  });
+});
+
+describe('Ordinary text ending in a bracket', () => {
+  it.each(['Index it as arr[i', 'See the footnote [^1', 'Options: [a, b'])('keeps %j', (content) => {
+    const { container } = render(<AnswerBubble content={content} citations={[]} grounded={false} trace={null} />);
+    expect(container.querySelector('.answer-prose')).toHaveTextContent(content);
+  });
+});

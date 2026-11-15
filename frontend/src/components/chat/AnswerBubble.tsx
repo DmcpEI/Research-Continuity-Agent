@@ -41,7 +41,7 @@ export function dropUnfinishedMarker(content: string): string {
 
 // Citation markers are shown as chips, not inline; the streamed draft drops them the same way.
 export function stripCitationMarkers(content: string): string {
-  return content
+  return dropUnfinishedMarker(content)
     .replace(/\[\[[\w:/.-]+\]\]/g, '')
     .replace(/\[(?:src|chk):[^\]\s]+\]/g, '')
     .split('\n')
