@@ -20,7 +20,7 @@ from rca.flows.facts_check import (
     parse_facts,
 )
 from rca.flows.retrieve_flow import RetrievalBundle, RetrieveFlow
-from rca.llm.client import ChatMessage, EchoLLMClient, LLMClient
+from rca.llm.client import ChatMessage, ChatResponse, EchoLLMClient, LLMClient
 from rca.llm.factory import get_llm_client
 from rca.retrieval.query_classifier import QueryType, classify_query
 
@@ -143,9 +143,12 @@ Rules:
         trace: QueryTrace | None = None,
         conversation_messages: Sequence[dict[str, str]] | None = None,
         on_stage: Callable[[str], None] | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> GeneratedAnswer:
         # Reports "retrieving", "generating" and "checking" as they start. It may raise to stop
         # the request; the exception propagates before the next stage begins.
+        # on_token gets the answer as the model writes it (a draft: the checks below can still
+        # replace it); raising from it ends the model call.
         stage = on_stage or (lambda _name: None)
         trace = trace or QueryTrace(query=query)
         trace.model = getattr(self.llm, "model", self.llm.__class__.__name__)
@@ -165,7 +168,7 @@ Rules:
             ]
             stage("generating")
             llm_started = perf_counter()
-            response = self.llm.chat(messages)
+            response = self._answer_call(messages, on_token)
             trace.stages.append(
                 StageTrace(
                     name="llm_generate",
@@ -269,7 +272,7 @@ Rules:
         ]
         stage("generating")
         llm_started = perf_counter()
-        response = self.llm.chat(messages)
+        response = self._answer_call(messages, on_token)
         trace.stages.append(
             StageTrace(
                 name="llm_generate",
@@ -343,6 +346,13 @@ Rules:
             + self._rerank_labels(bundle),
             trace=trace,
         )
+
+    def _answer_call(
+        self, messages: list[ChatMessage], on_token: Callable[[str], None] | None
+    ) -> ChatResponse:
+        if on_token is None:
+            return self.llm.chat(messages)
+        return self.llm.chat_stream(messages, on_token)
 
     @staticmethod
     def _rerank_labels(bundle: RetrievalBundle) -> list[str]:

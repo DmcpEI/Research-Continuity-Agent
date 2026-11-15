@@ -1089,7 +1089,7 @@ def test_chat_stream_sends_stages_then_the_chat_payload(tmp_path: Path) -> None:
         llm = object()
         rewrite_llm = llm
 
-        def generate_answer(self, query, conversation_messages=None, on_stage=None):
+        def generate_answer(self, query, conversation_messages=None, on_stage=None, on_token=None):
             for stage in ("retrieving", "generating"):
                 if on_stage:  # /chat passes none
                     on_stage(stage)
@@ -1122,7 +1122,7 @@ def test_chat_stream_reports_a_failure_as_an_error_event(tmp_path: Path) -> None
     class FailingGenerateFlow:
         llm = object()
 
-        def generate_answer(self, query, conversation_messages=None, on_stage=None):
+        def generate_answer(self, query, conversation_messages=None, on_stage=None, on_token=None):
             on_stage("retrieving")
             raise RuntimeError("Ollama is not running")
 
@@ -1147,7 +1147,7 @@ def test_chat_stream_stops_before_the_model_when_the_client_goes_away(tmp_path: 
     class SlowRetrievalFlow:
         llm = object()
 
-        def generate_answer(self, query, conversation_messages=None, on_stage=None):
+        def generate_answer(self, query, conversation_messages=None, on_stage=None, on_token=None):
             try:
                 on_stage("retrieving")
                 in_retrieval.set()
@@ -1177,3 +1177,71 @@ def test_chat_stream_stops_before_the_model_when_the_client_goes_away(tmp_path: 
     assert finished.wait(timeout=5)
     assert len(chunks) == 1 and "retrieving" in chunks[0]
     assert reached == []
+
+
+def test_chat_stream_sends_the_draft_as_token_events_before_the_final(tmp_path: Path) -> None:
+    class StreamingFlow:
+        llm = object()
+
+        def generate_answer(self, query, conversation_messages=None, on_stage=None, on_token=None):
+            on_stage("retrieving")
+            on_stage("generating")
+            for piece in ("Jam", "", "Packer packs."):  # an empty piece is not sent
+                on_token(piece)
+            return GeneratedAnswer(query=query, answer="JamPacker packs.", outcome="unverified")
+
+    client = TestClient(create_app(settings=_settings_for(tmp_path), generate_flow=StreamingFlow()))
+    events = _sse_events(client.post("/chat/stream", json={"query": "What is JamPacker?"}).text)
+
+    assert [name for name, _ in events] == ["stage", "stage", "token", "token", "final"]
+    assert [data["text"] for name, data in events if name == "token"] == ["Jam", "Packer packs."]
+    assert events[-1][1]["answer"] == "JamPacker packs."
+
+
+def test_chat_stream_stops_the_model_while_tokens_are_flowing(tmp_path: Path) -> None:
+    import asyncio
+    import threading
+    import time
+
+    from rca.api.main import ChatRequest
+
+    sent: list[str] = []
+    finished = threading.Event()
+    outcome: list[str] = []
+
+    class EndlessFlow:
+        llm = object()
+
+        def generate_answer(self, query, conversation_messages=None, on_stage=None, on_token=None):
+            try:
+                on_stage("generating")
+                for index in range(2000):  # about 4 s of tokens, never idle for 0.5 s
+                    on_token(f"w{index} ")
+                    sent.append("x")
+                    time.sleep(0.002)
+                outcome.append("ran to the end")
+                return GeneratedAnswer(query=query, answer="all", outcome="unverified")
+            except Exception as exc:
+                outcome.append(type(exc).__name__)
+                raise
+            finally:
+                finished.set()
+
+    app = create_app(settings=_settings_for(tmp_path), generate_flow=EndlessFlow())
+    endpoint = next(
+        route.endpoint for route in app.routes if getattr(route, "path", "") == "/chat/stream"
+    )
+
+    class GoneOnceTokensFlow:
+        async def is_disconnected(self) -> bool:
+            return len(sent) >= 5
+
+    async def run() -> list[str]:
+        response = await endpoint(ChatRequest(query="What is JamPacker?"), GoneOnceTokensFlow())
+        return [chunk async for chunk in response.body_iterator]
+
+    chunks = asyncio.run(run())
+    assert finished.wait(timeout=10)
+    assert outcome == ["_ChatStopped"]
+    assert len(sent) < 2000
+    assert not any("final" in chunk for chunk in chunks)

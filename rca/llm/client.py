@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
 
@@ -45,6 +46,16 @@ class LLMClient(ABC):
         get a plain chat; callers must still validate the reply."""
         del schema
         return self.chat(messages)
+
+    def chat_stream(
+        self, messages: list[ChatMessage], on_token: Callable[[str], None]
+    ) -> ChatResponse:
+        """Chat that hands each piece of the reply to `on_token` as it arrives (pieces may be
+        empty). If `on_token` raises, the call stops there. Providers without streaming hand
+        over the whole reply once."""
+        response = self.chat(messages)
+        on_token(response.text)
+        return response
 
     def chat_with_tools(
         self,
@@ -169,6 +180,49 @@ class OllamaLLMClient(LLMClient):
             result = self._post_json("/api/chat", payload, timeout=120)
             text = result["message"]["content"]
         return ChatResponse(text=text, raw=result)
+
+    def chat_stream(
+        self, messages: list[ChatMessage], on_token: Callable[[str], None]
+    ) -> ChatResponse:
+        if self._api_style == "openai":
+            return super().chat_stream(messages, on_token)
+        payload = {
+            "model": self.model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "stream": True,
+            "think": self.think,
+            "options": self.options,
+            **self._keep_alive_field(),
+        }
+        parts: list[str] = []
+        last: dict[str, Any] = {}
+        # Leaving this block (on_token raising included) closes the connection, and Ollama
+        # stops generating when its client hangs up.
+        with self._open("/api/chat", payload, timeout=120) as response:
+            for line in response:
+                if not line.strip():
+                    continue
+                try:
+                    chunk = json.loads(line)
+                except ValueError:
+                    chunk = None
+                if not isinstance(chunk, dict):
+                    raise RuntimeError(f"Ollama sent an unexpected line: {line[:200]!r}")
+                if "error" in chunk:
+                    raise RuntimeError(f"Ollama stopped the reply: {chunk['error']}")
+                message = chunk.get("message")
+                piece = message.get("content") if isinstance(message, dict) else None
+                piece = piece if isinstance(piece, str) else ""
+                parts.append(piece)
+                last = chunk
+                on_token(piece)
+        if last.get("done") is not True:
+            # The connection closed before Ollama finished: a partial reply, not a whole one.
+            raise RuntimeError("The Ollama stream ended before the reply was done.")
+        text = "".join(parts)
+        return ChatResponse(
+            text=text, raw={**last, "message": {"role": "assistant", "content": text}}
+        )
 
     def chat_with_tools(
         self,
@@ -330,6 +384,10 @@ class OllamaLLMClient(LLMClient):
         return normalized
 
     def _post_json(self, path: str, payload: dict[str, Any], timeout: int) -> dict[str, Any]:
+        with self._open(path, payload, timeout) as response:
+            return json.loads(response.read())
+
+    def _open(self, path: str, payload: dict[str, Any], timeout: int):
         import urllib.error
         import urllib.request
 
@@ -343,8 +401,7 @@ class OllamaLLMClient(LLMClient):
             headers=headers,
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
-                return json.loads(response.read())
+            return urllib.request.urlopen(request, timeout=timeout)
         except urllib.error.HTTPError as exc:
             # Keep the server's message (e.g. '"gemma3:12b" does not support thinking');
             # urllib's own text is only "HTTP Error 400: Bad Request".

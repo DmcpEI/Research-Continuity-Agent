@@ -833,3 +833,37 @@ def test_a_stop_requested_while_retrieving_never_calls_the_model() -> None:
     with pytest.raises(Stopped):
         flow.generate_answer("How does JamPacker plan?", on_stage=stop_before_generating)
     assert llm.calls == 0  # proper-noun query: no rewrite call either
+
+
+class _StreamCountingLLM(StubLLMClient):
+    def __init__(self, responses: list[str] | None = None) -> None:
+        super().__init__(responses)
+        self.streamed = 0
+
+    def chat_stream(self, messages, on_token):
+        self.streamed += 1
+        return super().chat_stream(messages, on_token)
+
+
+def test_on_token_streams_the_answer_call_and_nothing_else() -> None:
+    llm = _StreamCountingLLM()
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=llm)
+    pieces: list[str] = []
+    result = flow.generate_answer(_CONCEPTUAL, on_token=pieces.append)
+
+    assert llm.calls == 2 and llm.streamed == 1  # the rewrite is a whole call
+    assert "".join(pieces) == llm.responses[1]
+    assert result.answer.startswith("JamPacker combines planning")
+    assert result.trace.prompt_tokens == 11 + 29  # usage still counted from the streamed reply
+
+    conversational = _StreamCountingLLM(["Hello there."])
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=conversational)
+    pieces.clear()
+    flow.generate_answer("Why didn't you respond?", on_token=pieces.append)
+    assert conversational.streamed == 1 and pieces == ["Hello there."]
+
+
+def test_without_on_token_the_flow_never_streams() -> None:
+    llm = _StreamCountingLLM()
+    GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=llm).generate_answer(_CONCEPTUAL)
+    assert llm.streamed == 0 and llm.calls == 2

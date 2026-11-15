@@ -281,8 +281,9 @@ def create_app(
 
     @router.post("/chat/stream")
     async def chat_stream(payload: ChatRequest, request: Request) -> StreamingResponse:
-        """Server-sent events: `stage` while working, then one `final` (the /chat payload) or
-        one `error`. A client that disconnects stops the request at the next stage."""
+        """Server-sent events: `stage` while working, `token` pieces of the draft answer while
+        the model writes it, then one `final` (the /chat payload) or one `error`. A client that
+        disconnects stops the request at the next stage or token."""
         flow, model = chat_flow(payload)
         loop = asyncio.get_running_loop()
         events: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
@@ -300,10 +301,20 @@ def create_app(
                 "stage", {"stage": name, "elapsed_ms": int((time.perf_counter() - started) * 1000)}
             )
 
+        def on_token(text: str) -> None:
+            # Raising here leaves the model's read loop, which closes its connection.
+            if stopped.is_set():
+                raise _ChatStopped
+            if text:
+                emit("token", {"text": text})
+
         def work() -> None:
             try:
                 result = flow.generate_answer(
-                    payload.query, conversation_messages=payload.messages, on_stage=on_stage
+                    payload.query,
+                    conversation_messages=payload.messages,
+                    on_stage=on_stage,
+                    on_token=on_token,
                 )
                 emit("final", _chat_payload(result, model))
             except _ChatStopped:
@@ -313,21 +324,24 @@ def create_app(
                 emit("error", {"detail": detail})
 
         async def stream():
-            # ponytail: one default-executor thread per stream for the whole generation; a model
-            # call already running finishes after a stop. Token streaming (step 11, part 2) ends it.
+            # ponytail: one default-executor thread per stream for the whole generation; after a
+            # stop, a rewrite or facts-check call already running still finishes (the answer call
+            # streams and ends at its next token).
             worker = loop.run_in_executor(None, work)
             try:
                 while True:
                     try:
                         name, data = await asyncio.wait_for(events.get(), timeout=0.5)
                     except TimeoutError:
-                        if await request.is_disconnected():
-                            return
-                        continue
+                        name, data = "", {}
                     if name == "stopped":
                         return
-                    yield f"event: {name}\ndata: {json.dumps(data)}\n\n"
-                    if name in ("final", "error"):
+                    if name:
+                        yield f"event: {name}\ndata: {json.dumps(data)}\n\n"
+                        if name in ("final", "error"):
+                            return
+                    # After every event too: while tokens flow, the wait above never times out.
+                    if await request.is_disconnected():
                         return
             finally:
                 # Disconnect, cancellation or the end: the next stage callback raises.

@@ -446,3 +446,165 @@ def test_clients_without_structured_output_fall_back_to_plain_chat() -> None:
     reply = EchoLLMClient().chat_json([ChatMessage(role="user", content="hi")], {"type": "object"})
 
     assert reply.text == "[stubbed-llm] hi"
+
+
+class _NdjsonServer:
+    """A local HTTP server that streams Ollama-style NDJSON chunks, one every few milliseconds,
+    and records the request and whether the client hung up before the stream ended."""
+
+    def __init__(self, pieces: list[str], delay: float = 0.02) -> None:
+        import http.server
+        import threading
+
+        self.pieces = pieces
+        self.payloads: list[dict] = []
+        self.written = 0
+        self.hung_up = threading.Event()
+        self.done = threading.Event()
+        owner = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                import time
+
+                length = int(self.headers["Content-Length"])
+                owner.payloads.append(json.loads(self.rfile.read(length)))
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self.end_headers()
+                chunks = [
+                    {"message": {"role": "assistant", "content": piece}, "done": False}
+                    for piece in owner.pieces
+                ]
+                chunks.append(
+                    {
+                        "message": {"role": "assistant", "content": ""},
+                        "done": True,
+                        "prompt_eval_count": 11,
+                        "eval_count": len(owner.pieces),
+                    }
+                )
+                try:
+                    for chunk in chunks:
+                        self.wfile.write(json.dumps(chunk).encode() + b"\n")
+                        self.wfile.flush()
+                        owner.written += 1
+                        time.sleep(delay)
+                except (BrokenPipeError, ConnectionResetError):
+                    owner.hung_up.set()
+                finally:
+                    owner.done.set()
+
+            def log_message(self, *args) -> None:
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def test_chat_stream_passes_each_piece_on_and_returns_the_whole_reply() -> None:
+    server = _NdjsonServer(["Jam", "Packer ", "packs."])
+    try:
+        client = OllamaLLMClient(base_url=server.url, model="m")
+        pieces: list[str] = []
+        reply = client.chat_stream([ChatMessage(role="user", content="hi")], pieces.append)
+
+        assert [piece for piece in pieces if piece] == ["Jam", "Packer ", "packs."]
+        assert reply.text == "JamPacker packs."
+        assert reply.raw["prompt_eval_count"] == 11 and reply.raw["eval_count"] == 3
+        assert reply.raw["message"]["content"] == "JamPacker packs."
+        assert server.payloads[0]["stream"] is True
+        assert server.payloads[0]["model"] == "m"
+    finally:
+        server.close()
+
+
+def test_chat_stream_hangs_up_when_on_token_raises() -> None:
+    server = _NdjsonServer([f"w{index} " for index in range(200)])
+    try:
+        client = OllamaLLMClient(base_url=server.url, model="m")
+
+        class Stop(Exception):
+            pass
+
+        seen: list[str] = []
+
+        def on_token(piece: str) -> None:
+            seen.append(piece)
+            if len(seen) == 2:
+                raise Stop
+
+        with pytest.raises(Stop):
+            client.chat_stream([ChatMessage(role="user", content="hi")], on_token)
+
+        assert server.done.wait(timeout=10)
+        assert server.hung_up.is_set()  # the server saw the connection close
+        assert server.written < 200
+    finally:
+        server.close()
+
+
+def test_chat_stream_raises_the_error_ollama_sends_mid_stream(monkeypatch) -> None:
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            pass
+
+        def __iter__(self):
+            yield b'{"message": {"role": "assistant", "content": "Ja"}, "done": false}\n'
+            yield b'{"error": "model runner has unexpectedly stopped"}\n'
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda request, timeout=120: Response())
+    client = OllamaLLMClient(base_url="http://ollama.invalid", model="m")
+
+    with pytest.raises(RuntimeError, match="model runner has unexpectedly stopped"):
+        client.chat_stream([ChatMessage(role="user", content="hi")], lambda piece: None)
+
+
+def test_clients_without_streaming_hand_over_the_whole_reply_once() -> None:
+    from rca.llm.client import EchoLLMClient
+
+    pieces: list[str] = []
+    reply = EchoLLMClient().chat_stream([ChatMessage(role="user", content="hi")], pieces.append)
+
+    assert pieces == ["[stubbed-llm] hi"] and reply.text == "[stubbed-llm] hi"
+
+
+def _stream_of(lines: list[bytes]):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            pass
+
+        def __iter__(self):
+            yield from lines
+
+    return lambda request, timeout=120: Response()
+
+
+@pytest.mark.parametrize(
+    ("lines", "message"),
+    [
+        # The connection dropped before Ollama said it was done: not a whole reply.
+        ([b'{"message": {"role": "assistant", "content": "Half"}, "done": false}\n'], "ended"),
+        ([b"[1, 2]\n"], "unexpected"),
+        ([b"not json\n"], "unexpected"),
+    ],
+)
+def test_chat_stream_rejects_a_stream_that_is_not_a_whole_reply(
+    monkeypatch, lines: list[bytes], message: str
+) -> None:
+    monkeypatch.setattr(urllib.request, "urlopen", _stream_of(lines))
+    client = OllamaLLMClient(base_url="http://ollama.invalid", model="m")
+
+    with pytest.raises(RuntimeError, match=message):
+        client.chat_stream([ChatMessage(role="user", content="hi")], lambda piece: None)

@@ -675,6 +675,55 @@ As decided in M8, stage events first; token streaming is the second part of this
   show only in the conversation that is waiting, the parser accepts CRLF line endings, and an
   unknown stage reads "Working".
 
+**Part 2: tokens (2026-11-15).**
+
+- **Only the answer call streams.** `LLMClient.chat_stream(messages, on_token)` calls back with
+  each piece of the reply as it arrives. The base class calls `chat` and hands over the whole
+  reply once, so every client and test fake keeps working. `OllamaLLMClient` reads Ollama's
+  NDJSON stream (`stream: true`). The OpenAI-compatible path uses the base class (no streaming),
+  because no backend in use needs it. The query rewrite (about 0.5 s) and the facts check
+  (about 3.5 s) stay whole calls; streaming them shows nothing, and they are short.
+- **The flow.** `generate_answer(on_token=...)` sends the answer call (and the conversational
+  call) through `chat_stream`; without `on_token` it calls `chat` exactly as before, so `/chat`,
+  the harness and the bench do not change.
+- **Draft, then final.** `/chat/stream` adds `token` events (`{"text": ...}`, empty pieces
+  dropped) between `generating` and `final`. The streamed text is a draft: the final answer is
+  still decided after the whole reply, so citations are attached then, and a reply the checks
+  reject is replaced by the refusal. The UI shows the draft (markers removed, the same way the
+  answer bubble removes them, plus a marker still being written at the end) under the stage
+  line, and the `final` turn replaces it. A stopped request keeps no draft, like a failed one.
+  The thread follows the draft while the reader is at the bottom and leaves them alone once
+  they scroll up.
+- **Stop moves to the input bar** (found live): under a growing draft the button kept moving,
+  and two clicks in the live check missed it. While a question runs, Stop takes Send's place.
+- **Break-it review fixes:** a double-click on Send no longer stops the question (Stop has its
+  own key, so it takes neither Send's focus nor the second click); every token re-rendered every
+  earlier answer's Markdown (about 39 ms per token with 40 answers in jsdom), so answers are
+  memoised and only the draft re-renders; the draft-follow scroll ran in a conversation that
+  was not waiting; the unfinished-marker cut dropped ordinary text such as `arr[i`, so only a
+  marker's start counts; a stream that ends without Ollama's `done` chunk, or has a line that is
+  not a JSON object, now fails instead of passing as a whole reply; a `token` event without
+  text is skipped.
+- **Found live, same fix:** a reply cut off by the 512-token limit ended with a half-written
+  marker (`[[chk:pdf/bag_all_you_need_learn`) in the final answer too, so the shared strip
+  function drops an unfinished marker at the end of any answer.
+- **Stop ends the model call.** `on_token` raises once the client has gone; the exception leaves
+  the read loop, the connection closes, and Ollama stops generating when its client hangs up.
+  Ollama sends no tokens while it reads the prompt, so a stop there waits for the first token
+  (break-it review: with a 5k-token prompt Ollama kept working about 8 s after the client left;
+  closing the socket from another thread would end it, kept as a known limit). The endpoint also
+  checks for a disconnect after every event, not only after 0.5 s idle. Under uvicorn, Starlette
+  already cancels the stream when the client leaves, so this is a second guard for servers that
+  do not; the unit test drives the endpoint directly and fails with the idle-only check.
+- **Proof:** a client test against a small local HTTP server that streams NDJSON: the pieces and
+  the joined text and token counts come back, and a raising `on_token` makes the server see the
+  connection close before the stream ends. Flow test: `on_token` routes the answer call through
+  `chat_stream`, and no `on_token` keeps `chat`. API test: `token` events between the stages
+  and `final`; a disconnect while tokens flow stops the stream (fails with the idle-only check).
+  vitest: the parser passes tokens on, the pending block shows the draft without markers, and a
+  stop drops it. Live: tokens arrive one by one in the browser, and Ollama's log shows a stopped
+  answer call ending early.
+
 ## Kept from ROADMAP (folded in 2026-11-11)
 
 ROADMAP.md was deleted in step 5. Its shipped-milestone lists are history (git log, CHANGELOG.md);
