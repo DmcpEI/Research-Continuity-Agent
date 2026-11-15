@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import StrEnum
 from time import perf_counter
 
@@ -142,7 +142,11 @@ Rules:
         limit: int = 5,
         trace: QueryTrace | None = None,
         conversation_messages: Sequence[dict[str, str]] | None = None,
+        on_stage: Callable[[str], None] | None = None,
     ) -> GeneratedAnswer:
+        # Reports "retrieving", "generating" and "checking" as they start. It may raise to stop
+        # the request; the exception propagates before the next stage begins.
+        stage = on_stage or (lambda _name: None)
         trace = trace or QueryTrace(query=query)
         trace.model = getattr(self.llm, "model", self.llm.__class__.__name__)
         query_type = classify_query(query)
@@ -159,6 +163,7 @@ Rules:
                     ),
                 ),
             ]
+            stage("generating")
             llm_started = perf_counter()
             response = self.llm.chat(messages)
             trace.stages.append(
@@ -179,6 +184,7 @@ Rules:
             )
 
         # Step 1: retrieve grounded context
+        stage("retrieving")
         if query_type is QueryType.proper_noun:
             rewritten = query
             self._append_warning(trace, "rewrite skipped: proper_noun query")
@@ -261,6 +267,7 @@ Rules:
                 ),
             ),
         ]
+        stage("generating")
         llm_started = perf_counter()
         response = self.llm.chat(messages)
         trace.stages.append(
@@ -278,6 +285,8 @@ Rules:
         grounding = self._verify_grounding(answer_text, citations, bundle)
         hedged = is_hedged(answer_text)
         check_facts = hedged and self.settings.facts_check_enabled
+        if check_facts:
+            stage("checking")
         facts_status = self._check_facts(query, answer_text, trace) if check_facts else None
         facts_failed = check_facts and facts_status is None
         abstention = self._decide_abstention(

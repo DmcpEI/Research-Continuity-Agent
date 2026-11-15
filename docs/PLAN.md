@@ -642,6 +642,29 @@ As decided in M6, one commit per part:
   after, invalid tool calls `11` to `2`. Model timeouts from other load on the machine cost 0 to 2
   tasks per run, on both sides.
 
+## Step 11: progress and cancel, design (2026-11-15)
+
+As decided in M8, stage events first; token streaming is the second part of this step.
+
+- **Stages from the flow, not a timer.** `GenerateFlow.generate_answer(on_stage=...)` calls back
+  with `retrieving` (rewrite and retrieval), `generating` (the model call) and `checking` (the
+  facts check, only when it runs). A refusal before the model call never reports `generating`.
+- **`POST /chat/stream`** (server-sent events, POST because it carries the question and history):
+  `stage` events with the stage and elapsed milliseconds, then one `final` event whose data is
+  exactly the `/chat` payload, or one `error` event with the same detail `/chat` would return.
+  `/chat` is unchanged for the harness and tests; both share the request-scoped model logic.
+- **Cancel.** The client aborts the request. The server notices the disconnect and the next stage
+  callback raises, so a request stopped while retrieving never calls the model, and one stopped
+  while generating skips the facts check. A model call already running finishes on the server:
+  stopping it needs token streaming, which reads the model's output piece by piece.
+- **The UI.** While waiting, the thread shows the current stage in words ("Searching your
+  library", "Writing the answer", "Checking the answer"), the seconds since the question, and a
+  Stop button. A stopped request becomes a "Stopped" turn that can be retried and, like a failed
+  request, is not sent back as history.
+- **Proof:** an API test that reads the event sequence from a stub flow; flow tests for the stage
+  order on each path and for stopping before the model call; vitest for the stream parser and the
+  pending block (fake timers); a live run in the browser.
+
 ## Kept from ROADMAP (folded in 2026-11-11)
 
 ROADMAP.md was deleted in step 5. Its shipped-milestone lists are history (git log, CHANGELOG.md);

@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 import logging
+import queue
 import shutil
+import threading
+import time
 import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from rca.agent.loop import AgentLoop
@@ -244,11 +248,10 @@ def create_app(
 
         return {"deleted": source_id}
 
-    @router.post("/chat")
-    def chat(payload: ChatRequest) -> dict[str, Any]:
+    def chat_flow(payload: ChatRequest) -> tuple[Any, str]:
+        """The flow and model for one chat request; a different model is request-scoped."""
         if not payload.query.strip():
             raise HTTPException(status_code=400, detail="Query must not be empty")
-
         default_model = (
             cfg.openai_chat_model
             if cfg.llm_backend == "openai_compatible"
@@ -263,26 +266,72 @@ def create_app(
             flow.llm = build_llm_for_model(cfg, payload.model)
             if getattr(generator, "rewrite_llm", None) is generator.llm:
                 flow.rewrite_llm = flow.llm
+        return flow, model
+
+    @router.post("/chat")
+    def chat(payload: ChatRequest) -> dict[str, Any]:
+        flow, model = chat_flow(payload)
         try:
-            result = flow.generate_answer(
-                payload.query,
-                conversation_messages=payload.messages,
-            )
+            result = flow.generate_answer(payload.query, conversation_messages=payload.messages)
         except Exception as exc:
             raise HTTPException(
                 status_code=502,
                 detail=f"Generation failed for model {model}: {_exception_message(exc)}",
             ) from exc
-        return {
-            "answer": result.answer,
-            "citations": [citation.model_dump(mode="json") for citation in result.citations],
-            "outcome": result.outcome.value,
-            "grounded": result.grounded,
-            "trace": result.trace.model_dump(mode="json") if result.trace else None,
-            "failure_labels": result.failure_labels,
-            "active_source_ids": _active_source_ids(result),
-            "model": result.trace.model if result.trace and result.trace.model else model,
-        }
+        return _chat_payload(result, model)
+
+    @router.post("/chat/stream")
+    async def chat_stream(payload: ChatRequest, request: Request) -> StreamingResponse:
+        """Server-sent events: `stage` while working, then one `final` (the /chat payload) or
+        one `error`. A client that disconnects stops the request at the next stage."""
+        flow, model = chat_flow(payload)
+        events: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
+        stopped = threading.Event()
+        started = time.perf_counter()
+
+        def on_stage(name: str) -> None:
+            if stopped.is_set():
+                raise _ChatStopped
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            events.put(("stage", {"stage": name, "elapsed_ms": elapsed_ms}))
+
+        def work() -> None:
+            try:
+                result = flow.generate_answer(
+                    payload.query, conversation_messages=payload.messages, on_stage=on_stage
+                )
+                events.put(("final", _chat_payload(result, model)))
+            except _ChatStopped:
+                events.put(("stopped", {}))
+            except Exception as exc:
+                detail = f"Generation failed for model {model}: {_exception_message(exc)}"
+                events.put(("error", {"detail": detail}))
+
+        async def stream():
+            worker = asyncio.get_running_loop().run_in_executor(None, work)
+            try:
+                while True:
+                    try:
+                        name, data = await asyncio.to_thread(events.get, True, 0.5)
+                    except queue.Empty:
+                        if await request.is_disconnected():
+                            return
+                        continue
+                    if name == "stopped":
+                        return
+                    yield f"event: {name}\ndata: {json.dumps(data)}\n\n"
+                    if name in ("final", "error"):
+                        return
+            finally:
+                # Disconnect, cancellation or the end: the next stage callback raises.
+                stopped.set()
+                del worker
+
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
     @router.post("/agent")
     def agent_chat(payload: AgentRequest) -> dict[str, Any]:
@@ -525,6 +574,23 @@ def create_app(
     app.include_router(router)
     app.add_event_handler("shutdown", agent.close)
     return app
+
+
+class _ChatStopped(Exception):
+    """Raised from a stage callback after the client went away."""
+
+
+def _chat_payload(result: GeneratedAnswer, model: str) -> dict[str, Any]:
+    return {
+        "answer": result.answer,
+        "citations": [citation.model_dump(mode="json") for citation in result.citations],
+        "outcome": result.outcome.value,
+        "grounded": result.grounded,
+        "trace": result.trace.model_dump(mode="json") if result.trace else None,
+        "failure_labels": result.failure_labels,
+        "active_source_ids": _active_source_ids(result),
+        "model": result.trace.model if result.trace and result.trace.model else model,
+    }
 
 
 def _active_source_ids(generated: GeneratedAnswer) -> list[str]:

@@ -1074,3 +1074,106 @@ def test_agent_accepts_an_old_client_payload_and_runs_the_task_alone(tmp_path: P
     )
     assert response.status_code == 200
     assert agent.runs == 1
+
+
+def _sse_events(body: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in body.strip().split("\n\n"):
+        fields = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
+        events.append((fields["event"], json.loads(fields["data"])))
+    return events
+
+
+def test_chat_stream_sends_stages_then_the_chat_payload(tmp_path: Path) -> None:
+    class StagedGenerateFlow:
+        llm = object()
+        rewrite_llm = llm
+
+        def generate_answer(self, query, conversation_messages=None, on_stage=None):
+            for stage in ("retrieving", "generating"):
+                if on_stage:  # /chat passes none
+                    on_stage(stage)
+            return GeneratedAnswer(
+                query=query,
+                answer="JamPacker packs boxes. [[src:pdf/jampacker]]",
+                outcome="answered",
+                citations=[Citation(source_id="src:pdf/jampacker", title="JamPacker", excerpt="x")],
+            )
+
+    client = TestClient(
+        create_app(settings=_settings_for(tmp_path), generate_flow=StagedGenerateFlow())
+    )
+    plain = client.post("/chat", json={"query": "What is JamPacker?"}).json()
+    response = client.post("/chat/stream", json={"query": "What is JamPacker?"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = _sse_events(response.text)
+    assert [name for name, _ in events] == ["stage", "stage", "final"]
+    assert [data["stage"] for name, data in events if name == "stage"] == [
+        "retrieving",
+        "generating",
+    ]
+    assert all(isinstance(data["elapsed_ms"], int) for name, data in events if name == "stage")
+    assert events[-1][1] == plain  # the same payload /chat returns
+
+
+def test_chat_stream_reports_a_failure_as_an_error_event(tmp_path: Path) -> None:
+    class FailingGenerateFlow:
+        llm = object()
+
+        def generate_answer(self, query, conversation_messages=None, on_stage=None):
+            on_stage("retrieving")
+            raise RuntimeError("Ollama is not running")
+
+    client = TestClient(
+        create_app(settings=_settings_for(tmp_path), generate_flow=FailingGenerateFlow())
+    )
+    events = _sse_events(client.post("/chat/stream", json={"query": "What is JamPacker?"}).text)
+    assert [name for name, _ in events] == ["stage", "error"]
+    assert "Ollama is not running" in events[-1][1]["detail"]
+    assert client.post("/chat/stream", json={"query": "  "}).status_code == 400
+
+
+def test_chat_stream_stops_before_the_model_when_the_client_goes_away(tmp_path: Path) -> None:
+    import asyncio
+    import threading
+
+    from rca.api.main import ChatRequest
+
+    in_retrieval, may_continue, finished = threading.Event(), threading.Event(), threading.Event()
+    reached: list[str] = []
+
+    class SlowRetrievalFlow:
+        llm = object()
+
+        def generate_answer(self, query, conversation_messages=None, on_stage=None):
+            try:
+                on_stage("retrieving")
+                in_retrieval.set()
+                may_continue.wait(timeout=5)
+                on_stage("generating")  # raises once the client is gone
+                reached.append("model called")
+                return GeneratedAnswer(query=query, answer="never", outcome="unverified")
+            finally:
+                finished.set()
+
+    app = create_app(settings=_settings_for(tmp_path), generate_flow=SlowRetrievalFlow())
+    endpoint = next(
+        route.endpoint for route in app.routes if getattr(route, "path", "") == "/chat/stream"
+    )
+
+    class GoneRequest:
+        async def is_disconnected(self) -> bool:
+            return in_retrieval.is_set()
+
+    async def run() -> list[str]:
+        response = await endpoint(ChatRequest(query="What is JamPacker?"), GoneRequest())
+        chunks = [chunk async for chunk in response.body_iterator]
+        may_continue.set()
+        return chunks
+
+    chunks = asyncio.run(run())
+    assert finished.wait(timeout=5)
+    assert len(chunks) == 1 and "retrieving" in chunks[0]
+    assert reached == []

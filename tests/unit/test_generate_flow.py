@@ -793,3 +793,43 @@ def test_an_answer_built_without_the_reranker_says_so() -> None:
         "rerank_unavailable"
         not in healthy.generate_answer("How does JamPacker plan?").failure_labels
     )
+
+
+# --- Step 11: stages are reported by the flow itself, and a stop is honoured between them. ---
+
+
+def test_stages_are_reported_in_order_on_each_path() -> None:
+    seen: list[str] = []
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=StubLLMClient())
+    flow.generate_answer("How does JamPacker plan?", on_stage=seen.append)
+    assert seen == ["retrieving", "generating"]
+
+    seen.clear()
+    flow, _ = _facts_flow(_HEDGED_NEARBY, _NO_FACTS)
+    flow.generate_answer(_CONCEPTUAL, on_stage=seen.append)
+    assert seen == ["retrieving", "generating", "checking"]
+
+    seen.clear()  # refused before the model call: never says "generating"
+    gated = GenerateFlow(
+        retrieve_flow=StubRetrieveFlow(rerank_score=-9.0), llm_client=StubLLMClient()
+    )
+    gated.generate_answer("How does JamPacker plan?", on_stage=seen.append)
+    assert seen == ["retrieving"]
+
+
+def test_a_stop_requested_while_retrieving_never_calls_the_model() -> None:
+    import pytest
+
+    class Stopped(Exception):
+        pass
+
+    llm = StubLLMClient()
+
+    def stop_before_generating(stage: str) -> None:
+        if stage == "generating":
+            raise Stopped
+
+    flow = GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=llm)
+    with pytest.raises(Stopped):
+        flow.generate_answer("How does JamPacker plan?", on_stage=stop_before_generating)
+    assert llm.calls == 0  # proper-noun query: no rewrite call either
