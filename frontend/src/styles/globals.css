@@ -959,23 +959,14 @@ input {
   color: var(--text-2);
 }
 
+/* A draft, not the answer yet: muted until the final turn replaces it. */
+.thread-draft {
+  color: var(--text-2);
+}
+
 .thread-pending-elapsed {
   font-family: var(--font-mono);
   color: var(--text-3);
-}
-
-.thread-pending-stop {
-  border: 1px solid var(--border);
-  border-radius: var(--r-full);
-  background: var(--surface);
-  color: var(--text);
-  padding: var(--s-1) var(--s-2);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
-.thread-pending-stop:hover {
-  background: var(--raised);
 }
 
 .thread-empty-hint {

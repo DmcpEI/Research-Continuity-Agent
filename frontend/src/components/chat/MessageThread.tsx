@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import type { ChatStage } from '../../api/client';
-import { AnswerBubble } from './AnswerBubble';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { ApiCitation, ChatStage } from '../../api/client';
+import { AnswerBubble, dropUnfinishedMarker, stripCitationMarkers } from './AnswerBubble';
 import { isFailedRequest, type Message } from '../../hooks/useChat';
 
 type MessageThreadProps = {
@@ -19,7 +21,12 @@ type MessageThreadProps = {
   stage?: ChatStage | null;
   startedAt?: number | null;
   onStop?: () => void;
+  // The answer so far, as the model writes it; the final turn replaces it.
+  draft?: string;
 };
+
+// One empty list, so a memoised answer without citations is not re-rendered for a new [].
+const NO_CITATIONS: ApiCitation[] = [];
 
 const STAGE_TEXT: Record<ChatStage, string> = {
   retrieving: 'Searching your library',
@@ -27,23 +34,27 @@ const STAGE_TEXT: Record<ChatStage, string> = {
   checking: 'Checking the answer',
 };
 
-function PendingBlock({ stage, startedAt, onStop }: { stage: ChatStage | null; startedAt: number | null; onStop?: () => void }) {
+function PendingBlock({ stage, startedAt, draft }: { stage: ChatStage | null; startedAt: number | null; draft: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
   const seconds = startedAt === null ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000));
+  const shown = stripCitationMarkers(dropUnfinishedMarker(draft));
   return (
-    <div className="thread-pending" aria-live="polite">
-      <span>{stage ? (STAGE_TEXT[stage] ?? 'Working') : 'Sending the question'}</span>
-      <span className="thread-pending-elapsed">{seconds} s</span>
-      {onStop ? (
-        <button className="thread-pending-stop" type="button" onClick={onStop}>
-          Stop
-        </button>
+    <>
+      <div className="thread-pending" aria-live="polite">
+        <span>{stage ? (STAGE_TEXT[stage] ?? 'Working') : 'Sending the question'}</span>
+        <span className="thread-pending-elapsed">{seconds} s</span>
+      </div>
+      {/* The draft sits outside the live region so a screen reader is not read every piece. */}
+      {shown ? (
+        <div className="answer-prose thread-draft" data-testid="thread-draft">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{shown}</ReactMarkdown>
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -61,6 +72,7 @@ export function MessageThread({
   stage = null,
   startedAt = null,
   onStop,
+  draft = '',
 }: MessageThreadProps) {
   const [query, setQuery] = useState('');
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -75,6 +87,14 @@ export function MessageThread({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [isLoading, messages]);
+
+  // Follow the draft as it grows, unless the reader has scrolled up to read something else.
+  useEffect(() => {
+    const body = endRef.current?.parentElement;
+    if (isLoading && draft && body && body.scrollHeight - body.scrollTop - body.clientHeight < 200) {
+      endRef.current?.scrollIntoView({ block: 'end' });
+    }
+  }, [draft, isLoading]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -134,7 +154,7 @@ export function MessageThread({
         {messages.map((message) =>
           message.role === 'assistant' ? (
             <AnswerBubble
-              citations={message.citations ?? []}
+              citations={message.citations ?? NO_CITATIONS}
               content={message.content}
               grounded={Boolean(message.grounded)}
               key={message.id}
@@ -154,7 +174,7 @@ export function MessageThread({
           ),
         )}
 
-        {isLoading ? <PendingBlock stage={stage} startedAt={startedAt} onStop={onStop} /> : null}
+        {isLoading ? <PendingBlock stage={stage} startedAt={startedAt} draft={draft} /> : null}
         <div ref={endRef} />
       </div>
 
@@ -170,14 +190,33 @@ export function MessageThread({
           title={inputTitle}
           value={query}
         />
-        <button
-          className="thread-send-btn"
-          disabled={inputDisabled || !query.trim()}
-          type="submit"
-          title={inputTitle}
-        >
-          Send
-        </button>
+        {/* While a question runs, Stop takes Send's place, so it stays put as the draft grows. */}
+        {/* Separate keys: Stop never inherits Send's focus, so a second Enter does nothing, and
+            the second click of a double-click on Send (detail 2) does not stop the question. */}
+        {isLoading && onStop ? (
+          <button
+            className="thread-send-btn"
+            key="stop"
+            type="button"
+            onClick={(event) => {
+              if (event.detail <= 1) {
+                onStop();
+              }
+            }}
+          >
+            Stop
+          </button>
+        ) : (
+          <button
+            key="send"
+            className="thread-send-btn"
+            disabled={inputDisabled || !query.trim()}
+            type="submit"
+            title={inputTitle}
+          >
+            Send
+          </button>
+        )}
       </form>
     </div>
   );

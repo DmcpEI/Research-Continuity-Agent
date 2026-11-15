@@ -59,3 +59,40 @@ describe('sendChat stream parsing edges', () => {
     expect(stages).toEqual(['retrieving']);
   });
 });
+
+describe('sendChat token events', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('passes each draft piece on in order, then resolves with the final payload', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        streamOf([
+          'event: stage\ndata: {"stage": "generating", "elapsed_ms": 5}\n\n',
+          'event: token\ndata: {"text": "Jam"}\n\nevent: token\ndata: {"text": "Packer\\n\\npacks."}\n\n',
+          `event: final\ndata: ${JSON.stringify(finalPayload)}\n\n`,
+        ]),
+      ),
+    );
+    const pieces: string[] = [];
+    const result = await sendChat('q', undefined, undefined, [], { onToken: (text) => pieces.push(text) });
+    expect(pieces).toEqual(['Jam', 'Packer\n\npacks.']);
+    expect(result).toEqual(finalPayload);
+  });
+});
+
+describe('sendChat with a malformed token event', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('skips a token event without text instead of adding "undefined"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        streamOf(['event: token\ndata: {}\n\nevent: token\ndata: {"text": "ok"}\n\n', `event: final\ndata: ${JSON.stringify(finalPayload)}\n\n`]),
+      ),
+    );
+    const pieces: string[] = [];
+    await sendChat('q', undefined, undefined, [], { onToken: (text) => pieces.push(text) });
+    expect(pieces).toEqual(['ok']);
+  });
+});

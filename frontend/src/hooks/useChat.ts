@@ -66,6 +66,8 @@ export function useChat({
   // The step the server is on and when the question was sent, for the pending block.
   const [stage, setStage] = useState<ChatStage | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  // The answer so far while the model writes it; dropped when the request ends.
+  const [draft, setDraft] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
   const mutation = useMutation({
@@ -81,7 +83,12 @@ export function useChat({
       model?: string;
       history: ApiChatMessage[];
       signal: AbortSignal;
-    }) => sendChat(query, cid, model, history, { onStage: setStage, signal }),
+    }) =>
+      sendChat(query, cid, model, history, {
+        onStage: setStage,
+        onToken: (text) => setDraft((previous) => previous + text),
+        signal,
+      }),
   });
 
   // Aborts the request in flight; the server stops at its next step.
@@ -111,6 +118,7 @@ export function useChat({
     const controller = new AbortController();
     abortRef.current = controller;
     setStage(null);
+    setDraft('');
     setStartedAt(Date.now());
     try {
       const response = await mutation.mutateAsync({
@@ -164,6 +172,7 @@ export function useChat({
         abortRef.current = null;
       }
       setStage(null);
+      setDraft('');
       setStartedAt(null);
     }
   };
@@ -197,6 +206,7 @@ export function useChat({
     stop,
     stage,
     startedAt,
+    draft,
     takeFailedQuestion,
     isLoading: mutation.isPending,
     error: mutation.error,

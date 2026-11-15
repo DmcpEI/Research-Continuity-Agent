@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ConversationList } from './ConversationList';
 import { MessageThread } from './MessageThread';
 import { type Message, type MessagesByConversation, useChat } from '../../hooks/useChat';
@@ -118,7 +118,7 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   const activeConversationModel =
     activeConversation?.model ?? window.localStorage.getItem(CHAT_MODEL_STORAGE_KEY) ?? undefined;
 
-  const { send, stop, stage, startedAt, takeFailedQuestion, isLoading } = useChat({
+  const { send, stop, stage, startedAt, draft, takeFailedQuestion, isLoading } = useChat({
     conversationId: activeConversationId,
     activeModel: activeConversationModel,
     messagesByConversation,
@@ -285,14 +285,18 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
     onGraphFocusChange?.(focusSourceIds);
   }, [activeMessages, activeSelectedSourceId, onGraphFocusChange]);
 
-  const handleCitationClick = (sourceId: string) => {
-    const normalizedSourceId = toPaperSourceId(sourceId);
-    setSelectedSourceByConversation((previous) => ({
-      ...previous,
-      [activeConversationId]: normalizedSourceId,
-    }));
-    onCitationClick?.(normalizedSourceId);
-  };
+  // Stable between renders, so the memoised answers do not re-render for every draft token.
+  const handleCitationClick = useCallback(
+    (sourceId: string) => {
+      const normalizedSourceId = toPaperSourceId(sourceId);
+      setSelectedSourceByConversation((previous) => ({
+        ...previous,
+        [activeConversationId]: normalizedSourceId,
+      }));
+      onCitationClick?.(normalizedSourceId);
+    },
+    [activeConversationId, onCitationClick],
+  );
 
   const handleSend = async (query: string) => {
     if (hasGlobalPending && isWaitingOnOtherConversation) {
@@ -457,6 +461,7 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
         onRetry={handleRetry}
         stage={stage}
         startedAt={startedAt}
+        draft={draft}
         onStop={stop}
         inputDisabledReason={
           isWaitingOnOtherConversation

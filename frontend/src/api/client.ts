@@ -189,11 +189,14 @@ export type ChatStage = 'retrieving' | 'generating' | 'checking';
 
 export type ChatStreamOptions = {
   onStage?: (stage: ChatStage) => void;
+  // Pieces of the draft answer while the model writes it; the final payload can still differ.
+  onToken?: (text: string) => void;
   signal?: AbortSignal;
 };
 
 /**
- * Asks a question over `/api/chat/stream`: `onStage` hears each step as the server starts it, and
+ * Asks a question over `/api/chat/stream`: `onStage` hears each step as the server starts it,
+ * `onToken` each piece of the draft answer, and
  * the promise resolves with the same payload `/api/chat` returns. Aborting `signal` stops the
  * request; the server then stops at its next step.
  */
@@ -246,6 +249,11 @@ export async function sendChat(
       const data: unknown = fields.data ? JSON.parse(fields.data) : {};
       if (fields.event === 'stage') {
         options.onStage?.((data as { stage: ChatStage }).stage);
+      } else if (fields.event === 'token') {
+        const text = (data as { text?: unknown }).text;
+        if (typeof text === 'string') {
+          options.onToken?.(text);
+        }
       } else if (fields.event === 'final') {
         return data as ApiChatResponse;
       } else if (fields.event === 'error') {

@@ -51,3 +51,60 @@ describe('Stopping a question', () => {
     expect(result.current.isLoading).toBe(false);
   });
 });
+
+describe('The draft', () => {
+  afterEach(() => vi.mocked(sendChat).mockReset());
+
+  it('collects the pieces as they arrive and is dropped when the request is stopped', async () => {
+    vi.mocked(sendChat).mockImplementation(
+      (_q, _c, _m, _h, options?: ChatStreamOptions) =>
+        new Promise((_resolve, reject) => {
+          options?.onStage?.('generating');
+          options?.onToken?.('Jam');
+          options?.onToken?.('Packer');
+          options?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        }),
+    );
+    const { result } = renderHook(
+      () => {
+        const [byConversation, setByConversation] = useState<MessagesByConversation>({});
+        return useChat({ conversationId: 'c1', messagesByConversation: byConversation, setMessagesByConversation: setByConversation });
+      },
+      { wrapper },
+    );
+
+    let sent: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sent = result.current.send('What is JamPacker?').catch(() => undefined);
+    });
+    await waitFor(() => expect(result.current.draft).toBe('JamPacker'));
+
+    act(() => result.current.stop());
+    await act(async () => {
+      await sent;
+    });
+
+    expect(result.current.draft).toBe('');
+    const last = result.current.messages[result.current.messages.length - 1];
+    expect(last.content).toBe('You stopped this request.');
+  });
+
+  it('starts empty for the next question after an answer', async () => {
+    vi.mocked(sendChat).mockImplementation(async (_q, _c, _m, _h, options?: ChatStreamOptions) => {
+      options?.onToken?.('Draft text');
+      return { answer: 'Final text', citations: [], outcome: 'answered', grounded: true, trace: null };
+    });
+    const { result } = renderHook(
+      () => {
+        const [byConversation, setByConversation] = useState<MessagesByConversation>({});
+        return useChat({ conversationId: 'c1', messagesByConversation: byConversation, setMessagesByConversation: setByConversation });
+      },
+      { wrapper },
+    );
+    await act(async () => {
+      await result.current.send('What is JamPacker?');
+    });
+    expect(result.current.draft).toBe('');
+    expect(result.current.messages[result.current.messages.length - 1].content).toBe('Final text');
+  });
+});

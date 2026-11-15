@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { type AnswerOutcome, type ApiCitation } from '../../api/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -26,7 +27,30 @@ type AnswerBubbleProps = {
   onRetry?: () => void;
 };
 
-export function AnswerBubble({
+// A marker left unfinished at the end: a draft mid-write, or a reply cut off by the length
+// limit. Only a marker's start counts, so ordinary text such as `arr[i` stays.
+export function dropUnfinishedMarker(content: string): string {
+  const tail = /\[\[?([^\]\s]*)$/.exec(content);
+  if (!tail) {
+    return content;
+  }
+  const start = tail[1];
+  const isMarker = /^(?:src|chk):/.test(start) || 'src:'.startsWith(start) || 'chk:'.startsWith(start);
+  return isMarker ? content.slice(0, tail.index) : content;
+}
+
+// Citation markers are shown as chips, not inline; the streamed draft drops them the same way.
+export function stripCitationMarkers(content: string): string {
+  return content
+    .replace(/\[\[[\w:/.-]+\]\]/g, '')
+    .replace(/\[(?:src|chk):[^\]\s]+\]/g, '')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trim();
+}
+
+export const AnswerBubble = memo(function AnswerBubble({
   content,
   citations,
   outcome,
@@ -44,13 +68,7 @@ export function AnswerBubble({
     return all.findIndex((item) => item.source_id === citation.source_id) === index;
   });
 
-  const displayContent = content
-    .replace(/\[\[[\w:/.-]+\]\]/g, '')
-    .replace(/\[(?:src|chk):[^\]\s]+\]/g, '')
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .join('\n')
-    .trim();
+  const displayContent = stripCitationMarkers(content);
 
   // An outcome this build does not know (newer server) falls back to the grounded flag too.
   const fallback = grounded ? BADGES.answered : BADGES.unverified;
@@ -90,4 +108,4 @@ export function AnswerBubble({
       <QueryTrace trace={trace} />
     </article>
   );
-}
+});
