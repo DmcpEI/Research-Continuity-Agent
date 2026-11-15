@@ -6,7 +6,6 @@ import asyncio
 import copy
 import json
 import logging
-import queue
 import shutil
 import threading
 import time
@@ -285,35 +284,43 @@ def create_app(
         """Server-sent events: `stage` while working, then one `final` (the /chat payload) or
         one `error`. A client that disconnects stops the request at the next stage."""
         flow, model = chat_flow(payload)
-        events: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
+        loop = asyncio.get_running_loop()
+        events: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
         stopped = threading.Event()
         started = time.perf_counter()
+
+        def emit(name: str, data: dict[str, Any]) -> None:
+            # From the worker thread to the event loop, without a second thread polling.
+            loop.call_soon_threadsafe(events.put_nowait, (name, data))
 
         def on_stage(name: str) -> None:
             if stopped.is_set():
                 raise _ChatStopped
-            elapsed_ms = int((time.perf_counter() - started) * 1000)
-            events.put(("stage", {"stage": name, "elapsed_ms": elapsed_ms}))
+            emit(
+                "stage", {"stage": name, "elapsed_ms": int((time.perf_counter() - started) * 1000)}
+            )
 
         def work() -> None:
             try:
                 result = flow.generate_answer(
                     payload.query, conversation_messages=payload.messages, on_stage=on_stage
                 )
-                events.put(("final", _chat_payload(result, model)))
+                emit("final", _chat_payload(result, model))
             except _ChatStopped:
-                events.put(("stopped", {}))
+                emit("stopped", {})
             except Exception as exc:
                 detail = f"Generation failed for model {model}: {_exception_message(exc)}"
-                events.put(("error", {"detail": detail}))
+                emit("error", {"detail": detail})
 
         async def stream():
-            worker = asyncio.get_running_loop().run_in_executor(None, work)
+            # ponytail: one default-executor thread per stream for the whole generation; a model
+            # call already running finishes after a stop. Token streaming (step 11, part 2) ends it.
+            worker = loop.run_in_executor(None, work)
             try:
                 while True:
                     try:
-                        name, data = await asyncio.to_thread(events.get, True, 0.5)
-                    except queue.Empty:
+                        name, data = await asyncio.wait_for(events.get(), timeout=0.5)
+                    except TimeoutError:
                         if await request.is_disconnected():
                             return
                         continue

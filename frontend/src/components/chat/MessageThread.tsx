@@ -36,7 +36,7 @@ function PendingBlock({ stage, startedAt, onStop }: { stage: ChatStage | null; s
   const seconds = startedAt === null ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000));
   return (
     <div className="thread-pending" aria-live="polite">
-      <span>{stage ? STAGE_TEXT[stage] : 'Sending the question'}</span>
+      <span>{stage ? (STAGE_TEXT[stage] ?? 'Working') : 'Sending the question'}</span>
       <span className="thread-pending-elapsed">{seconds} s</span>
       {onStop ? (
         <button className="thread-pending-stop" type="button" onClick={onStop}>

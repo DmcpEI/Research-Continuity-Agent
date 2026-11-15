@@ -654,9 +654,12 @@ As decided in M8, stage events first; token streaming is the second part of this
   exactly the `/chat` payload, or one `error` event with the same detail `/chat` would return.
   `/chat` is unchanged for the harness and tests; both share the request-scoped model logic.
 - **Cancel.** The client aborts the request. The server notices the disconnect and the next stage
-  callback raises, so a request stopped while retrieving never calls the model, and one stopped
-  while generating skips the facts check. A model call already running finishes on the server:
-  stopping it needs token streaming, which reads the model's output piece by piece.
+  callback raises, so a request stopped while retrieving never calls the answer model (the
+  query rewrite inside retrieval still runs), and one stopped while generating skips the facts
+  check. A model call already running finishes on the server, so a Retry right after Stop can wait
+  behind it; stopping it needs token streaming, which reads the model's output piece by piece.
+  Each stream holds one worker thread for its generation; events reach the event loop through
+  `call_soon_threadsafe`, so no second thread polls (break-it review).
 - **The UI.** While waiting, the thread shows the current stage in words ("Searching your
   library", "Writing the answer", "Checking the answer"), the seconds since the question, and a
   Stop button. A stopped request becomes a "Stopped" turn that can be retried and, like a failed
@@ -668,7 +671,9 @@ As decided in M8, stage events first; token streaming is the second part of this
   as each step started (`retrieving` at 0 s, `generating` at 5.6 s, `final` at about 16 s); a
   question aborted after 1 s left only the 0.5 s rewrite call in Ollama's log and no answer call
   (a normal run adds one of about 9 s); in the browser the pending block counted seconds, Stop gave
-  a "Stopped" turn, and Retry brought a cited answer.
+  a "Stopped" turn, and Retry brought a cited answer. After the review the pending block and Stop
+  show only in the conversation that is waiting, the parser accepts CRLF line endings, and an
+  unknown stage reads "Working".
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

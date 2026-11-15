@@ -138,4 +138,15 @@ describe('ChatView on first run', () => {
     const empty = await screen.findByText(/Add PDFs in Library/);
     expect(within(empty.closest('.thread-empty-state') as HTMLElement).queryAllByRole('button')).toHaveLength(0);
   });
+
+  it('shows the pending block and Stop only in the conversation that is waiting', async () => {
+    vi.mocked(sendChat).mockImplementationOnce(() => new Promise(() => undefined));
+    const user = userEvent.setup();
+    renderChat();
+    await user.type(screen.getByPlaceholderText('Ask a question about your research…'), 'What is JamPacker?{Enter}');
+    expect(await screen.findByRole('button', { name: 'Stop' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /New conversation/ }));
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+  });
 });

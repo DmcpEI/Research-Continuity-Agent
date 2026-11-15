@@ -229,7 +229,8 @@ export async function sendChat(
     if (done) {
       break;
     }
-    buffer += decoder.decode(value, { stream: true });
+    // A proxy may rewrite line endings to CRLF; events are separated by a blank line either way.
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n?/g, '\n');
     let boundary = buffer.indexOf('\n\n');
     while (boundary >= 0) {
       const block = buffer.slice(0, boundary);

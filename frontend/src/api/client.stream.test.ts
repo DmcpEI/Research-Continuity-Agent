@@ -47,3 +47,15 @@ describe('sendChat over the stage stream', () => {
     await expect(sendChat('q')).rejects.toThrow('The connection closed before an answer arrived.');
   });
 });
+
+describe('sendChat stream parsing edges', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('accepts CRLF line endings, as a proxy may rewrite them', async () => {
+    const crlf = `event: stage\r\ndata: {"stage": "retrieving", "elapsed_ms": 1}\r\n\r\nevent: final\r\ndata: ${JSON.stringify(finalPayload)}\r\n\r\n`;
+    vi.stubGlobal('fetch', vi.fn(async () => streamOf([crlf])));
+    const stages: string[] = [];
+    await expect(sendChat('q', undefined, undefined, [], { onStage: (s) => stages.push(s) })).resolves.toEqual(finalPayload);
+    expect(stages).toEqual(['retrieving']);
+  });
+});

@@ -449,7 +449,8 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
       />
       <MessageThread
         conversationId={activeConversationId}
-        isLoading={isLoading}
+        // The pending block and Stop belong to the conversation that is waiting.
+        isLoading={isLoading && pendingConversationId === activeConversationId}
         messages={activeMessages}
         onCitationClick={handleCitationClick}
         onSend={handleSend}

@@ -32,4 +32,11 @@ describe('Pending block while a question runs', () => {
     screen.getByRole('button', { name: 'Stop' }).click();
     expect(onStop).toHaveBeenCalledTimes(1);
   });
+
+  it('shows a stage name it does not know as plain progress, not an empty label', () => {
+    render(
+      <MessageThread conversationId="c1" messages={[]} isLoading onSend={vi.fn()} stage={'reranking' as never} startedAt={Date.now()} />,
+    );
+    expect(screen.getByText('Working')).toBeInTheDocument();
+  });
 });
