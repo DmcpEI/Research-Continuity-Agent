@@ -185,13 +185,26 @@ export async function deleteSource(id: string): Promise<{ deleted: string }> {
   return parseJson<{ deleted: string }>(response);
 }
 
+export type ChatStage = 'retrieving' | 'generating' | 'checking';
+
+export type ChatStreamOptions = {
+  onStage?: (stage: ChatStage) => void;
+  signal?: AbortSignal;
+};
+
+/**
+ * Asks a question over `/api/chat/stream`: `onStage` hears each step as the server starts it, and
+ * the promise resolves with the same payload `/api/chat` returns. Aborting `signal` stops the
+ * request; the server then stops at its next step.
+ */
 export async function sendChat(
   query: string,
   conversationId?: string,
   model?: string,
   messages: ApiChatMessage[] = [],
+  options: ChatStreamOptions = {},
 ): Promise<ApiChatResponse> {
-  const response = await fetch('/api/chat', {
+  const response = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -202,9 +215,45 @@ export async function sendChat(
       model: model ?? null,
       messages,
     }),
+    signal: options.signal,
   });
+  if (!response.ok || !response.body) {
+    return parseJson<ApiChatResponse>(response); // throws ApiError with the server's detail
+  }
 
-  return parseJson<ApiChatResponse>(response);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf('\n\n');
+      const fields: Record<string, string> = {};
+      for (const line of block.split('\n')) {
+        const colon = line.indexOf(': ');
+        if (colon > 0) {
+          fields[line.slice(0, colon)] = line.slice(colon + 2);
+        }
+      }
+      const data: unknown = fields.data ? JSON.parse(fields.data) : {};
+      if (fields.event === 'stage') {
+        options.onStage?.((data as { stage: ChatStage }).stage);
+      } else if (fields.event === 'final') {
+        return data as ApiChatResponse;
+      } else if (fields.event === 'error') {
+        const detail = String((data as { detail?: unknown }).detail ?? 'Request failed');
+        throw new ApiError(502, detail, fields.data);
+      }
+    }
+  }
+  throw new Error('The connection closed before an answer arrived.');
 }
 
 export async function sendAgent(query: string): Promise<ApiAgentResponse> {

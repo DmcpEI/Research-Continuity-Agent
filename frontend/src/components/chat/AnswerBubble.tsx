@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { CitationChip } from './CitationChip';
 import { QueryTrace } from './QueryTrace';
 
-type BubbleOutcome = AnswerOutcome | 'error';
+type BubbleOutcome = AnswerOutcome | 'error' | 'stopped';
 
 const BADGES: Record<BubbleOutcome, { label: string; className: string } | null> = {
   answered: { label: '✓ Cited', className: 'is-grounded' },
@@ -12,6 +12,7 @@ const BADGES: Record<BubbleOutcome, { label: string; className: string } | null>
   not_found: { label: 'No evidence found', className: 'is-not-found' },
   conversational: null,
   error: { label: 'Request failed', className: 'is-error' },
+  stopped: { label: 'Stopped', className: 'is-not-found' },
 };
 
 type AnswerBubbleProps = {

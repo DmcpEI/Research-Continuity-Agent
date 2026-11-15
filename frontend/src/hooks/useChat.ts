@@ -1,6 +1,12 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { type AnswerOutcome, type ApiCitation, type ApiChatMessage, sendChat } from '../api/client';
+import {
+  type AnswerOutcome,
+  type ApiCitation,
+  type ApiChatMessage,
+  type ChatStage,
+  sendChat,
+} from '../api/client';
 
 export type Message = {
   id: string;
@@ -8,8 +14,8 @@ export type Message = {
   content: string;
   citations?: ApiCitation[];
   activeSourceIds?: string[];
-  // 'error' is client-only: the request failed, so there is no answer to classify.
-  outcome?: AnswerOutcome | 'error';
+  // Client-only: 'error' (the request failed) and 'stopped' (the user stopped it) carry no answer.
+  outcome?: AnswerOutcome | 'error' | 'stopped';
   grounded?: boolean;
   model?: string;
   trace?: Record<string, unknown> | null;
@@ -21,7 +27,11 @@ export type MessagesByConversation = Record<string, Message[]>;
 // Builds before outcomes existed saved error bubbles with no outcome; their id prefix has always
 // marked them, so it identifies them without guessing from the text.
 export function isFailedRequest(message: Message): boolean {
-  return message.outcome === 'error' || (message.outcome === undefined && message.id.startsWith('msg-error-'));
+  return (
+    message.outcome === 'error' ||
+    message.outcome === 'stopped' ||
+    (message.outcome === undefined && message.id.startsWith('msg-error-'))
+  );
 }
 
 // The turns the model sees as history. A failed request is not an answer, so neither it nor the
@@ -53,6 +63,10 @@ export function useChat({
 }: UseChatArgs) {
   const key = conversationId ?? '__default__';
   const messages = messagesByConversation[key] ?? [];
+  // The step the server is on and when the question was sent, for the pending block.
+  const [stage, setStage] = useState<ChatStage | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const mutation = useMutation({
     mutationFn: ({
@@ -60,13 +74,18 @@ export function useChat({
       cid,
       model,
       history,
+      signal,
     }: {
       query: string;
       cid?: string;
       model?: string;
       history: ApiChatMessage[];
-    }) => sendChat(query, cid, model, history),
+      signal: AbortSignal;
+    }) => sendChat(query, cid, model, history, { onStage: setStage, signal }),
   });
+
+  // Aborts the request in flight; the server stops at its next step.
+  const stop = () => abortRef.current?.abort();
 
   const send = async (query: string, modelOverride?: string) => {
     const trimmed = query.trim();
@@ -89,12 +108,17 @@ export function useChat({
       [key]: [...(previous[key] ?? []), userMessage],
     }));
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStage(null);
+    setStartedAt(Date.now());
     try {
       const response = await mutation.mutateAsync({
         query: trimmed,
         cid: conversationId,
         model,
         history: outboundHistory,
+        signal: controller.signal,
       });
       const assistantMessage: Message = {
         id: `msg-assistant-${Date.now()}`,
@@ -116,11 +140,12 @@ export function useChat({
 
       return response;
     } catch (error) {
+      const stopped = controller.signal.aborted;
       const errorMessage: Message = {
         id: `msg-error-${Date.now()}`,
         role: 'assistant',
-        content: `I could not complete the request. ${String(error)}`,
-        outcome: 'error',
+        content: stopped ? 'You stopped this request.' : `I could not complete the request. ${String(error)}`,
+        outcome: stopped ? 'stopped' : 'error',
         grounded: false,
         citations: [],
         activeSourceIds: [],
@@ -134,6 +159,12 @@ export function useChat({
         [key]: [...(previous[key] ?? []), errorMessage],
       }));
       throw error;
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      setStage(null);
+      setStartedAt(null);
     }
   };
 
@@ -163,6 +194,9 @@ export function useChat({
     messagesByConversation,
     messages,
     send,
+    stop,
+    stage,
+    startedAt,
     takeFailedQuestion,
     isLoading: mutation.isPending,
     error: mutation.error,

@@ -118,7 +118,7 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
   const activeConversationModel =
     activeConversation?.model ?? window.localStorage.getItem(CHAT_MODEL_STORAGE_KEY) ?? undefined;
 
-  const { send, takeFailedQuestion, isLoading } = useChat({
+  const { send, stop, stage, startedAt, takeFailedQuestion, isLoading } = useChat({
     conversationId: activeConversationId,
     activeModel: activeConversationModel,
     messagesByConversation,
@@ -454,6 +454,9 @@ export function ChatView({ onCitationClick, onGraphFocusChange }: ChatViewProps)
         onCitationClick={handleCitationClick}
         onSend={handleSend}
         onRetry={handleRetry}
+        stage={stage}
+        startedAt={startedAt}
+        onStop={stop}
         inputDisabledReason={
           isWaitingOnOtherConversation
             ? 'Waiting for response in another conversation.'

@@ -662,8 +662,13 @@ As decided in M8, stage events first; token streaming is the second part of this
   Stop button. A stopped request becomes a "Stopped" turn that can be retried and, like a failed
   request, is not sent back as history.
 - **Proof:** an API test that reads the event sequence from a stub flow; flow tests for the stage
-  order on each path and for stopping before the model call; vitest for the stream parser and the
-  pending block (fake timers); a live run in the browser.
+  order on each path and for stopping before the model call; a test that drives the endpoint with
+  a request reporting a disconnect (fails without the stop flag); vitest for the stream parser,
+  the pending block (fake timers) and the stopped turn. Live, on the library copy: events arrived
+  as each step started (`retrieving` at 0 s, `generating` at 5.6 s, `final` at about 16 s); a
+  question aborted after 1 s left only the 0.5 s rewrite call in Ollama's log and no answer call
+  (a normal run adds one of about 9 s); in the browser the pending block counted seconds, Stop gave
+  a "Stopped" turn, and Retry brought a cited answer.
 
 ## Kept from ROADMAP (folded in 2026-11-11)
 

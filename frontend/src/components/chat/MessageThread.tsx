@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import type { ChatStage } from '../../api/client';
 import { AnswerBubble } from './AnswerBubble';
 import { isFailedRequest, type Message } from '../../hooks/useChat';
 
@@ -14,7 +15,37 @@ type MessageThreadProps = {
   // Questions about papers in this library (see suggestions.ts); none while it is loading.
   suggestions?: string[];
   libraryEmpty?: boolean;
+  // While a question runs: the server's current step, when it was sent, and how to stop it.
+  stage?: ChatStage | null;
+  startedAt?: number | null;
+  onStop?: () => void;
 };
+
+const STAGE_TEXT: Record<ChatStage, string> = {
+  retrieving: 'Searching your library',
+  generating: 'Writing the answer',
+  checking: 'Checking the answer',
+};
+
+function PendingBlock({ stage, startedAt, onStop }: { stage: ChatStage | null; startedAt: number | null; onStop?: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const seconds = startedAt === null ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000));
+  return (
+    <div className="thread-pending" aria-live="polite">
+      <span>{stage ? STAGE_TEXT[stage] : 'Sending the question'}</span>
+      <span className="thread-pending-elapsed">{seconds} s</span>
+      {onStop ? (
+        <button className="thread-pending-stop" type="button" onClick={onStop}>
+          Stop
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 export function MessageThread({
   conversationId,
@@ -27,6 +58,9 @@ export function MessageThread({
   inputDisabledReason = null,
   suggestions = [],
   libraryEmpty = false,
+  stage = null,
+  startedAt = null,
+  onStop,
 }: MessageThreadProps) {
   const [query, setQuery] = useState('');
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -120,16 +154,7 @@ export function MessageThread({
           ),
         )}
 
-        {isLoading ? (
-          <div className="thread-thinking" aria-live="polite">
-            <span>Thinking</span>
-            <span className="thread-thinking-dots" aria-hidden="true">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </span>
-          </div>
-        ) : null}
+        {isLoading ? <PendingBlock stage={stage} startedAt={startedAt} onStop={onStop} /> : null}
         <div ref={endRef} />
       </div>
 
