@@ -78,6 +78,13 @@ class IngestFlow:
             file_sha256=file_sha256,
             content_sha256=content_sha256,
         )
+        if resolution.ingest_status is IngestStatus.unchanged and (
+            self.graph_store.source_is_incomplete(resolution.source_id)
+        ):
+            # A failed ingest left other content in the graph than this committed file, so
+            # "unchanged" would keep it: rewrite the source and commit a new revision.
+            resolution.ingest_status = IngestStatus.updated
+            resolution.record_revision = True
         source_id = resolution.source_id
         source_kind = self._source_kind(payload["metadata"]["kind"])
         existing_source = self.graph_store.get_node(source_id)
@@ -156,6 +163,12 @@ class IngestFlow:
                     }
                 )
 
+            # The revision row is the commit record. The graph is written first (one
+            # transaction), then the vectors, then the revision row last, with no transaction
+            # across the stores. If anything between fails, the source names a
+            # current_revision_id with no row (GraphStore.source_is_incomplete), and the next
+            # ingest of the same file finds no revision for it, resolves as `updated` and
+            # rewrites everything, so it converges.
             old_chunk_ids = self.graph_store.replace_source_chunks_atomic(
                 source_id=source_id,
                 source_node=source_node,

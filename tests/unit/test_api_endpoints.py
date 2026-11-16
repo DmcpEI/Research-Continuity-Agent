@@ -298,6 +298,164 @@ def test_ingest_endpoint_accepts_upload_and_returns_result(tmp_path: Path) -> No
     assert fake_ingest.last_path.suffix == ".pdf"
 
 
+class _TextPDF:
+    """Reads an uploaded "PDF" as text; raises on one that says BROKEN."""
+
+    def extract(self, path):
+        text = Path(path).read_bytes().decode("latin-1")
+        if "BROKEN" in text:
+            raise ValueError("cannot read PDF")
+        return {"title": "Paper", "content": "Body text. " * 50 + text, "metadata": {"kind": "pdf"}}
+
+
+def _upload_client(tmp_path: Path):
+    from rca.flows.ingest_flow import IngestFlow
+
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    flow = IngestFlow(settings, graph_store=store, vector_store=vectors, pdf_extractor=_TextPDF())
+    app = create_app(settings=settings, graph_store=store, vector_store=vectors, ingest_flow=flow)
+    client = TestClient(app, raise_server_exceptions=False)
+    uploads = tmp_path / ".rca" / "uploads"
+    return client, flow, uploads
+
+
+def _upload(client: TestClient, name: str, body: bytes):
+    return client.post("/sources/ingest", files={"file": (name, body, "application/pdf")})
+
+
+def test_uploading_the_same_pdf_twice_keeps_one_file_and_one_source(tmp_path: Path) -> None:
+    client, _flow, uploads = _upload_client(tmp_path)
+
+    first = _upload(client, "paper.pdf", b"%PDF same bytes")
+    second = _upload(client, "paper.pdf", b"%PDF same bytes")
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert second.json()["source_id"] == first.json()["source_id"]
+    assert second.json()["ingest_status"] == "unchanged"
+    assert sorted(p.name for p in uploads.iterdir()) == ["paper.pdf"]
+    [source] = client.get("/sources").json()
+    assert Path(source["latest_path"]).name == "paper.pdf"
+
+
+def test_same_bytes_under_another_name_reuse_the_stored_file(tmp_path: Path) -> None:
+    client, _flow, uploads = _upload_client(tmp_path)
+
+    first = _upload(client, "paper.pdf", b"%PDF same bytes")
+    second = _upload(client, "copy of paper.pdf", b"%PDF same bytes")
+
+    assert second.json()["source_id"] == first.json()["source_id"]
+    assert sorted(p.name for p in uploads.iterdir()) == ["paper.pdf"]
+
+
+def test_an_unreadable_upload_leaves_no_file_behind(tmp_path: Path) -> None:
+    client, _flow, uploads = _upload_client(tmp_path)
+
+    assert _upload(client, "broken.pdf", b"%PDF BROKEN").status_code == 500
+    assert _upload(client, "broken.pdf", b"%PDF BROKEN").status_code == 500
+
+    assert list(uploads.iterdir()) == []
+    assert client.get("/sources").json() == []
+
+
+def test_upload_that_fails_after_the_graph_write_is_flagged_and_repaired_by_reuploading(
+    tmp_path: Path,
+) -> None:
+    client, flow, uploads = _upload_client(tmp_path)
+    original_upsert = flow.vector_store.upsert_texts
+
+    def failing_upsert(ids, documents, metadatas, embeddings=None):
+        raise RuntimeError("simulated vector write failure")
+
+    flow.vector_store.upsert_texts = failing_upsert
+    try:
+        assert _upload(client, "paper.pdf", b"%PDF new paper").status_code == 500
+    finally:
+        flow.vector_store.upsert_texts = original_upsert
+
+    # The graph already points at the file, so it stays; the source says it is incomplete.
+    assert sorted(p.name for p in uploads.iterdir()) == ["paper.pdf"]
+    [source] = client.get("/sources").json()
+    assert source["incomplete"] is True
+    assert client.get(f"/sources/{source['id']}").json()["incomplete"] is True
+
+    retry = _upload(client, "paper.pdf", b"%PDF new paper")
+
+    assert retry.status_code == 200
+    assert retry.json()["source_id"] == source["id"]
+    assert sorted(p.name for p in uploads.iterdir()) == ["paper.pdf"]
+    [source] = client.get("/sources").json()
+    assert source["incomplete"] is False
+
+
+def test_a_stored_file_changed_on_disk_is_not_reused_for_an_upload(tmp_path: Path) -> None:
+    client, flow, uploads = _upload_client(tmp_path)
+    _upload(client, "paper.pdf", b"%PDF version ONE")
+    (uploads / "paper.pdf").write_bytes(b"%PDF version TWO edited on disk")
+
+    again = _upload(client, "paper.pdf", b"%PDF version ONE")
+
+    assert again.status_code == 200
+    stored = Path(client.get("/sources").json()[0]["latest_path"])
+    chunk = flow.graph_store.get_node(again.json()["chunk_ids"][0])
+    assert "version ONE" in chunk.text  # the uploaded bytes, not the edited file
+    assert any(p.read_bytes() == b"%PDF version ONE" for p in uploads.iterdir())
+    assert stored.read_bytes() == b"%PDF version ONE"
+
+
+def test_reuploading_a_missing_file_under_another_name_repairs_the_source(tmp_path: Path) -> None:
+    client, flow, uploads = _upload_client(tmp_path)
+    original_upsert = flow.vector_store.upsert_texts
+
+    def failing_upsert(ids, documents, metadatas, embeddings=None):
+        raise RuntimeError("simulated vector write failure")
+
+    flow.vector_store.upsert_texts = failing_upsert
+    try:
+        assert _upload(client, "paper.pdf", b"%PDF lost paper").status_code == 500
+    finally:
+        flow.vector_store.upsert_texts = original_upsert
+    (uploads / "paper.pdf").unlink()
+
+    retry = _upload(client, "copy.pdf", b"%PDF lost paper")
+
+    assert retry.status_code == 200
+    [source] = client.get("/sources").json()
+    assert retry.json()["source_id"] == source["id"] == "src:pdf/paper"
+    assert source["incomplete"] is False
+    assert sorted(p.name for p in uploads.iterdir() if p.is_file()) == ["paper.pdf"]
+
+
+def test_a_failed_move_leaves_no_empty_file(tmp_path: Path, monkeypatch) -> None:
+    import rca.api.main as api_main
+
+    client, _flow, uploads = _upload_client(tmp_path)
+
+    def failing_replace(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(api_main.os, "replace", failing_replace)
+    assert _upload(client, "paper.pdf", b"%PDF bytes").status_code == 500
+    monkeypatch.undo()
+
+    assert [p for p in uploads.rglob("*") if p.is_file()] == []
+    assert _upload(client, "paper.pdf", b"%PDF bytes").status_code == 200
+    assert sorted(p.name for p in uploads.iterdir() if p.is_file()) == ["paper.pdf"]
+
+
+def test_sources_never_flag_a_source_from_before_revision_tracking(tmp_path: Path) -> None:
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    store.upsert_node(Node(id="src:pdf/old", kind=NodeKind.paper, title="Old", metadata={}))
+    client = TestClient(create_app(settings=settings, graph_store=store))
+
+    [source] = client.get("/sources").json()
+
+    assert source["incomplete"] is False
+    assert client.get("/sources/src:pdf/old").json()["incomplete"] is False
+
+
 def test_status_endpoint_returns_counts_and_backend_fields(tmp_path: Path) -> None:
     settings = _settings_for(tmp_path)
     store = GraphStore(settings.graph_db_path)

@@ -96,6 +96,9 @@ export function SourceRow({ source, onOpen, selected = false, onContextMenu }: S
       <td>
         <p className="library-source-title">{source.title || 'Untitled source'}</p>
         <p className="library-source-id">{source.id}</p>
+        {source.incomplete ? (
+          <p className="library-source-warning">Not fully indexed: upload it again to repair</p>
+        ) : null}
       </td>
       <td>
         <span className="library-chunk-badge">{source.chunk_count}</span>

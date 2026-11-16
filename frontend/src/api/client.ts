@@ -72,6 +72,8 @@ export type ApiSourceSummary = {
   latest_path: string | null;
   content_sha256: string | null;
   latest_revision_created_at: string | null;
+  // An ingest wrote the graph but did not finish; absent from older servers.
+  incomplete?: boolean;
 };
 
 export type ApiRevision = {

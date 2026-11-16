@@ -123,6 +123,34 @@ class GraphStore:
             }
         )
 
+    def source_is_incomplete(self, source_id: str) -> bool:
+        """The source names a revision that was never committed: an ingest wrote the graph and
+        then failed before its revision row (the commit record, see IngestFlow.ingest_path).
+        Sources from before revision tracking name none and are not flagged."""
+        node = self.get_node(source_id)
+        revision_id = node.metadata.get("current_revision_id") if node else None
+        if not revision_id:
+            return False
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM source_revisions WHERE revision_id = ?", (revision_id,)
+            ).fetchone()
+        return row is None
+
+    def find_source_by_file_hash(self, file_sha256: str) -> Node | None:
+        """The source whose current file has this SHA-256, committed or not."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id FROM nodes
+                WHERE kind != 'chunk' AND json_extract(metadata, '$.file_sha256') = ?
+                ORDER BY created_at ASC
+                LIMIT 1
+                """,
+                (file_sha256,),
+            ).fetchone()
+        return self.get_node(row["id"]) if row else None
+
     @staticmethod
     def _row_to_revision(row: sqlite3.Row | None) -> SourceRevision | None:
         if row is None:

@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
+import itertools
 import json
 import logging
-import shutil
+import os
 import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -146,6 +149,7 @@ def create_app(
                     "latest_revision_created_at": (
                         latest_revision.created_at.isoformat() if latest_revision else None
                     ),
+                    "incomplete": store.source_is_incomplete(source_id),
                 }
             )
         return response
@@ -226,6 +230,7 @@ def create_app(
             "created_at": node.created_at.isoformat(),
             "chunk_count": len(store.list_source_chunk_ids(node.id)),
             "revisions": revisions,
+            "incomplete": store.source_is_incomplete(node.id),
         }
 
     @router.delete("/sources/{source_id:path}")
@@ -537,17 +542,60 @@ def create_app(
         upload_dir = cfg.filesystem_root / ".rca" / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        stem = Path(original_name).stem
-        candidate = upload_dir / f"{stem}{suffix}"
-        counter = 1
-        while candidate.exists():
-            candidate = upload_dir / f"{stem}-{counter}{suffix}"
-            counter += 1
+        # Hash the upload before it gets a name, so the same file is never stored twice.
+        incoming = upload_dir / f".incoming-{uuid.uuid4().hex}{suffix}"
+        digest = hashlib.sha256()
+        try:
+            with incoming.open("wb") as handle:
+                for block in iter(lambda: file.file.read(1024 * 1024), b""):
+                    digest.update(block)
+                    handle.write(block)
+            file_sha256 = digest.hexdigest()
 
-        with candidate.open("wb") as handle:
-            shutil.copyfileobj(file.file, handle)
+            # Already stored (possibly by an ingest that failed half-way): ingest that file
+            # again, which repairs an incomplete source and is a no-op otherwise. Only if it
+            # still holds these bytes: a file edited on disk since must not replace the upload.
+            existing = store.find_source_by_file_hash(file_sha256)
+            stored = existing.metadata.get("latest_path") if existing else None
+            stored_path = Path(stored) if isinstance(stored, str) and stored else None
+            if stored_path is not None and stored_path.is_file():
+                if IngestFlow._file_sha256(stored_path) == file_sha256:
+                    return ingester.ingest_path(stored_path).model_dump(mode="json")
+                stored_path = None
+            # A stored upload that is gone gets these bytes back under its own name, so the
+            # source is repaired instead of a second one being created under the new name.
+            restore = stored_path is not None and stored_path.parent == upload_dir
 
-        result = ingester.ingest_path(candidate)
+            stem = Path(original_name).stem
+            candidates = itertools.chain(
+                [stored_path] if restore else [],
+                [upload_dir / f"{stem}{suffix}"],
+                (upload_dir / f"{stem}-{n}{suffix}" for n in itertools.count(1)),
+            )
+            for candidate in candidates:
+                try:
+                    # Claim the name atomically, so two uploads never overwrite each other.
+                    os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                    break
+                except FileExistsError:
+                    continue
+            try:
+                os.replace(incoming, candidate)
+            except OSError:
+                candidate.unlink(missing_ok=True)  # not the empty claim, left behind
+                raise
+        finally:
+            incoming.unlink(missing_ok=True)
+
+        try:
+            result = ingester.ingest_path(candidate)
+        except Exception:
+            # Keep the file only if the graph already points at it (a later step failed);
+            # uploading it again then repairs the source.
+            written = store.find_source_by_file_hash(file_sha256)
+            if written is None or written.metadata.get("latest_path") != str(candidate):
+                candidate.unlink(missing_ok=True)
+            raise
         return result.model_dump(mode="json")
 
     @router.get("/status")

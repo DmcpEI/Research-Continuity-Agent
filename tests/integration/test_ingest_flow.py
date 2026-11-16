@@ -190,6 +190,8 @@ def test_ingest_flow_partial_failure_self_heals_on_retry(tmp_path) -> None:
 
     revisions_after_failure = ingest_flow.graph_store.list_source_revisions(first.source_id)
     assert len(revisions_after_failure) == 1
+    # The graph holds the new chunks but the commit record (the revision row) is missing.
+    assert ingest_flow.graph_store.source_is_incomplete(first.source_id) is True
 
     ingest_flow.vector_store.upsert_texts = original_upsert
     recovery = ingest_flow.ingest_path(note_path)
@@ -198,6 +200,81 @@ def test_ingest_flow_partial_failure_self_heals_on_retry(tmp_path) -> None:
     assert recovery.revision_id != first.revision_id
     revisions_after_recovery = ingest_flow.graph_store.list_source_revisions(first.source_id)
     assert len(revisions_after_recovery) == 2
+    assert ingest_flow.graph_store.source_is_incomplete(first.source_id) is False
+
+
+def test_ingest_flow_failed_first_ingest_is_incomplete_then_converges(tmp_path) -> None:
+    settings = _settings_for(tmp_path)
+    note_path = tmp_path / "new-note.md"
+    note_path.write_text("# New\n\nfirst content\n", encoding="utf-8")
+    ingest_flow = IngestFlow(settings=settings)
+    original_upsert = ingest_flow.vector_store.upsert_texts
+
+    def failing_upsert(ids, documents, metadatas, embeddings=None):
+        raise RuntimeError("simulated vector write failure")
+
+    ingest_flow.vector_store.upsert_texts = failing_upsert
+    try:
+        with pytest.raises(RuntimeError, match="simulated vector write failure"):
+            ingest_flow.ingest_path(note_path)
+    finally:
+        ingest_flow.vector_store.upsert_texts = original_upsert
+
+    source_id = make_source_id("note", "new-note")
+    assert ingest_flow.graph_store.get_node(source_id) is not None
+    assert ingest_flow.graph_store.list_source_revisions(source_id) == []
+    assert ingest_flow.graph_store.source_is_incomplete(source_id) is True
+
+    retry = ingest_flow.ingest_path(note_path)
+
+    assert retry.source_id == source_id
+    assert len(ingest_flow.graph_store.list_source_revisions(source_id)) == 1
+    assert ingest_flow.graph_store.source_is_incomplete(source_id) is False
+    assert {hit.id for hit in ingest_flow.vector_store.query("first content", 5)} >= set(
+        retry.chunk_ids
+    )
+
+
+def test_an_incomplete_source_is_rewritten_even_when_its_file_is_unchanged(tmp_path) -> None:
+    """A failed v2 update, then v1 again: v1's file has a committed revision, but the graph
+    holds v2's chunks, so "unchanged" would leave them and the flag in place."""
+    settings = _settings_for(tmp_path)
+    note_path = tmp_path / "note.md"
+    note_path.write_text("# Note\n\nversion one text\n", encoding="utf-8")
+    ingest_flow = IngestFlow(settings=settings)
+    first = ingest_flow.ingest_path(note_path)
+
+    note_path.write_text("# Note\n\nversion two text\n", encoding="utf-8")
+    original_upsert = ingest_flow.vector_store.upsert_texts
+
+    def failing_upsert(ids, documents, metadatas, embeddings=None):
+        raise RuntimeError("simulated vector write failure")
+
+    ingest_flow.vector_store.upsert_texts = failing_upsert
+    try:
+        with pytest.raises(RuntimeError):
+            ingest_flow.ingest_path(note_path)
+    finally:
+        ingest_flow.vector_store.upsert_texts = original_upsert
+    assert ingest_flow.graph_store.source_is_incomplete(first.source_id) is True
+
+    note_path.write_text("# Note\n\nversion one text\n", encoding="utf-8")
+    again = ingest_flow.ingest_path(note_path)
+
+    assert again.ingest_status == "updated"
+    assert ingest_flow.graph_store.source_is_incomplete(first.source_id) is False
+    chunk = ingest_flow.graph_store.get_node(again.chunk_ids[0])
+    assert "version one" in chunk.text
+
+
+def test_source_is_incomplete_is_false_for_sources_from_before_revisions(tmp_path) -> None:
+    ingest_flow = IngestFlow(settings=_settings_for(tmp_path))
+    ingest_flow.graph_store.upsert_node(
+        Node(id="src:pdf/legacy", kind=NodeKind.paper, title="Legacy", metadata={"kind": "pdf"})
+    )
+
+    assert ingest_flow.graph_store.source_is_incomplete("src:pdf/legacy") is False
+    assert ingest_flow.graph_store.source_is_incomplete("src:pdf/missing") is False
 
 
 def test_ingest_writes_no_event_log(tmp_path, monkeypatch) -> None:
