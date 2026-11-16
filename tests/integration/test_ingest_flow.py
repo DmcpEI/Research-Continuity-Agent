@@ -201,7 +201,7 @@ def test_ingest_flow_partial_failure_self_heals_on_retry(tmp_path) -> None:
 
 
 def test_ingest_writes_no_event_log(tmp_path, monkeypatch) -> None:
-    """The ingest event log was write-only (PLAN step 5); ingest must not create one."""
+    """The ingest event log was write-only and was removed; ingest must not create one."""
     monkeypatch.chdir(tmp_path)  # any default relative path lands in tmp, never in ./.rca
     note_path = tmp_path / "note.md"
     note_path.write_text("# Note\n\nResearch continuity.\n", encoding="utf-8")

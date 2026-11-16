@@ -641,7 +641,7 @@ Caveats: the labels and the verifier prompts are drafted by the same assistant, 
 
 ### Facts check shipped, end to end on the test split (2026-11-11)
 
-`verifier_facts_on_hedge` now runs inside `GenerateFlow` (prompt, schema and parser in `rca/flows/facts_check.py`, imported by `compare_answer_classifiers.py`; design in docs/PLAN.md, "Step 3: facts check, design"). Unlike the offline rows above, the shipped decision keeps the citation rules, and the hedge rule was widened to cover the old phrase list; no labelled answer changes hedge status. Harness on the 40 test questions, `qwen3.5:4b`, against a copy of the library, every store path pointed at the copy; "before" is `a19d7fb`, "after" the step-3 code with the check on:
+`verifier_facts_on_hedge` now runs inside `GenerateFlow` (prompt, schema and parser in `rca/flows/facts_check.py`, imported by `compare_answer_classifiers.py`). Unlike the offline rows above, the shipped decision keeps the citation rules, and the hedge rule was widened to cover the old phrase list; no labelled answer changes hedge status. Harness on the 40 test questions, `qwen3.5:4b`, against a copy of the library, every store path pointed at the copy; "before" is `a19d7fb`, "after" the step-3 code with the check on:
 
 | | before | after |
 |---|---|---|

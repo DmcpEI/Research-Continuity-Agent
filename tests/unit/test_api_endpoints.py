@@ -916,7 +916,7 @@ def test_agent_models_lists_installed_models_and_probes_only_the_current_one(
 
 
 def test_agent_model_is_never_switched_silently(tmp_path: Path, monkeypatch) -> None:
-    """Replaces the old auto-reconcile test (PLAN M5): no switch, /agent says what to do."""
+    """Replaces the old auto-reconcile test: no switch, /agent says what to do."""
     _FakeOllama(monkeypatch, TWO_MODELS, no_tools={"tool-bad:latest"})
     settings = _ollama_settings(tmp_path, "tool-bad:latest")
     agent = _CountingAgentLoop()

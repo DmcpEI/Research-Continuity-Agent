@@ -133,7 +133,7 @@ Always run Python through `uv run`: the system Python lacks ChromaDB and silentl
 | `RCA_LLM_BACKEND` | `ollama` | `ollama` or `openai_compatible` (then set `RCA_OPENAI_*`) |
 | `RCA_FACTS_CHECK_ENABLED` | `true` | Facts check on hedged replies |
 | `RCA_LLM_KEEP_ALIVE` | `1m` | How long Ollama keeps a model loaded |
-| `RCA_DATA_DIR` | `.rca` | Library location (set the store paths too; see PLAN.md) |
+| `RCA_DATA_DIR` | `.rca` | Library location (also set `RCA_GRAPH_DB_PATH`, `RCA_VECTOR_DIR` and `RCA_EXPERIMENT_DB_PATH`) |
 | `RCA_ENABLE_FILESYSTEM_TOOLS` / `RCA_FILESYSTEM_ROOT` | `true` / cwd | Agent file tools and their sandbox root |
 
 **Tests and hooks** (the same commands CI runs):
@@ -183,7 +183,6 @@ The published numbers are the scorecard above: `eval/harness.py --split test` ru
 
 ## Docs
 
-- [PLAN.md](docs/PLAN.md): the plan, decisions and open questions (the only roadmap)
 - [EVAL.md](docs/EVAL.md): evaluation methods, results and limitations
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [DATA_MODEL.md](docs/DATA_MODEL.md): how it is built
 - [DESIGN.md](docs/DESIGN.md): UI review and design system

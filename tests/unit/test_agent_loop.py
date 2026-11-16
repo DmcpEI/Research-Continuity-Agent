@@ -650,7 +650,7 @@ def test_stop_reason_is_a_fixed_set_and_serialises_as_before() -> None:
 
 def test_knowledge_base_search_returns_citeable_chunks_with_their_text() -> None:
     """The agent got one 300-character excerpt per paper and no chunk ID, so it could not cite
-    or read the passage that answers (PLAN M6)."""
+    or read the passage that answers."""
     from types import SimpleNamespace
 
     from rca.agent.tools import KnowledgeBaseAdapter
@@ -694,7 +694,7 @@ def test_knowledge_base_search_returns_citeable_chunks_with_their_text() -> None
 
 
 def test_the_clarification_heuristic_names_no_paper_from_one_library() -> None:
-    """`pic2` was one corpus's paper name hard-coded into the agent (PLAN M6)."""
+    """`pic2` was one corpus's paper name hard-coded into the agent."""
     assert (
         AgentLoop._looks_like_specific_query("pic2 safety attributes in grocery bagging") is False
     )

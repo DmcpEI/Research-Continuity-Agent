@@ -1,6 +1,6 @@
 # RCA frontend: review and design system
 
-2026-11-10. Companion to [PLAN.md](PLAN.md). Based on reading `frontend/` and using every screen
+2026-11-10. Based on reading `frontend/` and using every screen
 of the built app in a browser at 1280×800 and 1440×900. Step F1 is done (section 6); the rest is
 not implemented yet. The values themselves live in `frontend/src/styles/tokens.css`; this file
 explains them.
@@ -269,7 +269,7 @@ browser at 1280×800, in both colour schemes once the light theme exists.
 | F10 | Light theme | Contrast script over both token sets |
 
 F3 and F4 come before plan step 6 in value: they are the difference between "cites" and "shows".
-Backend work these need, tracked in PLAN.md: store uploaded PDFs under the data directory, not a
+Backend work these need: store uploaded PDFs under the data directory, not a
 temp path (F4); page number in chunk metadata so "Open PDF" can jump to the page (after F4); stage
 events (plan step 11, upgrades F5).
 

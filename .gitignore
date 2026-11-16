@@ -21,3 +21,6 @@ eval/results/traces/
 docs/RCA Research Assistant.html
 frontend/*.tsbuildinfo
 /CLAUDE.md
+# The plan is kept local, not published
+docs/PLAN.md
+docs/PLAN-claude-md.diff
