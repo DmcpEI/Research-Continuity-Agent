@@ -357,6 +357,7 @@ The keyword hit rate, long read as a retrieval or rewrite weakness, nearly doubl
 ## Known Limitations
 
 - Keyword hit rate (`20.5%` on the old 100-question run) was long read as the primary retrieval weakness; most of it came from the answer model seeing only 240 characters per chunk (see "Full chunk text in the prompt"). With full chunks `qwen3.5:4b` reaches `0.484` on the dev split.
+- "✓ Cited" means cited, not checked: about one cited sentence in four is not fully backed by the block it cites, and no support check tried so far meets the bar for a "Supported" badge (see "Citation Support Labels").
 - Split-model rewriting has been evaluated and rejected for production due to latency cost versus marginal gains.
 - Answers that say the context does not answer the question but still give part of an answer (`contradictory` in Answer Outcome Labels) pass as grounded answers; the abstention decision cannot tell them from refusals that cite a nearby block (#6).
 
@@ -655,6 +656,86 @@ The check ran on 13 of 40 replies (median 1.7 s, max 4.8 s) and never failed; it
 
 ---
 
+## Citation Support Labels (step 12)
+
+Why: the "✓ Cited" badge means the answer cites a block it was given and shares two content words
+with it. It does not mean the cited block says what the sentence says. The question here is
+whether a check can earn a "Supported" badge: per cited sentence, does the cited passage state
+it?
+
+Labels: `eval/sample_support_labels.py` splits the full-text `qwen3.5:4b` answers already
+labelled for #6 into sentences (every useful answer on test, 27; a seeded 25 of 55 on dev) and
+adds one swapped citation per answer (a cited sentence paired with another block the model saw,
+the wrong-citation error). Each sentence is labelled against the full text of the blocks it
+cites, as the model saw them: `supported` (every detail stated), `partial` (some detail, such as
+a number, name, cause or attribution, missing or different), `unsupported`, or `no_claim`
+(heading, list intro, gap statement). A sentence that states a gap and also a fact is labelled on
+the fact. Uncited sentences are labelled against all blocks the model saw. Files:
+`eval/support_labels_{dev,test}.json` (node IDs only, no paper text). Test labels were written
+before any check ran on test; the break-it review then found two test labels inconsistent with
+these rules (`synth-003#2`, `stablebinpacking-005#2`, both `supported` → `partial`), and the
+test numbers below are rescored from the same run's predictions with the corrected labels.
+
+| | dev | test |
+|---|---|---|
+| natural cited sentences that make a claim | 60 (16 partial or unsupported) | 79 (22) |
+| swapped citations that make a claim | 24 (all not supported; 1 partial) | 25 (all not supported; 6 partial) |
+| uncited sentences that state a fact | 24 (2 partial) | 21 (3 partial or unsupported) |
+
+So about one cited sentence in four is not fully backed by the block it cites (dev 16/60, test
+22/79). Typical cases on
+test: one table's scores reported as another benchmark's (`sgvl-003`), facts from a figure in
+chunk 0016 cited to chunk 0017 (`vlmsurvey-004`), "the baseline reached 98%" where 98% is the
+method and the baseline 83% (`densepack-003`).
+
+Checks (`eval/compare_support_checks.py`), each judging one cited sentence against its cited
+text with `qwen3.5:4b` at temperature 0:
+- `overlap`: the current word-overlap rule, per sentence.
+- `llm_verdict`: the model returns `supported` / `partial` / `unsupported` / `nothing_to_check`.
+- `llm_quote`: the model first copies the shortest part of the passage that states the sentence;
+  supported only if the verdict says so and 80% of the quote's 4-word runs are in the passage.
+
+The bar, fixed before the test run: catch at least 80% of not-supported cited sentences, keep at
+least 85% of supported ones, at most 3 s added per answer. Two prompt rounds on dev. Round 1
+found that real quotes failed an exact match (two sentences joined, a PDF hyphen kept, markdown)
+and that "it states X but not Y" sentences were judged on the missing Y; round 2 matched quotes on
+4-word runs and told the model to ignore "not stated" parts. A one-call-per-answer variant was
+slower and worse and was dropped. Dev round 2: `llm_verdict` caught 31/40 (natural 8/16), kept
+39/44, 3.3 s per answer; `llm_quote` 34/40 (natural 11/16), 29/44, 4.6 s.
+
+Test, one run (Wilson 95% intervals; time is the median per answer, the model loaded). Kappa is
+given over all cited claims and over natural sentences only; the swapped ones are all not
+supported, which raises the first:
+
+| | caught (natural + swapped) | natural only | swapped only | kept | kappa (all / natural) | time |
+|---|---|---|---|---|---|---|
+| `overlap` | 3/47 (6%) | 0/22 | 3/25 | 57/57 | 0.07 / 0.00 | 0 |
+| `llm_verdict` | 36/47 (77%, 63–86%) | 15/22 | 21/25 | 52/57 (91%, 81–96%) | 0.69 / 0.61 | 4.1 s |
+| `llm_quote` | 41/47 (87%, 75–94%) | 18/22 | 23/25 | 42/57 (74%, 61–83%) | 0.60 / 0.48 | 7.4 s |
+
+No check passes. `llm_verdict` misses the catch bar and the time bar; `llm_quote` catches enough
+but drops one supported sentence in four and takes 7.4 s. `llm_verdict` lets the clearest
+error on test through as supported (`sgvl-003`, VSR scores presented as Winoground) and misses subtle shifts of
+attribution and purpose; on dev it misses the same kind (a planning rate called an execution
+rate, credit moved from pre-training to the decomposition). At answer level, it would mark 11 of
+the 25 test answers that cite something as Supported; 9 of those 11 have every cited claim
+labelled supported, and 1 also holds an uncited sentence labelled partial.
+
+Decision: **the badge stays "Cited".** A badge that is wrong on about one answer in five it
+marks, at 4 s per answer, does not meet the bar set for it. The word-overlap rule behind
+"Cited" catches almost nothing (3/47), which is what the badge's name already says.
+
+Caveats: labels, checks and prompts are by the same assistant (`labeled_by: assistant-draft`;
+one test item is `unsure`); the dev prompts were tuned in two rounds on 60 natural sentences; 22
+natural not-supported sentences on test give wide intervals. A `nothing_to_check` verdict (for a
+sentence that only states a gap) skips the check, and on test one `partial` claim passed that
+way under each LLM check. Concurrent calls do not cut the
+time on this machine: Ollama runs one request at a time (`OLLAMA_NUM_PARALLEL=1`). Not tried: a
+larger checker model (a second model in 18 GB of RAM), an NLI model (none installed), checking
+uncited sentences. Run outputs: scratchpad only, not committed.
+
+---
+
 ## Current Status
 
 What is true today, independent of any single artifact:
@@ -662,6 +743,7 @@ What is true today, independent of any single artifact:
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
 - abstention has two measured parts: the pre-generation rerank gate (`rerank_max <= -3.618`, rechecked with `qwen3.5:4b` rewrites) and the facts check on hedged replies; an unanswerable question answered without any hedge passes both, so it is still the main open weakness
+- citation support is measured but not checked at answer time: on test, 22 of 79 cited sentences are not fully backed by their block; the best per-sentence check caught 77% of not-supported cited sentences (natural and swapped) at 4.1 s per answer, below the bar for a "Supported" badge
 - a human-authored external subset would still be stronger for bias reduction than self-authored or model-authored additions
 
 Known active failure themes:

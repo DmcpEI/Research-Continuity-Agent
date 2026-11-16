@@ -1,0 +1,3351 @@
+{
+ "source": "eval/answer_labels_fulltext_test.json",
+ "seed": 20261116,
+ "answers": 27,
+ "labels": [
+  "supported",
+  "partial",
+  "unsupported",
+  "no_claim"
+ ],
+ "context_note": "Judged against the full text of the cited blocks, as the model saw them (RetrievalHit.text); uncited sentences against every block in context_node_ids.",
+ "items": [
+  {
+   "question_id": "densepack-003",
+   "question": "What improvement do the robustness strategies deliver over the open-loop baseline in Dense Robotic Packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-003",
+   "context_node_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0067",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0010",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000",
+    "src:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-003#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The robustness strategies improve packing success rates significantly over the open-loop baseline, specifically raising the rate for five-item packing from 83% to 98%.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0010"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "densepack-003",
+   "question": "What improvement do the robustness strategies deliver over the open-loop baseline in Dense Robotic Packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-003",
+   "context_node_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0067",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0010",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000",
+    "src:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-003#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "When combined with dynamic model acquisition, these strategies achieve a 100% success rate on all tested packing problems, outperforming the baseline which reached 98%.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "100% is stated; the baseline was 83%, not 98% (98% is V4)",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "densepack-003",
+   "question": "What improvement do the robustness strategies deliver over the open-loop baseline in Dense Robotic Packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-003",
+   "context_node_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0067",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0010",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000",
+    "src:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-003#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Additionally, both closed-loop and robust strategies decrease the frequency of smash events (instances where maximum loading force exceeded 20 N) compared to the baseline.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "densepack-003",
+   "question": "What improvement do the robustness strategies deliver over the open-loop baseline in Dense Robotic Packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-003",
+   "context_node_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0067",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0010",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000",
+    "src:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-003#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "When combined with dynamic model acquisition, these strategies achieve a 100% success rate on all tested packing problems, outperforming the baseline which reached 98%.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0063"
+   ]
+  },
+  {
+   "question_id": "sayplan-002",
+   "question": "What scale of environments does SayPlan evaluate on?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-002",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0054",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0008",
+    "src:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-002#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "SayPlan evaluates its capabilities across two expansive environments: a large office floor spanning 37 rooms and 150 interactable assets and objects, and a three-storey house with 28 rooms and 112 objects.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0008"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-002",
+   "question": "What scale of environments does SayPlan evaluate on?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-002",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0054",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0008",
+    "src:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-002#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The framework is designed to operate in large-scale environments spanning multiple floors and rooms, as stated in the conclusion.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-002",
+   "question": "What scale of environments does SayPlan evaluate on?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-002",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0054",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0008",
+    "src:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-002#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Additionally, SayPlan successfully translates validated plans to a real-world mobile manipulator agent operating across multiple rooms, assets, and objects in a large office environment.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-002",
+   "question": "What scale of environments does SayPlan evaluate on?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-002",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0054",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0008",
+    "src:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-002#0/swap",
+   "kind": "swapped",
+   "sentence_index": 0,
+   "sentence": "SayPlan evaluates its capabilities across two expansive environments: a large office floor spanning 37 rooms and 150 interactable assets and objects, and a three-storey house with 28 rooms and 112 objects.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0000"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0008"
+   ]
+  },
+  {
+   "question_id": "moo-001",
+   "question": "In Manipulation of Open-World Objects (MOO), what information does the pre-trained vision-language model extract, and what inputs condition the robot policy?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moo-001",
+   "context_node_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0000",
+    "src:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0005",
+    "chk:pdf/vision-language_foundation_models_as_effective_robot_imitators:0011"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moo-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "In Manipulation of Open-World Objects (MOO), the pre-trained vision-language model extracts object-identifying information from both the language command and the image.",
+   "cited_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moo-001",
+   "question": "In Manipulation of Open-World Objects (MOO), what information does the pre-trained vision-language model extract, and what inputs condition the robot policy?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moo-001",
+   "context_node_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0000",
+    "src:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0005",
+    "chk:pdf/vision-language_foundation_models_as_effective_robot_imitators:0011"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moo-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "Specifically, the system uses a VLM to identify the 2D image coordinates of objects present in the instruction.",
+   "cited_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0005"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moo-001",
+   "question": "In Manipulation of Open-World Objects (MOO), what information does the pre-trained vision-language model extract, and what inputs condition the robot policy?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moo-001",
+   "context_node_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0000",
+    "src:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0005",
+    "chk:pdf/vision-language_foundation_models_as_effective_robot_imitators:0011"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moo-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The robot policy is conditioned on three inputs: the current image, the language instruction, and the extracted object information (specifically the 2D coordinates).",
+   "cited_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the cited chunk does not say the object information is 2D coordinates (chunk 0005 does)",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moo-001",
+   "question": "In Manipulation of Open-World Objects (MOO), what information does the pre-trained vision-language model extract, and what inputs condition the robot policy?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moo-001",
+   "context_node_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0000",
+    "src:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001",
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0005",
+    "chk:pdf/vision-language_foundation_models_as_effective_robot_imitators:0011"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moo-001#0/swap",
+   "kind": "swapped",
+   "sentence_index": 0,
+   "sentence": "In Manipulation of Open-World Objects (MOO), the pre-trained vision-language model extracts object-identifying information from both the language command and the image.",
+   "cited_ids": [
+    "chk:pdf/vision-language_foundation_models_as_effective_robot_imitators:0011"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/open-world_object_manipulation_using_pre-trained_vision-language_models:0001"
+   ]
+  },
+  {
+   "question_id": "jampacker-001",
+   "question": "What are the two main components of JamPacker and what problem does each solve?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:jampacker-001",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0008",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0016",
+    "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "chk:pdf/jsonschemabench_a_rigorous_benchmark_of_structured_outputs_for_language_models:0068",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:jampacker-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "Based on the provided context, JamPacker is defined as a system that combines two specific components: **Jampack** and the **Fault Recovery Module (FRM)**.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "jampacker-001",
+   "question": "What are the two main components of JamPacker and what problem does each solve?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:jampacker-001",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0008",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0016",
+    "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "chk:pdf/jsonschemabench_a_rigorous_benchmark_of_structured_outputs_for_language_models:0068",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:jampacker-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "**Jampack** is an offline 3D bin packing algorithm designed to achieve higher packing efficiency compared to state-of-the-art methods by computing placement points called \"internal corner points\" to maximize the utilization of free spaces between objects.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "jampacker-001",
+   "question": "What are the two main components of JamPacker and what problem does each solve?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:jampacker-001",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0008",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0016",
+    "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "chk:pdf/jsonschemabench_a_rigorous_benchmark_of_structured_outputs_for_language_models:0068",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:jampacker-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "**The Fault Recovery Module (FRM)** is a module introduced for the robotic manipulator that monitors object placement, calculates a fault score, adjusts placements if required, and learns to adjust offsets on-the-go.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "jampacker-001",
+   "question": "What are the two main components of JamPacker and what problem does each solve?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:jampacker-001",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0008",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0016",
+    "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "chk:pdf/jsonschemabench_a_rigorous_benchmark_of_structured_outputs_for_language_models:0068",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:jampacker-001#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "The context does not explicitly state the specific problem each component solves in isolation; rather, it describes them as combined elements of a single system that results in \"near-perfect packing with minimal overall packing time\".",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "gap statement plus a fact; the near-perfect packing quote is in chunk 0006 (uncited)",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "jampacker-001",
+   "question": "What are the two main components of JamPacker and what problem does each solve?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:jampacker-001",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0008",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0016",
+    "src:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects",
+    "chk:pdf/jsonschemabench_a_rigorous_benchmark_of_structured_outputs_for_language_models:0068",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:jampacker-001#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "The broader problem addressed by the entire JamPacker system is the offline packing of 3D irregular shapes into a container while ensuring stability and feasibility for a robot gripper, though the specific text regarding \"stability\" and \"robot-feasibility constraints\" appears in documents focused on non-convex objects rather than the cuboid focus of the JamPacker paper.",
+   "cited_ids": [],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "attributes the irregular-shape problem of other papers to JamPacker",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moma-002",
+   "question": "Why does the MoMa-LLM paper introduce AUC-E in addition to success and SPL?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moma-002",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0040",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0034",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0069",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0145"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moma-002#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The MoMa-LLM paper introduces AUC-E because standard success and SPL metrics rely on an arbitrarily set maximum time budget or number of environment steps, which fails to differentiate between methods that search thoroughly but take more steps versus those that search large areas quickly but might miss small objects.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moma-002",
+   "question": "Why does the MoMa-LLM paper introduce AUC-E in addition to success and SPL?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moma-002",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0040",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0034",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0069",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0145"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moma-002#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "Instead, the authors propose a new metric that evaluates the full efficiency curve by calculating the share of episodes that succeeded for each possible budget (number of steps), allowing for the comparison of success rates across arbitrary budgets.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moma-002",
+   "question": "Why does the MoMa-LLM paper introduce AUC-E in addition to success and SPL?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moma-002",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0040",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0034",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0069",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0145"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moma-002#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "This approach can also be reduced to a single number via the area under the efficiency curve (AUC-E), where a perfect policy finding all objects in a single step would have a value of one and a policy finding no objects would have a value of zero.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0034"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "moma-002",
+   "question": "Why does the MoMa-LLM paper introduce AUC-E in addition to success and SPL?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:moma-002",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0040",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0034",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0069",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0145"
+   ],
+   "item_id": "qwen3.5:4b/full-test:moma-002#2/swap",
+   "kind": "swapped",
+   "sentence_index": 2,
+   "sentence": "This approach can also be reduced to a single number via the area under the efficiency curve (AUC-E), where a perfect policy finding all objects in a single step would have a value of one and a policy finding no objects would have a value of zero.",
+   "cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0145"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0034"
+   ]
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context does not contain sufficient information to answer how the grocery bagging paper's approach to object identification differs from AutoBag's, as the text focuses on the *types* of inputs used by each system rather than a comparative analysis of their identification methodologies.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "**Grocery Bagging Paper Perception Inputs:**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "heading",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The grocery bagging paper relies on **checkout-style RGB images** of groceries to map visual observations into a structured inventory schema.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "It emphasizes that perception must provide more than generic labels, instead producing a **structured inventory representation** that is consistent, machine-readable, and aligned with downstream constraints such as separating raw animal products from ready-to-eat foods.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "only the raw-animal-products part is in chunk 0030; the rest is chunk 0010",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "The system evaluates perception not only by recognition accuracy but also by the reliability of producing valid structured outputs, addressing issues like formatting failures and inconsistent naming found in modern Vision Language Models (VLMs).",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#5",
+   "kind": "natural",
+   "sentence_index": 5,
+   "sentence": "**AutoBag Perception Inputs:**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "heading",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#6",
+   "kind": "natural",
+   "sentence_index": 6,
+   "sentence": "AutoBag relies on **visual observations** to enable a dual-arm robot to open plastic bags and insert objects, utilizing novel metrics to evaluate bag state quality.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "dual-arm is not in the cited chunk",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#7",
+   "kind": "natural",
+   "sentence_index": 7,
+   "sentence": "The system uses visual feedback to perform purposeful motions for separating bag layers and exposing actionable grasp points, treating bag opening as an interactive perception problem.",
+   "cited_ids": [
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "attributes SLIP's interactive perception to AutoBag; the cited chunk does not describe the motions",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#8",
+   "kind": "natural",
+   "sentence_index": 8,
+   "sentence": "**Difference in Identification Approaches:**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "heading",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#9",
+   "kind": "natural",
+   "sentence_index": 9,
+   "sentence": "The context does not explicitly state how the identification approaches differ between the two papers.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#10",
+   "kind": "natural",
+   "sentence_index": 10,
+   "sentence": "It notes that prior bagging systems typically emphasize manipulation success and motion policy learning, whereas the grocery bagging paper targets a perception interface enabling safe, preference-aware bag construction once items are observable.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#11",
+   "kind": "natural",
+   "sentence_index": 11,
+   "sentence": "However, the text does not describe AutoBag's specific identification mechanism or contrast it with the structured schema-driven approach of the grocery bagging paper beyond noting that AutoBag demonstrates end-to-end bag opening and insertion in physical experiments [[chk:pdf/aut",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "gap statement plus a fact in chunk 0029 (marker cut off, so uncited)",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-008",
+   "question": "What perception inputs do the grocery bagging paper and AutoBag each rely on, and how do their approaches to object identification differ?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-008",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-008#3/swap",
+   "kind": "swapped",
+   "sentence_index": 3,
+   "sentence": "It emphasizes that perception must provide more than generic labels, instead producing a **structured inventory representation** that is consistent, machine-readable, and aligned with downstream constraints such as separating raw animal products from ready-to-eat foods.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0030"
+   ]
+  },
+  {
+   "question_id": "autobag-003",
+   "question": "What physical bagging success rate does AutoBag report and how is it measured?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-003",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0028",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-003#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "AutoBag reports a physical success rate of 16/30 for inserting at least one item across a variety of initial bag configurations.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "autobag-003",
+   "question": "What physical bagging success rate does AutoBag report and how is it measured?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-003",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0028",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-003#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The measurement involves running 6 trials per experiment setting to evaluate the n = 2 success rate (where n represents the number of trials) for opening bags and inserting objects on three respective tiers, yielding results of 3/6, 2/6, and 1/6.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0028"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "n is not the number of trials",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "autobag-003",
+   "question": "What physical bagging success rate does AutoBag report and how is it measured?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-003",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0028",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-003#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Success is determined by whether the robot successfully opens the bag upward and places both objects inside, rather than merely achieving an opening area or ensuring a round shape.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0028"
+   ],
+   "label": "partial",
+   "unsure": true,
+   "note": "the chunk discusses metrics as ablations; success defined as both objects inside is an inference",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "autobag-003",
+   "question": "What physical bagging success rate does AutoBag report and how is it measured?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-003",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0028",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-003#0/swap",
+   "kind": "swapped",
+   "sentence_index": 0,
+   "sentence": "AutoBag reports a physical success rate of 16/30 for inserting at least one item across a variety of initial bag configurations.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ]
+  },
+  {
+   "question_id": "osgp-001",
+   "question": "How is a natural-language task converted into a planning objective in Optimal Scene Graph Planning with LLM Guidance?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:osgp-001",
+   "context_node_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0000",
+    "src:pdf/optimal_scene_graph_planning_with_large_language_model_guidance",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0001",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006",
+    "src:pdf/learning_to_reason_over_scene_graphs_a_case_study_of_finetuning_gpt-2_into_a_robot_language_model_for_grounded_task_planning"
+   ],
+   "item_id": "qwen3.5:4b/full-test:osgp-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "In *Optimal Scene Graph Planning with Large Language Model Guidance*, a natural language task is converted into a planning objective by utilizing a large language model (LLM) to translate the task into a linear temporal logic (LTL) automaton.",
+   "cited_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "osgp-001",
+   "question": "How is a natural-language task converted into a planning objective in Optimal Scene Graph Planning with LLM Guidance?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:osgp-001",
+   "context_node_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0000",
+    "src:pdf/optimal_scene_graph_planning_with_large_language_model_guidance",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0001",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006",
+    "src:pdf/learning_to_reason_over_scene_graphs_a_case_study_of_finetuning_gpt-2_into_a_robot_language_model_for_grounded_task_planning"
+   ],
+   "item_id": "qwen3.5:4b/full-test:osgp-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "This process involves describing the scene graph to the LLM using the connectivity of its attributes, such as object and room hierarchies, so that the model can generate an associated LTL formula and automaton from the natural language input.",
+   "cited_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "osgp-001",
+   "question": "How is a natural-language task converted into a planning objective in Optimal Scene Graph Planning with LLM Guidance?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:osgp-001",
+   "context_node_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0000",
+    "src:pdf/optimal_scene_graph_planning_with_large_language_model_guidance",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0001",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006",
+    "src:pdf/learning_to_reason_over_scene_graphs_a_case_study_of_finetuning_gpt-2_into_a_robot_language_model_for_grounded_task_planning"
+   ],
+   "item_id": "qwen3.5:4b/full-test:osgp-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The resulting LTL automaton serves as the formal planning objective within a hierarchical planning domain constructed from the scene graph.",
+   "cited_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "osgp-001",
+   "question": "How is a natural-language task converted into a planning objective in Optimal Scene Graph Planning with LLM Guidance?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:osgp-001",
+   "context_node_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0000",
+    "src:pdf/optimal_scene_graph_planning_with_large_language_model_guidance",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0001",
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006",
+    "src:pdf/learning_to_reason_over_scene_graphs_a_case_study_of_finetuning_gpt-2_into_a_robot_language_model_for_grounded_task_planning"
+   ],
+   "item_id": "qwen3.5:4b/full-test:osgp-001#2/swap",
+   "kind": "swapped",
+   "sentence_index": 2,
+   "sentence": "The resulting LTL automaton serves as the formal planning objective within a hierarchical planning domain constructed from the scene graph.",
+   "cited_ids": [
+    "src:pdf/learning_to_reason_over_scene_graphs_a_case_study_of_finetuning_gpt-2_into_a_robot_language_model_for_grounded_task_planning"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/optimal_scene_graph_planning_with_large_language_model_guidance:0006"
+   ]
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context does not specify the name or technical details of the symbolic planner that ViLaIn interfaces with; it only describes the interaction mechanism.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The context states that ViLaIn drives a \"symbolic planner\" to find plans based on generated Problem Descriptions (PDs).",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Regarding error messages, the context explains that ViLaIn can refine the generated problem description by using an error message from the planner as input for a re-prompting process.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "Specifically, the system uses a prompt template asking \"What part of the PDDL problem do you think is causing this error?\" to generate an explanation, which is then added to the input prompt for GPT-4 to create a refined problem.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "This cycle of Chain-of-Thought reasoning with re-prompting can be repeated as often as necessary until the planner returns no more error messages.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "the paper's \"until the planner returns error messages\" read as \"no more\"",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#5",
+   "kind": "natural",
+   "sentence_index": 5,
+   "sentence": "The framework is evaluated using a symbolic planner that operates on PDDL domains and problems, such as those found in the cooking, blocks world, and tower of Hanoi datasets used for evaluation.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the three domains are in chunk 0021, not the cited chunk 0001",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vilain-004",
+   "question": "What symbolic planner does ViLaIn interface with, and how are planner error messages used?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vilain-004",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0020",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vilain-004#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "The context states that ViLaIn drives a \"symbolic planner\" to find plans based on generated Problem Descriptions (PDs).",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0001"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009"
+   ]
+  },
+  {
+   "question_id": "autobag-004",
+   "question": "What robot and sensing setup does AutoBag use in its physical experiments?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029",
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0009",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context does not contain specific details regarding the robot or sensing setup used by AutoBag in its physical experiments.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "autobag-004",
+   "question": "What robot and sensing setup does AutoBag use in its physical experiments?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029",
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0009",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "While one document mentions a \"YuMi robot\" using AutoBag, it does not describe the associated sensors or camera configuration.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "autobag-004",
+   "question": "What robot and sensing setup does AutoBag use in its physical experiments?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029",
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0009",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Another document details a different system (a 6R industrial robot with specific cameras and grippers) but explicitly states this is for \"Dense Robotic Packing\" and not AutoBag.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the chunk describes the setup but never says it is not AutoBag's",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "autobag-004",
+   "question": "What robot and sensing setup does AutoBag use in its physical experiments?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:autobag-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0029",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029",
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0009",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0006"
+   ],
+   "item_id": "qwen3.5:4b/full-test:autobag-004#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "While one document mentions a \"YuMi robot\" using AutoBag, it does not describe the associated sensors or camera configuration.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0001"
+   ]
+  },
+  {
+   "question_id": "sayplan-004",
+   "question": "What scene representation and validation mechanism does SayPlan use to check whether generated plans are feasible?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-004",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0050",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0033",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0033"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "SayPlan utilizes hierarchical 3D scene graphs as its primary scene representation to enable scalability by allowing the agent to explore the environment from the highest level of the hierarchy.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-004",
+   "question": "What scene representation and validation mechanism does SayPlan use to check whether generated plans are feasible?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-004",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0050",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0033",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0033"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "To validate whether generated plans are feasible, SayPlan employs a scene graph simulator that ensures the plan is grounded to the environment via iterative replanning.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-004",
+   "question": "What scene representation and validation mechanism does SayPlan use to check whether generated plans are feasible?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-004",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0050",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0033",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0033"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "This mechanism allows the framework to verify if a high-level plan generated by an LLM is executable by computing an optimal navigational path between nodes and simulating the full plan to check for feasibility.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-004",
+   "question": "What scene representation and validation mechanism does SayPlan use to check whether generated plans are feasible?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-004",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0050",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0033",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0033"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-004#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "The system iteratively replans until feedback indicates success, at which point the full plan is returned as an executable plan.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sayplan-004",
+   "question": "What scene representation and validation mechanism does SayPlan use to check whether generated plans are feasible?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sayplan-004",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0050",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0034",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0033",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0033"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sayplan-004#3/swap",
+   "kind": "swapped",
+   "sentence_index": 3,
+   "sentence": "The system iteratively replans until feedback indicates success, at which point the full plan is returned as an executable plan.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0033"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ]
+  },
+  {
+   "question_id": "para-001",
+   "question": "How does the grocery bagging system normalize different product descriptions into one shared item label?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-001",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context describes a schema-driven approach where product descriptions are normalized into shared labels by mapping free-form model outputs to a fixed vocabulary of 85 grocery item concepts plus an \"unknown_item\" token.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-001",
+   "question": "How does the grocery bagging system normalize different product descriptions into one shared item label?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-001",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "When a pipeline variant enables a deterministic unknown–item mapper, it attempts to map these free-form descriptions into the canonical labels whenever possible.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-001",
+   "question": "How does the grocery bagging system normalize different product descriptions into one shared item label?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-001",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "In cases where such mapping occurs, the model's original free-text description is kept in a separate field while only the canonical identifier is rewritten to match exactly one label from the canonical item list or the special token.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-001",
+   "question": "How does the grocery bagging system normalize different product descriptions into one shared item label?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-001",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-001#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "The system relies on this closed-set design, which matches the implementation used in all pipelines and ensures that evaluation rewards both recognition quality and correct use of the vocabulary.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-001",
+   "question": "How does the grocery bagging system normalize different product descriptions into one shared item label?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-001",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-001#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "The context does not specify the exact algorithmic methods or specific rules used to perform the mapping between free-form descriptions and canonical labels, only that such a deterministic mapper is enabled in some pipeline variants.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "gap statement plus a fact in chunk 0053",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-001",
+   "question": "How does the grocery bagging system normalize different product descriptions into one shared item label?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-001",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-001#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "When a pipeline variant enables a deterministic unknown–item mapper, it attempts to map these free-form descriptions into the canonical labels whenever possible.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0053"
+   ]
+  },
+  {
+   "question_id": "para-005",
+   "question": "How does ViLaIn turn a spoken task plus a scene observation into a planner-ready symbolic file?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-005",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0002"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-005#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "ViLaIn turns a spoken task plus a scene observation into a planner-ready symbolic file by first converting linguistic instructions into human-readable Problem Descriptions (PDs) using Large Language Models (LLMs), which then drive symbolic planners to find plans based on those PDs.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the cited chunk does not say ViLaIn uses LLMs",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-005",
+   "question": "How does ViLaIn turn a spoken task plus a scene observation into a planner-ready symbolic file?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-005",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0002"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-005#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The process involves generating the objects and initial state for the PD from scene observations, a task related to computer vision where the system handles objects not included in fixed classes like classical detectors.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-005",
+   "question": "How does ViLaIn turn a spoken task plus a scene observation into a planner-ready symbolic file?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-005",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0002"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-005#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "If the symbolic planner returns an error message, ViLaIn refines the generated PD by using Chain-of-Thought reasoning with a prompt template asking \"What part of the PDDL problem do you think is causing this error?\" to generate a refined problem based on the explanation.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-005",
+   "question": "How does ViLaIn turn a spoken task plus a scene observation into a planner-ready symbolic file?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-005",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0002"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-005#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "This iterative refinement continues until the planner returns no more error messages, at which point the final PD serves as the input for the symbolic planner.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-005",
+   "question": "How does ViLaIn turn a spoken task plus a scene observation into a planner-ready symbolic file?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-005",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0002"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-005#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "The resulting Problem Description is a sequence of discrete symbolic actions (e.g., pick(a) and place(a, b)) that complete the task and are guaranteed to be logically correct because their correctness is automatically verifiable.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "plans, not PDs, are action sequences; the chunk says PDs are verifiable, not guaranteed correct",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-005",
+   "question": "How does ViLaIn turn a spoken task plus a scene observation into a planner-ready symbolic file?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-005",
+   "context_node_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0009",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0011",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021",
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0002"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-005#3/swap",
+   "kind": "swapped",
+   "sentence_index": 3,
+   "sentence": "This iterative refinement continues until the planner returns no more error messages, at which point the final PD serves as the input for the symbolic planner.",
+   "cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0001"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/vision-language_interpreter_for_robot_task_planning:0021"
+   ]
+  },
+  {
+   "question_id": "sgvl-003",
+   "question": "How much does SGVL improve BLIP on Winoground metrics?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sgvl-003",
+   "context_node_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0034",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0024",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0033",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0032"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sgvl-003#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "Based on the provided context, SGVL improves BLIP on Winoground metrics by **+2.3** in the Adjacency score, **+5.2** in the Directional score, **+4.1** in the Orientation score, **+5.6** in the Projective score, **+1.3** in the Proximity score, and **+8.8** in the Topological score.",
+   "cited_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "these are the VSR table's numbers, presented as Winoground",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sgvl-003",
+   "question": "How much does SGVL improve BLIP on Winoground metrics?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sgvl-003",
+   "context_node_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0034",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0024",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0033",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0032"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sgvl-003#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "Additionally, SGVL improves BLIP's average Winoground score by **+5.9** points.",
+   "cited_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "the VSR average, presented as Winoground",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sgvl-003",
+   "question": "How much does SGVL improve BLIP on Winoground metrics?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sgvl-003",
+   "context_node_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0034",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0024",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0033",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0032"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sgvl-003#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The context also provides specific scores for the Text, Image, and Group sub-tasks where SGVL achieves **42.8**, **27.3**, and **21.5** respectively, which represent improvements of **+3.8**, **+8.1**, and **+6.5** over the BLIP baseline.",
+   "cited_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0024"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "sgvl-003",
+   "question": "How much does SGVL improve BLIP on Winoground metrics?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:sgvl-003",
+   "context_node_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0034",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0024",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0033",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0032"
+   ],
+   "item_id": "qwen3.5:4b/full-test:sgvl-003#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "Additionally, SGVL improves BLIP's average Winoground score by **+5.9** points.",
+   "cited_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0032"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0028"
+   ]
+  },
+  {
+   "question_id": "stablebinpacking-005",
+   "question": "What makes a packing plan robot-packable in the stable bin packing paper, and why is that stricter than ordinary packing feasibility?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:stablebinpacking-005",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003",
+    "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0000",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0007",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0019"
+   ],
+   "item_id": "qwen3.5:4b/full-test:stablebinpacking-005#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "Based on the provided context, a packing plan is considered **robot-packable** if it satisfies four specific constraints: stability against previously packed objects and the bin itself, and manipulation feasibility which requires a feasible robot motion to load the object while obeying kinematic, grasp, and collision constraints.",
+   "cited_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "stablebinpacking-005",
+   "question": "What makes a packing plan robot-packable in the stable bin packing paper, and why is that stricter than ordinary packing feasibility?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:stablebinpacking-005",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003",
+    "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0000",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0007",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0019"
+   ],
+   "item_id": "qwen3.5:4b/full-test:stablebinpacking-005#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The context does not explicitly state why these constraints are \"stricter\" than ordinary packing feasibility; it only notes that the application of robot-packable constraints is independent of the specific problem addressed and focuses on offline packing of 3D irregular shapes.",
+   "cited_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "gap statement plus facts stated in chunk 0003",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "stablebinpacking-005",
+   "question": "What makes a packing plan robot-packable in the stable bin packing paper, and why is that stricter than ordinary packing feasibility?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:stablebinpacking-005",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003",
+    "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0000",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0007",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0019"
+   ],
+   "item_id": "qwen3.5:4b/full-test:stablebinpacking-005#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "While the introduction mentions that ordinary bin packing objectives typically focus on geometric and physical aspects like maximizing space utilization, enforcing stability, and ensuring feasibility under robot manipulation constraints, it does not define a baseline \"ordinary\" standard against which the robot-packable definition is strictly compared.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0019"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the text is the grocery paper's related work, not the stable bin packing paper's introduction (corrected after review)",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "stablebinpacking-005",
+   "question": "What makes a packing plan robot-packable in the stable bin packing paper, and why is that stricter than ordinary packing feasibility?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:stablebinpacking-005",
+   "context_node_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003",
+    "src:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator",
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0000",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0007",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0019"
+   ],
+   "item_id": "qwen3.5:4b/full-test:stablebinpacking-005#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "The context does not explicitly state why these constraints are \"stricter\" than ordinary packing feasibility; it only notes that the application of robot-packable constraints is independent of the specific problem addressed and focuses on offline packing of 3D irregular shapes.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0007"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "chunk 0007 has the offline planner under robot-packable constraints, not that they are independent of the problem",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/stable_bin_packing_of_non-convex_3d_objects_with_a_robot_manipulator:0003"
+   ]
+  },
+  {
+   "question_id": "para-004",
+   "question": "Which measurements does AutoBag use to tell whether the bag mouth is wide and upright enough for insertion?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0022",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "AutoBag uses two specific metrics to determine if the bag opening is sufficiently wide and upright for object insertion: the normalized convex hull area ($A_{CH}$) and the convex hull elongation ($E_{CH}$).",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-004",
+   "question": "Which measurements does AutoBag use to tell whether the bag mouth is wide and upright enough for insertion?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0022",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The normalized convex hull area is calculated by dividing the convex hull area of the perceived rim in 2D pixel space by the maximum convex hull value, which is determined through offline human manipulation to maximize the opening.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-004",
+   "question": "Which measurements does AutoBag use to tell whether the bag mouth is wide and upright enough for insertion?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0022",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "This normalization makes the metric size-agnostic.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-004",
+   "question": "Which measurements does AutoBag use to tell whether the bag mouth is wide and upright enough for insertion?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0022",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-004#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "Additionally, the system measures elongation using the ratio of the principal component analysis (PCA) major and minor axes of the convex hull in 2D pixel space.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-004",
+   "question": "Which measurements does AutoBag use to tell whether the bag mouth is wide and upright enough for insertion?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0022",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-004#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "The authors justify using elongation because a sideways-facing bag with a closed opening is considered worse than an upward-facing opening that is small but rounded, whereas normalized area alone might yield higher values for the former case.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "para-004",
+   "question": "Which measurements does AutoBag use to tell whether the bag mouth is wide and upright enough for insertion?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:para-004",
+   "context_node_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0010",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0022",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:para-004#4/swap",
+   "kind": "swapped",
+   "sentence_index": 4,
+   "sentence": "The authors justify using elongation because a sideways-facing bag with a closed opening is considered worse than an upward-facing opening that is small but rounded, whereas normalized area alone might yield higher values for the former case.",
+   "cited_ids": [
+    "chk:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception:0021"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0018",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0027"
+   ]
+  },
+  {
+   "question_id": "vlmsurvey-004",
+   "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vlmsurvey-004",
+   "context_node_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014",
+    "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0000",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vlmsurvey-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context outlines several future directions and challenges emphasized in the survey for robot vision, primarily through the structure of Figure 2 and a discussion on Section 6.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vlmsurvey-004",
+   "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vlmsurvey-004",
+   "context_node_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014",
+    "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0000",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vlmsurvey-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "These directions include addressing low-quality data, heterogeneity among modalities, efficient training and inference, and the scarcity of high-quality datasets.",
+   "cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "these are in Figure 2 in chunk 0016; the cited chunk 0017 has only the caption's end",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vlmsurvey-004",
+   "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vlmsurvey-004",
+   "context_node_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014",
+    "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0000",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vlmsurvey-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Additionally, the survey highlights the need for developing datasets and benchmarks specifically for multimodal fusion, as well as establishing evaluation metrics to compare performance across different approaches.",
+   "cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "in chunk 0016, not the cited chunk",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vlmsurvey-004",
+   "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vlmsurvey-004",
+   "context_node_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014",
+    "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0000",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vlmsurvey-004#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "The text also points toward the evolution of transformer variants and large vision-language models, alongside the development of lightweight and real-time models to enhance applicability in dynamic environments.",
+   "cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "in chunk 0016, not the cited chunk",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vlmsurvey-004",
+   "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vlmsurvey-004",
+   "context_node_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014",
+    "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0000",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vlmsurvey-004#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "Finally, the survey concludes by discussing future challenges and research directions in Section 6, which encompasses these areas of improvement and potential advancements in robot vision tasks.",
+   "cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "vlmsurvey-004",
+   "question": "What future directions does the multimodal fusion survey emphasize for robot vision?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:vlmsurvey-004",
+   "context_node_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0014",
+    "src:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0000",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017",
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "item_id": "qwen3.5:4b/full-test:vlmsurvey-004#3/swap",
+   "kind": "swapped",
+   "sentence_index": 3,
+   "sentence": "The text also points toward the evolution of transformer variants and large vision-language models, alongside the development of lightweight and real-time models to enhance applicability in dynamic environments.",
+   "cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0016"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the swapped block 0016 lists both directions; \"dynamic environments\" is not in it",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/multimodal_fusion_and_vision_language_models_a_survey_for_robot_vision:0017"
+   ]
+  },
+  {
+   "question_id": "cross-004",
+   "question": "How does SGVL's structured representation approach relate to the scene-understanding needs identified in the VLM survey?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0005",
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0062",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0055",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0036"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context does not contain information regarding a \"VLM survey\" or how SGVL's approach specifically relates to needs identified within such a survey.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-004",
+   "question": "How does SGVL's structured representation approach relate to the scene-understanding needs identified in the VLM survey?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0005",
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0062",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0055",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0036"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The text mentions that Vision and Language Models (VLMs) have demonstrated zero-shot performance but struggle with compositional scene understanding, including object attributes, relations, and action states.",
+   "cited_ids": [
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-004",
+   "question": "How does SGVL's structured representation approach relate to the scene-understanding needs identified in the VLM survey?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0005",
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0062",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0055",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0036"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "It further notes that obtaining structured annotations like scene graphs is time-consuming and costly for large-scale use, leading the authors to investigate whether small scene graph datasets can improve structured understanding in pretrained VLMs.",
+   "cited_ids": [
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-004",
+   "question": "How does SGVL's structured representation approach relate to the scene-understanding needs identified in the VLM survey?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0005",
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0062",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0055",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0036"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-004#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "However, no specific survey or its identified needs are described in the retrieved documents.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "cross-004",
+   "question": "How does SGVL's structured representation approach relate to the scene-understanding needs identified in the VLM survey?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:cross-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0005",
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0062",
+    "chk:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs:0055",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0036"
+   ],
+   "item_id": "qwen3.5:4b/full-test:cross-004#2/swap",
+   "kind": "swapped",
+   "sentence_index": 2,
+   "sentence": "It further notes that obtaining structured annotations like scene graphs is time-consuming and costly for large-scale use, leading the authors to investigate whether small scene graph datasets can improve structured understanding in pretrained VLMs.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0036"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "src:pdf/incorporating_structured_representations_into_pretrained_vision-language_models_using_scene_graphs"
+   ]
+  },
+  {
+   "question_id": "densepack-001",
+   "question": "What problem formulation does Dense Robotic Packing add beyond ordinary bin packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-001",
+   "context_node_ids": [
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0007",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0038",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "Based on the provided context, the *Dense Robotic Packing of Irregular and Novel 3D Objects* paper formulates the robotic packing problem to ensure **stability of the object pile** during packing and the **feasibility of the robot motion**, while maximizing packing density.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "densepack-001",
+   "question": "What problem formulation does Dense Robotic Packing add beyond ordinary bin packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-001",
+   "context_node_ids": [
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0007",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0038",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The context does not provide specific details on how *Dense Robotic Packing* differs from ordinary bin packing in terms of problem formulation, as it only describes the goals of its own constructive algorithm without explicitly defining the limitations or standard formulations of \"ordinary\" bin packing.",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "gap statement",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "densepack-001",
+   "question": "What problem formulation does Dense Robotic Packing add beyond ordinary bin packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-001",
+   "context_node_ids": [
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0007",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0038",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The other documents discuss general bin packing classifications (such as single, multiple, and residual bin packing problems) and robotic manipulation sub-problems but do not contain a comparative analysis of *Dense Robotic Packing*'s specific formulation against ordinary bin packing.",
+   "cited_ids": [
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0007"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "densepack-001",
+   "question": "What problem formulation does Dense Robotic Packing add beyond ordinary bin packing?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:densepack-001",
+   "context_node_ids": [
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0007",
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0038",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0035",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0000"
+   ],
+   "item_id": "qwen3.5:4b/full-test:densepack-001#2/swap",
+   "kind": "swapped",
+   "sentence_index": 2,
+   "sentence": "The other documents discuss general bin packing classifications (such as single, multiple, and residual bin packing problems) and robotic manipulation sub-problems but do not contain a comparative analysis of *Dense Robotic Packing*'s specific formulation against ordinary bin packing.",
+   "cited_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the review classifies by other problem types; no single/multiple/residual BPP",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/jampacker_an_efficient_and_reliable_robotic_bin_packing_system_for_cuboid_objects:0007"
+   ]
+  },
+  {
+   "question_id": "retail-001",
+   "question": "What combination of perception, reasoning, and planning does the AI-powered retail shelf system use to manage cluttered shelves?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:retail-001",
+   "context_node_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000",
+    "src:pdf/ai-powered_robotic_systems_for_intelligent_retail",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0099",
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0004",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:retail-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The AI-powered retail shelf system manages cluttered shelves by integrating advanced perception models with knowledge-based reasoning to enable precise object recognition and strategic placement even in cluttered spaces.",
+   "cited_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "retail-001",
+   "question": "What combination of perception, reasoning, and planning does the AI-powered retail shelf system use to manage cluttered shelves?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:retail-001",
+   "context_node_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000",
+    "src:pdf/ai-powered_robotic_systems_for_intelligent_retail",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0099",
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0004",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:retail-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "To resolve occlusion caused by clutter, the system utilizes implicit secondary adjustments through its knowledge-based reasoning component.",
+   "cited_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0004"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "retail-001",
+   "question": "What combination of perception, reasoning, and planning does the AI-powered retail shelf system use to manage cluttered shelves?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:retail-001",
+   "context_node_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000",
+    "src:pdf/ai-powered_robotic_systems_for_intelligent_retail",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0099",
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0004",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:retail-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Furthermore, a multi-layered planning framework ensures seamless manipulation and adaptation to real-time shelf conditions.",
+   "cited_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "retail-001",
+   "question": "What combination of perception, reasoning, and planning does the AI-powered retail shelf system use to manage cluttered shelves?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:retail-001",
+   "context_node_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000",
+    "src:pdf/ai-powered_robotic_systems_for_intelligent_retail",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0099",
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0004",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:retail-001#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "This integrated approach allows the system to autonomously detect, rearrange, and replenish items while executing intelligent restocking strategies.",
+   "cited_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "retail-001",
+   "question": "What combination of perception, reasoning, and planning does the AI-powered retail shelf system use to manage cluttered shelves?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:retail-001",
+   "context_node_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000",
+    "src:pdf/ai-powered_robotic_systems_for_intelligent_retail",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0099",
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0004",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0021"
+   ],
+   "item_id": "qwen3.5:4b/full-test:retail-001#0/swap",
+   "kind": "swapped",
+   "sentence_index": 0,
+   "sentence": "The AI-powered retail shelf system manages cluttered shelves by integrating advanced perception models with knowledge-based reasoning to enable precise object recognition and strategic placement even in cluttered spaces.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0099"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/ai-powered_robotic_systems_for_intelligent_retail:0000"
+   ]
+  },
+  {
+   "question_id": "bagall-001",
+   "question": "What are the two learned policies in Bag All You Need, and what stage of heterogeneous bagging does each one handle?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:bagall-001",
+   "context_node_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000",
+    "src:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0103",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0019",
+    "src:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception"
+   ],
+   "item_id": "qwen3.5:4b/full-test:bagall-001#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "In the \"Bag All You Need\" framework, the two learned policies are a **rearrangement policy** and a **lifting policy**.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "bagall-001",
+   "question": "What are the two learned policies in Bag All You Need, and what stage of heterogeneous bagging does each one handle?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:bagall-001",
+   "context_node_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000",
+    "src:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0103",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0019",
+    "src:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception"
+   ],
+   "item_id": "qwen3.5:4b/full-test:bagall-001#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The rearrangement policy handles the stage of placing multiple rigid objects and folding deformable objects to achieve desirable pre-bagging conditions.",
+   "cited_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "bagall-001",
+   "question": "What are the two learned policies in Bag All You Need, and what stage of heterogeneous bagging does each one handle?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:bagall-001",
+   "context_node_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000",
+    "src:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0103",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0019",
+    "src:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception"
+   ],
+   "item_id": "qwen3.5:4b/full-test:bagall-001#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The lifting policy handles the stage of inferring suitable grasp points for bi-manual bag lifting.",
+   "cited_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "bagall-001",
+   "question": "What are the two learned policies in Bag All You Need, and what stage of heterogeneous bagging does each one handle?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:bagall-001",
+   "context_node_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000",
+    "src:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0103",
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0019",
+    "src:pdf/bagging_by_learning_to_singulate_layers_using_interactive_perception"
+   ],
+   "item_id": "qwen3.5:4b/full-test:bagall-001#1/swap",
+   "kind": "swapped",
+   "sentence_index": 1,
+   "sentence": "The rearrangement policy handles the stage of placing multiple rigid objects and folding deformable objects to achieve desirable pre-bagging conditions.",
+   "cited_ids": [
+    "chk:pdf/autobag_learning_to_open_plastic_bags_and_insert_objects:0019"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/bag_all_you_need_learning_a_generalizable_bagging_strategy_for_heterogeneous_objects:0000"
+   ]
+  },
+  {
+   "question_id": "pic2-004",
+   "question": "Does adding YOLO improve packing-mode F1 scores in the grocery bagging evaluation?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-004",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0087",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0067",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0071",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "No, adding YOLO does not improve packing-mode F1 scores; in fact, it causes a net negative effect on micro-F1 for several models because the detector introduces false positives that outweigh any gains from missed items.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-004",
+   "question": "Does adding YOLO improve packing-mode F1 scores in the grocery bagging evaluation?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-004",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0087",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0067",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0071",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "On this small dataset, the YOLO-augmented pipelines do not improve the packing-mode metrics, and specifically, Qwen3-VL-8B-Instruct drops its F1 score from 0.344 to 0.315 when YOLO is added, while MiniCPM-V-4_5 drops from 0.357 to 0.316 in F1.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0067"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-004",
+   "question": "Does adding YOLO improve packing-mode F1 scores in the grocery bagging evaluation?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-004",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0087",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0067",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0071",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Additionally, the systematic precision drop observed when adding YOLO is consistent with the small but negative impact on performance metrics.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0087"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "garbled paraphrase; the systematic precision drop is stated",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-004",
+   "question": "Does adding YOLO improve packing-mode F1 scores in the grocery bagging evaluation?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-004",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0087",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0067",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0071",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-004#2/swap",
+   "kind": "swapped",
+   "sentence_index": 2,
+   "sentence": "Additionally, the systematic precision drop observed when adding YOLO is consistent with the small but negative impact on performance metrics.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0071"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0087"
+   ]
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "SayPlan achieves scalability for long-horizon planning by integrating three distinct components: a classical path planner, an iterative replanning pipeline, and a 3D scene graph simulator that guides semantic search.",
+   "cited_ids": [],
+   "label": "partial",
+   "unsure": false,
+   "note": "uncited; the simulator drives replanning, not semantic search",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The system begins with **Stage 1: Semantic Search**, where the LLM searches a collapsed version of the scene graph to identify relevant items; if the command is \"expand,\" the simulator reveals objects and assets within that node, allowing the LLM to reason over the environment.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "This process continues until a specific item or location is identified, at which point the LLM enters **Stage 2: Causal Planning** to generate a sequence of node-level navigational and manipulation actions.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "\"Stage 2: Causal Planning\" is named in chunk 0013, not the cited chunk 0021 (corrected after review)",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "To ensure executability, SayPlan shortens the LLM's planning horizon by delegating pose-level path planning to an optimal classical path planner like Dijkstra, which simplifies complex sequences of intermediate poses into direct transitions between key locations.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "Following the generation of a high-level plan, the system employs **iterative replanning** to refine the output; the LLM reflects on previous feedback from a scene graph simulator that verifies the full plan and corrects infeasible actions or hallucinated nodes.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the cited chunk says only that replanning continues until the plan is feasible",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#5",
+   "kind": "natural",
+   "sentence_index": 5,
+   "sentence": "This loop repeats until the plan is verified as executable, at which point it is passed to a low-level motion planner for robotic execution.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-003",
+   "question": "How do collapsed-graph semantic search, classical path planning, and iterative replanning combine in SayPlan to make long-horizon planning scalable?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-003",
+   "context_node_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0001",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0021",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0031",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023",
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-003#4/swap",
+   "kind": "swapped",
+   "sentence_index": 4,
+   "sentence": "Following the generation of a high-level plan, the system employs **iterative replanning** to refine the output; the LLM reflects on previous feedback from a scene graph simulator that verifies the full plan and corrects infeasible actions or hallucinated nodes.",
+   "cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0013"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the algorithm shows the feedback loop; correcting hallucinated nodes is not in it",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/sayplan_grounding_large_language_models_using_3d_scene_graphs_for_scalable_robot_task_planning:0023"
+   ]
+  },
+  {
+   "question_id": "synth-004",
+   "question": "Why does MoMa-LLM need both dynamic scene graphs and an object-centric action space for interactive search in unexplored homes?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000",
+    "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0001",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0054",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-004#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context explains that existing work primarily concentrates on explored environments, focusing on navigation or manipulation tasks in isolation, which struggles to generate executable plans for real-world robotic execution in large, unexplored, human-centered environments.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "this is in the abstract and intro (chunks 0000, 0001), not chunk 0041",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-004",
+   "question": "Why does MoMa-LLM need both dynamic scene graphs and an object-centric action space for interactive search in unexplored homes?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000",
+    "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0001",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0054",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-004#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "To address this, the authors propose MoMa-LLM as a novel approach that grounds language models within structured representations derived from open-vocabulary scene graphs, which are dynamically updated as the environment is explored.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-004",
+   "question": "Why does MoMa-LLM need both dynamic scene graphs and an object-centric action space for interactive search in unexplored homes?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000",
+    "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0001",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0054",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-004#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "The method tightly interleaves these dynamic representations with an object-centric action space to enable zero-shot, open-vocabulary performance on mobile manipulation and household robotic tasks in large realistic indoor environments.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-004",
+   "question": "Why does MoMa-LLM need both dynamic scene graphs and an object-centric action space for interactive search in unexplored homes?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000",
+    "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0001",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0054",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-004#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "Furthermore, extensive experiments show that MoMa-LLM achieves substantially improved search efficiency compared to conventional baselines by traveling shorter distances and performing fewer object interactions on average, indicating efficient and target-driven behavior in unstructured settings.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "the comparison with conventional baselines is in chunk 0001, not 0041",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "synth-004",
+   "question": "Why does MoMa-LLM need both dynamic scene graphs and an object-centric action space for interactive search in unexplored homes?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:synth-004",
+   "context_node_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000",
+    "src:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0001",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0054",
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0041"
+   ],
+   "item_id": "qwen3.5:4b/full-test:synth-004#2/swap",
+   "kind": "swapped",
+   "sentence_index": 2,
+   "sentence": "The method tightly interleaves these dynamic representations with an object-centric action space to enable zero-shot, open-vocabulary performance on mobile manipulation and household robotic tasks in large realistic indoor environments.",
+   "cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0001"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "chunk 0001 has the tasks and environments, not the object-centric action space",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/language-grounded_dynamic_scene_graphs_for_interactive_object_search_with_mobile_manipulation:0000"
+   ]
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "The provided context identifies several safety-critical attributes included in the grocery bagging inventory schema, specifically noting that attributes such as `is_liquid`, `leak_risk`, `cold_chain`, and `hazard_class` reach high average accuracy.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "These attributes are aligned with common packing constraints to prevent violations such as treating hygiene products as food or frozen food as shelf-stable.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "**is_liquid**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "list item",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "**leak_risk**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "list item",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "**cold_chain**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "list item",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#5",
+   "kind": "natural",
+   "sentence_index": 5,
+   "sentence": "**hazard_class**",
+   "cited_ids": [],
+   "label": "no_claim",
+   "unsure": false,
+   "note": "list item",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-009",
+   "question": "What safety-critical attributes are included in the grocery bagging inventory schema?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-009",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0090",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0010",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0048",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0000",
+    "src:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-009#6",
+   "kind": "natural",
+   "sentence_index": 6,
+   "sentence": "The context further notes that the schema includes a constrained set of categorical and boolean attributes designed to be aligned with common packing constraints, though it does not list every single attribute beyond those explicitly named above.",
+   "cited_ids": [],
+   "label": "supported",
+   "unsure": false,
+   "note": "uncited",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "review-006",
+   "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:review-006",
+   "context_node_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0019",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:review-006#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "Based on the provided context, the most commonly used sensor modalities for estimating item position, size, and orientation in robotic packing cells are RGB-D (Red, Green, Blue + Depth) sensors, light beams including lasers, and overhead cameras.",
+   "cited_ids": [],
+   "label": "partial",
+   "unsure": false,
+   "note": "uncited; overhead cameras come from the dense-packing paper, not the review",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "review-006",
+   "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:review-006",
+   "context_node_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0019",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:review-006#1",
+   "kind": "natural",
+   "sentence_index": 1,
+   "sentence": "The review identifies RGB-D systems as the most common, with Intel RealSense models such as SR300, D435, and D435i, and Asus's Xtion Pro Live being the specific manufacturers found.",
+   "cited_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "review-006",
+   "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:review-006",
+   "context_node_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0019",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:review-006#2",
+   "kind": "natural",
+   "sentence_index": 2,
+   "sentence": "Additionally, researchers have utilized light beams, including lasers, to determine item dimensions and surface heights more precisely.",
+   "cited_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "review-006",
+   "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:review-006",
+   "context_node_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0019",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:review-006#3",
+   "kind": "natural",
+   "sentence_index": 3,
+   "sentence": "In a specific physical testbed described for dense robotic packing of irregular objects, the system employed an RGB-D camera (Realsense SR300) alongside two high-resolution stereo/structured light black-and-white depth cameras (Ensenso N35) to combine color information with point clouds for pose recognition.",
+   "cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "review-006",
+   "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:review-006",
+   "context_node_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0019",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:review-006#4",
+   "kind": "natural",
+   "sentence_index": 4,
+   "sentence": "These sensors are located in various sections of the physical layout, including on the packing robot, in the general work environment, and in picking, packing, and detailing areas to obtain information on the current state of items.",
+   "cited_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029"
+   ],
+   "label": "supported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "review-006",
+   "question": "According to the freight packing review, what sensor modalities are most commonly used to estimate item position, size, and orientation in robotic packing cells?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:review-006",
+   "context_node_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0045",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0029",
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0019",
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ],
+   "item_id": "qwen3.5:4b/full-test:review-006#3/swap",
+   "kind": "swapped",
+   "sentence_index": 3,
+   "sentence": "In a specific physical testbed described for dense robotic packing of irregular objects, the system employed an RGB-D camera (Realsense SR300) alongside two high-resolution stereo/structured light black-and-white depth cameras (Ensenso N35) to combine color information with point clouds for pose recognition.",
+   "cited_ids": [
+    "chk:pdf/comprehensive_review_of_robotized_freight_packing:0031"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/dense_robotic_packing_of_irregular_and_novel_3d_objects:0029"
+   ]
+  },
+  {
+   "question_id": "pic2-010",
+   "question": "What specific error does YOLO+VLM cause in the easy scene SelfCheckoutEasy2?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-010",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0080",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0115"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-010#0",
+   "kind": "natural",
+   "sentence_index": 0,
+   "sentence": "In the easy scene SelfCheckoutEasy2, the YOLO+VLM pipeline causes juice boxes to be mislabeled as \"protein drink cartons\" rather than \"juice box.\" This error occurs because the evaluation uses a closed vocabulary, causing these differences to appear as hard errors even when the textual labels are plausible.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0115"
+   ],
+   "label": "unsupported",
+   "unsure": false,
+   "note": "the cited chunk only lists scene names; the error is in chunk 0080, which does not blame YOLO+VLM",
+   "labeled_by": "assistant-draft"
+  },
+  {
+   "question_id": "pic2-010",
+   "question": "What specific error does YOLO+VLM cause in the easy scene SelfCheckoutEasy2?",
+   "answerable": true,
+   "answer_item_id": "qwen3.5:4b/full-test:pic2-010",
+   "context_node_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0080",
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0115"
+   ],
+   "item_id": "qwen3.5:4b/full-test:pic2-010#0/swap",
+   "kind": "swapped",
+   "sentence_index": 0,
+   "sentence": "In the easy scene SelfCheckoutEasy2, the YOLO+VLM pipeline causes juice boxes to be mislabeled as \"protein drink cartons\" rather than \"juice box.\" This error occurs because the evaluation uses a closed vocabulary, causing these differences to appear as hard errors even when the textual labels are plausible.",
+   "cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0080"
+   ],
+   "label": "partial",
+   "unsure": false,
+   "note": "chunk 0080 states the error but not that YOLO+VLM caused it",
+   "labeled_by": "assistant-draft",
+   "original_cited_ids": [
+    "chk:pdf/robotic_grocery_bagging-structured_perception_for_packing_relevant_inventory_generation:0115"
+   ]
+  }
+ ]
+}
