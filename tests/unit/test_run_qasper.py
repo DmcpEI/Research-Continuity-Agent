@@ -323,3 +323,33 @@ def test_ask_sends_the_named_question_and_records_it(tmp_path):
 
     assert sent == ['In the paper "A Paper": Q1']
     assert records[0]["question"] == 'In the paper "A Paper": Q1'
+
+
+def test_select_context_mirrors_generate_flows_retrieval_half():
+    from rca.retrieval.query_classifier import QueryType
+
+    calls: list[tuple] = []
+    hits = [
+        SimpleNamespace(node_id="chk:pdf/p:0003", score=0.9, metadata={"rerank_score": 1.5}),
+        SimpleNamespace(node_id="chk:pdf/q:0001", score=0.4, metadata={"rerank_score": -2.0}),
+    ]
+
+    class Retrieve:
+        def retrieve(self, query, limit, query_type):
+            calls.append((query, limit, query_type))
+            return SimpleNamespace(hits=hits)
+
+    flow = SimpleNamespace(
+        retrieve_flow=Retrieve(),
+        _rewrite_query=lambda q: q + " extra",
+        _select_context_hits=lambda bundle: [h for h in bundle.hits if h.score > 0.55],
+    )
+
+    named = rq.select_context(flow, 'In the paper "Big Model": what data?')
+    plain = rq.select_context(flow, "what data do they use?")
+
+    assert calls[0][0] == 'In the paper "Big Model": what data?'  # proper noun: no rewrite
+    assert calls[0][1] == 5 and calls[0][2] is QueryType.proper_noun
+    assert calls[1][0] == "what data do they use? extra"
+    assert named == (["chk:pdf/p:0003"], 1.5)
+    assert plain[0] == ["chk:pdf/p:0003"]

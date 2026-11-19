@@ -270,6 +270,62 @@ def _ask_one(flow, graph, question: dict, text: str, source_id: str, trace_type)
     }
 
 
+def select_context(flow, text: str) -> tuple[list[str], float | None]:
+    """The context GenerateFlow would give the model, without calling it: (node IDs, top
+    rerank score). Mirrors generate_answer: classify, rewrite unless a proper noun, retrieve 5,
+    select, and retry with the raw question if the rewrite left nothing."""
+    from rca.retrieval.query_classifier import QueryType, classify_query
+
+    query_type = classify_query(text)
+    query = text if query_type is QueryType.proper_noun else flow._rewrite_query(text)
+    bundle = flow.retrieve_flow.retrieve(query, limit=5, query_type=query_type)
+    context = flow._select_context_hits(bundle)
+    if not context and query != text:
+        bundle = flow.retrieve_flow.retrieve(text, limit=5, query_type=query_type)
+        context = flow._select_context_hits(bundle)
+    scores = [hit.metadata["rerank_score"] for hit in bundle.hits if "rerank_score" in hit.metadata]
+    return [hit.node_id for hit in context], (max(scores) if scores else None)
+
+
+def retrieval_only(flow, paper_ids, data, manifest, name_paper: bool) -> dict[str, Any]:
+    """Evidence in the selected context for answerable questions, no answers generated."""
+    graph = flow.retrieve_flow.graph_store
+    records = []
+    for paper_id in paper_ids:
+        if "source_id" not in manifest.get(paper_id, {}):
+            continue
+        source_id = manifest[paper_id]["source_id"]
+        own = source_id.replace("src:", "chk:", 1) + ":"
+        for question in data[paper_id]["qas"]:
+            if classify(question) != "answerable":
+                continue
+            text = asked_text(question["question"], data[paper_id].get("title", ""), name_paper)
+            context, top = select_context(flow, text)
+            texts = [node.text or "" for node_id in context if (node := graph.get_node(node_id))]
+            records.append(
+                {
+                    "question_id": question["question_id"],
+                    "context_node_ids": context,
+                    "evidence_hit": evidence_hit(text_evidence(question), texts),
+                    "own_share": sum(n == source_id or n.startswith(own) for n in context)
+                    / max(1, len(context)),
+                    "opening_first": bool(context)
+                    and (context[0] == source_id or context[0] == own + "0000"),
+                    "rerank_max": top,
+                }
+            )
+    scored = [r for r in records if r["evidence_hit"] is not None]
+    return {
+        "summary": {
+            "questions": len(records),
+            "evidence_in_selected_context": f"{sum(r['evidence_hit'] for r in scored)}/{len(scored)}",
+            "own_paper_share_mean": round(statistics.mean(r["own_share"] for r in records), 3),
+            "opening_ranked_first": f"{sum(r['opening_first'] for r in records)}/{len(records)}",
+        },
+        "records": records,
+    }
+
+
 def summarize(records: list[dict]) -> dict[str, Any]:
     def share(hits: int, n: int) -> dict[str, Any]:
         low, high = wilson_interval(hits, n) if n else (None, None)
@@ -319,6 +375,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--library", type=Path, default=Path("eval/external/qasper/library"))
     parser.add_argument("--output-dir", type=Path, default=Path("eval/results"))
     parser.add_argument(
+        "--retrieval-only",
+        action="store_true",
+        help="Only retrieve (no answers): evidence in the selected context, for ablations.",
+    )
+    parser.add_argument(
         "--name-paper",
         action="store_true",
         help='Ask "In the paper "<title>": <question>" instead of the question as written.',
@@ -345,6 +406,17 @@ def main(argv: list[str] | None = None) -> int:
     provenance = collect_provenance(
         settings, flow.retrieve_flow.graph_store, flow.retrieve_flow.vector_store
     )
+    if args.retrieval_only:
+        result = retrieval_only(flow, paper_ids, data, manifest, args.name_paper)
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        output = args.output_dir / f"qasper_retrieval_{stamp}.json"
+        result["provenance"] = finish_provenance(provenance, flow.retrieve_flow.vector_store)
+        result["question_form"] = "paper named" if args.name_paper else "as written"
+        output.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+        print(json.dumps(result["summary"], indent=2))
+        print(f"-> {output}")
+        return 0
     commit = (provenance.get("code") or {}).get("commit") or "unknown"
     # One checkpoint per commit, so answers from different code are never mixed.
     form = "-named" if args.name_paper else ""
