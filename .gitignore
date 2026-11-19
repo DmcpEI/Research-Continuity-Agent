@@ -24,3 +24,5 @@ frontend/*.tsbuildinfo
 # The plan is kept local, not published
 docs/PLAN.md
 docs/PLAN-claude-md.diff
+# Downloaded eval data and the libraries built from it (QASPER, ...)
+eval/external/
