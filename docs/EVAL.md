@@ -55,17 +55,17 @@ Held-out test split, 40 questions (28 answerable, 12 unanswerable), shipped defa
 
 | Test split | Result | 95% interval |
 |---|---|---|
-| Answerable: answered, citing the expected paper | `24/28` (86%) | 68% to 94% |
-| Answerable: refused | `3/28` (11%) | 4% to 27% |
+| Answerable: answered, citing the expected paper | `26/28` (93%) | 77% to 98% |
+| Answerable: refused | `2/28` (7%) | 2% to 23% |
 | Unanswerable: refused ("not in your papers") | `12/12` (100%) | 76% to 100% |
-| When it answers: cites every expected paper | `24/25` (96%) | 80% to 99% |
+| When it answers: cites every expected paper | `26/26` (100%) | 87% to 100% |
 | Retrieval: expected paper in the top 5 | `27/28` (96%) | 82% to 99% |
-| Answer keyword hit rate (answerable, mean) | `0.595` | |
-| Time per question | mean `8.9 s`, median `8.9 s` | |
+| Answer keyword hit rate (answerable, mean) | `0.600` | |
+| Time per question | mean `9.1 s`, median `9.4 s` | |
 
-Misses. Answerable refused: `review-002`, `cross-004`, `autobag-004`. Answered without the expected citation: `pic2-009`. Unanswerable answered: none. Expected paper not in the top 5: `cross-004`.
+Misses. Answerable refused: `cross-004`, `autobag-004`. Answered without the expected citation: none. Unanswerable answered: none. Expected paper not in the top 5: `cross-004`.
 
-Run `20261111T173354Z`, commit `77ec660`, corpus `51b6785c3405cb16`. Reproduce: `uv run python eval/harness.py --split test`, then `uv run python eval/scorecard.py eval/results/run_<timestamp>.json`.
+Run `20261119T171445Z`, commit `389fcad`, corpus `51b6785c3405cb16`. Reproduce: `uv run python eval/harness.py --split test`, then `uv run python eval/scorecard.py eval/results/run_<timestamp>.json`.
 <!-- scorecard:end -->
 
 Reading it:
@@ -75,10 +75,16 @@ Reading it:
   outcomes: there `jampacker-001` was refused and `review-002` and `autobag-004` were answered,
   and `pic2-009` was answered instead of `unverified`. So "answerable refused" is 2/28 or 3/28
   depending on the run, and a single-question change between runs is not evidence by itself.
+- **What changed since the previous scorecard** (run `20261111T173354Z`, 24/28 answered with
+  the expected citation, 3/28 refused): the paper's `src:` node no longer repeats its first chunk
+  in the context (2026-11-19, see "QASPER"). `review-002` and `pic2-009` are now answered with
+  the expected citation, but both had already been answered in an earlier run of the old code, so
+  this scorecard cannot tell the change from run-to-run variation. The evidence for it is the dev
+  split (47 to 52 of 62; the six questions whose outcome changed all had a different context, five
+  gained and one went from a wrong-paper answer to a refusal) and QASPER (66 to 75 of 117).
 - **The misses:** `cross-004` names "the VLM survey", whose chunks do not reach the top 5 (an
-  aliasing gap, see Retrieval Ablations). It, `review-002` and `autobag-004` get a reply that
-  hedges, the facts check finds nothing in it that answers, and RCA declines. `pic2-009` answers
-  without a citation tag (`unverified`).
+  aliasing gap, see Retrieval Ablations); it and `autobag-004` get a reply that hedges, the facts
+  check finds nothing in it that answers, and RCA declines.
 - **Retrieval hit@5** comes from the same run (the top 5 of the final bundle), not from a
   separate ablation run; 33 of the 40 questions skip the rewrite as proper-noun queries.
 - **Not recorded as a fallback:** an empty model reply and a reply cut off at the token limit
@@ -752,17 +758,19 @@ all-question F1). No run had errors. Two question forms:
   paper and usually does not name it ("which baselines did they compare against?").
 - **Paper named** (run `20261119T125758Z`, commit `a14c5d2`): `In the paper "<title>": <question>`,
   the way a person asking RCA about one of many papers would.
+- **Paper named, opening once** (run `20261119T174337Z`, commit `389fcad`): the same, after the
+  paper's `src:` node stopped repeating its first chunk in the context (below).
 
-| | as written | paper named |
-|---|---|---|
-| answerable: answered citing the paper asked about | 30/117 (26%, 19–34%) | 66/117 (56%, 47–65%) |
-| answerable: refused | 40/117 (34%, 26–43%) | 48/117 (41%, 33–50%) |
-| unanswerable: refused | 8/12 (67%, 39–86%) | 9/12 (75%, 47–91%) |
-| an evidence paragraph in the selected context | 17/109 (16%, 10–24%) | 22/109 (20%, 14–29%) |
-| … of those, in context the model read (a gate can refuse first) | 14/84 | 22/108 |
-| token F1, answerable questions | 0.046 | 0.061 |
-| token F1, every question (as QASPER's evaluator) | 0.15 | 0.19 |
-| median time per question | 11.4 s | 8.4 s |
+| | as written | paper named | paper named, opening once |
+|---|---|---|---|
+| answerable: answered citing the paper asked about | 30/117 (26%, 19–34%) | 66/117 (56%, 47–65%) | 75/117 (64%, 55–72%) |
+| answerable: refused | 40/117 (34%, 26–43%) | 48/117 (41%, 33–50%) | 36/117 (31%, 23–40%) |
+| unanswerable: refused | 8/12 (67%, 39–86%) | 9/12 (75%, 47–91%) | 7/12 (58%, 32–81%) |
+| an evidence paragraph in the selected context | 17/109 (16%, 10–24%) | 22/109 (20%, 14–29%) | 30/109 (28%, 20–37%) |
+| … of those, in context the model read (a gate can refuse first) | 14/84 | 22/108 | 30/108 |
+| token F1, answerable questions | 0.046 | 0.061 | 0.074 |
+| token F1, every question (as QASPER's evaluator) | 0.15 | 0.19 | 0.17 |
+| median time per question | 11.4 s | 8.4 s | 9.0 s |
 
 Intervals are Wilson 95%. Evidence counts answerable questions with a text evidence paragraph
 (tables and figures left out); a match is half of the paragraph's
@@ -783,11 +791,28 @@ Reading it:
   usually follows it, so two of five slots carry the same opening text. Why chunk 0 wins is a
   hypothesis, not measured: every chunk's title is `<paper title> #N`, so title words lift all
   of a paper's chunks equally, but chunk 0's text also holds the title, and the cross-encoder
-  scores only each hit's first 240 characters, which for chunk 0 is the title block. Worth
-  trying next, with an ablation: use a named paper to choose the source and rank its chunks by
-  the rest of the question, and drop a `src:` node whose text repeats a chunk already in context.
+  scores only each hit's first 240 characters, which for chunk 0 is the title block.
+- **Ablation and fix (2026-11-19).** Retrieval only, four configurations on the paper-named
+  questions: evidence in the selected context 22/109 as shipped; 23 with the cross-encoder
+  reading whole chunks; 30 without the duplicated `src:` node; 33 with both. The opening still
+  ranks first in 88 to 92 of 117 in all four, so the title in the question, not the 240
+  characters, puts it first. On our golden set the expected paper in the top 5 did not change in
+  any configuration; the rerank gate's trade-off did not change without the `src:` node, and
+  shifted with whole-chunk input (the threshold would need recalibrating). Shipped: the `src:`
+  node is left out when it repeats its first chunk (on by default; dev split 47 to 52 of 62
+  answered with the expected citation; test scorecard above). The cost: fewer refusals of every
+  kind, so unanswerable questions refused on QASPER fell from 9 to 7 of 12 (two questions,
+  `11360385…` and `538430077…`, both with a changed context; our dev split held at 26 of 27).
+  Side effects: a `src:` node passed the context filter at any score, so a question whose only
+  context was one can now get an empty context (none in 246 questions); and the reserved slot can
+  go to a different paper. Our golden top-5 check was 90/90 in every configuration, a ceiling
+  that cannot show harm. Not shipped: whole-chunk input (one to three questions here, within
+  noise). The ablation's `select_context` skips the conversational shortcut and the rerank gate;
+  143 of 147 QASPER questions are proper-noun queries and one is gated in both configurations,
+  so this did not change the comparison. Next idea for the opening: use a named paper to
+  choose the source and rank its chunks by the rest of the question.
 - **Refusals follow.** With the right passage missing, the model often says the context does not
-  answer (41% of answerable questions refused). The 12 unanswerable questions are too few to read
+  answer (41% of answerable questions refused with the paper named, 31% after the fix below). The 12 unanswerable questions are too few to read
   much into the refusal rate.
 - **Token F1 is low by construction** and not comparable to QASPER papers that read the whole
   paper: gold answers are short spans or yes/no (19 of 117), RCA writes sentences.
@@ -810,7 +835,7 @@ What is true today, independent of any single artifact:
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
 - abstention has two measured parts: the pre-generation rerank gate (`rerank_max <= -3.618`, rechecked with `qwen3.5:4b` rewrites) and the facts check on hedged replies; an unanswerable question answered without any hedge passes both, so it is still the main open weakness
-- on questions written by others (QASPER, 40 unseen arXiv papers), RCA answers citing the right paper for 56% of answerable questions when the paper is named (26% when it is not), and the passage that answers is in the context for only 20%: the opening of the named paper fills the context (why is not yet measured)
+- on questions written by others (QASPER, 40 unseen arXiv papers), RCA answers citing the right paper for 64% of answerable questions when the paper is named (26% when it is not), and the passage that answers is in the context for 28%: the opening of a named paper still ranks first, because the title in the question matches it; with fewer refusals overall, 7 of 12 unanswerable QASPER questions are refused
 - citation support is measured but not checked at answer time: on test, 22 of 79 cited sentences are not fully backed by their block; the best per-sentence check caught 77% of not-supported cited sentences (natural and swapped) at 4.1 s per answer, below the bar for a "Supported" badge
 - a human-authored external subset would still be stronger for bias reduction than self-authored or model-authored additions
 

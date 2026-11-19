@@ -93,8 +93,9 @@ class Settings(BaseSettings):
     # What the cross-encoder reads of each hit: its first 240 characters ("excerpt") or the
     # whole chunk ("text"). The rerank gate threshold is calibrated for one of them.
     reranker_input: Literal["excerpt", "text"] = "excerpt"
-    # Leave out a paper's src: node when its text only repeats its first chunk (it always does
-    # for ingested files), so a paper's opening does not take two context slots. On since
+    # Leave out a paper's src: node when its text only repeats its first chunk (it does for
+    # ingested files when chunk_size >= 1000, the preview length; otherwise nothing is dropped),
+    # so a paper's opening does not take two context slots. On since
     # 2026-11-19: QASPER evidence in context 22 -> 30 of 109, dev answers citing the expected
     # paper 47 -> 52 of 62, retrieval hit@5 and the rerank gate unchanged (docs/EVAL.md).
     retrieval_skip_duplicate_source: bool = True

@@ -11,17 +11,17 @@ Held-out test split, 40 questions (28 answerable, 12 unanswerable), shipped defa
 
 | Test split | Result | 95% interval |
 |---|---|---|
-| Answerable: answered, citing the expected paper | `24/28` (86%) | 68% to 94% |
-| Answerable: refused | `3/28` (11%) | 4% to 27% |
+| Answerable: answered, citing the expected paper | `26/28` (93%) | 77% to 98% |
+| Answerable: refused | `2/28` (7%) | 2% to 23% |
 | Unanswerable: refused ("not in your papers") | `12/12` (100%) | 76% to 100% |
-| When it answers: cites every expected paper | `24/25` (96%) | 80% to 99% |
+| When it answers: cites every expected paper | `26/26` (100%) | 87% to 100% |
 | Retrieval: expected paper in the top 5 | `27/28` (96%) | 82% to 99% |
-| Answer keyword hit rate (answerable, mean) | `0.595` | |
-| Time per question | mean `8.9 s`, median `8.9 s` | |
+| Answer keyword hit rate (answerable, mean) | `0.600` | |
+| Time per question | mean `9.1 s`, median `9.4 s` | |
 
-Misses. Answerable refused: `review-002`, `cross-004`, `autobag-004`. Answered without the expected citation: `pic2-009`. Unanswerable answered: none. Expected paper not in the top 5: `cross-004`.
+Misses. Answerable refused: `cross-004`, `autobag-004`. Answered without the expected citation: none. Unanswerable answered: none. Expected paper not in the top 5: `cross-004`.
 
-Run `20261111T173354Z`, commit `77ec660`, corpus `51b6785c3405cb16`. Reproduce: `uv run python eval/harness.py --split test`, then `uv run python eval/scorecard.py eval/results/run_<timestamp>.json`.
+Run `20261119T171445Z`, commit `389fcad`, corpus `51b6785c3405cb16`. Reproduce: `uv run python eval/harness.py --split test`, then `uv run python eval/scorecard.py eval/results/run_<timestamp>.json`.
 <!-- scorecard:end -->
 
 Measured separately, not part of the scorecard:
@@ -29,7 +29,7 @@ Measured separately, not part of the scorecard:
 | What | Result | Details |
 |---|---|---|
 | Agent benchmark, 20 sandboxed tasks, default `qwen3.5:4b` (2026-11-12, two runs) | `18/20` tasks both runs, invalid tool calls `2` (was `11`) | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
-| QASPER: 147 questions written by others about 40 unseen arXiv papers (2026-11-19) | answered citing the right paper `66/117` with the paper named (`30/117` as written); the answering passage is in the context for `22/109` | [EVAL.md → QASPER](docs/EVAL.md#qasper-questions-written-by-others-step-17a) |
+| QASPER: 147 questions written by others about 40 unseen arXiv papers (2026-11-19) | answered citing the right paper `75/117` with the paper named (`30/117` as written); the answering passage is in the context for `30/109` | [EVAL.md → QASPER](docs/EVAL.md#qasper-questions-written-by-others-step-17a) |
 | Retrieval regression gate in CI | fails the build when any fixture question ranks worse | [EVAL.md → CI Retrieval Gate](docs/EVAL.md#ci-retrieval-gate) |
 
 Golden set: 129 questions, 39 of them unanswerable, split 89 dev (tuning) / 40 test (reported above). Known gaps: [Known Limitations](docs/EVAL.md#known-limitations).
