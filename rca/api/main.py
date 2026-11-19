@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import hashlib
+import io
 import itertools
 import json
 import logging
@@ -14,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -25,8 +27,9 @@ from pydantic import BaseModel, Field
 from rca.agent.loop import AgentLoop
 from rca.config.settings import Settings, get_settings
 from rca.contracts.nodes import NodeKind
+from rca.flows.fetch_flow import FetchedPaper, FetchError, fetch_paper
 from rca.flows.generate_flow import GeneratedAnswer, GenerateFlow
-from rca.flows.ingest_flow import IngestFlow
+from rca.flows.ingest_flow import IngestFlow, IngestResult
 from rca.flows.retrieve_flow import RetrieveFlow
 from rca.llm.models import (
     agent_model_choices,
@@ -42,6 +45,10 @@ from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore, backend_status
 
 logger = logging.getLogger(__name__)
+
+
+class FetchRequest(BaseModel):
+    identifier: str
 
 
 class ChatRequest(BaseModel):
@@ -69,6 +76,7 @@ def create_app(
     generate_flow: GenerateFlow | None = None,
     ingest_flow: IngestFlow | None = None,
     agent_loop: AgentLoop | None = None,
+    paper_fetcher: Callable[[str], FetchedPaper] | None = None,
 ) -> FastAPI:
     """Create the RCA FastAPI application."""
 
@@ -84,6 +92,7 @@ def create_app(
         settings=cfg,
         retrieve_flow=retrieve,
     )
+    fetcher = paper_fetcher or fetch_paper
     ingester = ingest_flow or IngestFlow(
         settings=cfg,
         graph_store=store,
@@ -529,16 +538,9 @@ def create_app(
             "ollama_connected": _is_ollama_connected(cfg),
         }
 
-    @router.post("/sources/ingest")
-    def ingest_source(file: UploadFile = File(...)) -> dict[str, Any]:
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="Uploaded file must include a filename")
-
-        original_name = Path(file.filename).name
+    def store_and_ingest(read: Callable[[int], bytes], original_name: str) -> IngestResult:
+        """Store a PDF in the uploads folder and ingest it; shared by upload and fetch."""
         suffix = Path(original_name).suffix.lower()
-        if suffix != ".pdf":
-            raise HTTPException(status_code=400, detail="Only .pdf files are supported")
-
         upload_dir = cfg.filesystem_root / ".rca" / "uploads"
         upload_dir.mkdir(parents=True, exist_ok=True)
 
@@ -547,7 +549,7 @@ def create_app(
         digest = hashlib.sha256()
         try:
             with incoming.open("wb") as handle:
-                for block in iter(lambda: file.file.read(1024 * 1024), b""):
+                for block in iter(lambda: read(1024 * 1024), b""):
                     digest.update(block)
                     handle.write(block)
             file_sha256 = digest.hexdigest()
@@ -560,7 +562,7 @@ def create_app(
             stored_path = Path(stored) if isinstance(stored, str) and stored else None
             if stored_path is not None and stored_path.is_file():
                 if IngestFlow._file_sha256(stored_path) == file_sha256:
-                    return ingester.ingest_path(stored_path).model_dump(mode="json")
+                    return ingester.ingest_path(stored_path)
                 stored_path = None
             # A stored upload that is gone gets these bytes back under its own name, so the
             # source is repaired instead of a second one being created under the new name.
@@ -596,7 +598,28 @@ def create_app(
             if written is None or written.metadata.get("latest_path") != str(candidate):
                 candidate.unlink(missing_ok=True)
             raise
-        return result.model_dump(mode="json")
+        return result
+
+    @router.post("/sources/ingest")
+    def ingest_source(file: UploadFile = File(...)) -> dict[str, Any]:
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Uploaded file must include a filename")
+
+        original_name = Path(file.filename).name
+        if Path(original_name).suffix.lower() != ".pdf":
+            raise HTTPException(status_code=400, detail="Only .pdf files are supported")
+        return store_and_ingest(file.file.read, original_name).model_dump(mode="json")
+
+    @router.post("/sources/fetch")
+    def fetch_source(payload: FetchRequest) -> dict[str, Any]:
+        try:
+            paper = fetcher(payload.identifier)
+        except FetchError as exc:
+            raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
+        result = store_and_ingest(io.BytesIO(paper.pdf).read, paper.file_name)
+        # After the ingest, so it is recorded even when the file was already in the library.
+        store.set_metadata_field(result.source_id, "origin", paper.origin)
+        return {**result.model_dump(mode="json"), "title": paper.title, "origin": paper.origin}
 
     @router.get("/status")
     def status() -> dict[str, Any]:

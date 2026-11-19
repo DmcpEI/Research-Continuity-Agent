@@ -328,6 +328,21 @@ export async function ingestFile(file: File): Promise<ApiIngestResult> {
   return parseJson<ApiIngestResult>(response);
 }
 
+export type ApiFetchResult = ApiIngestResult & {
+  title: string;
+  origin: { kind: string; identifier: string; url?: string; license?: string | null };
+};
+
+// Fetches an open-access paper by arXiv ID or DOI and ingests it like an upload.
+export async function fetchPaper(identifier: string): Promise<ApiFetchResult> {
+  const response = await fetch('/api/sources/fetch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier }),
+  });
+  return parseJson<ApiFetchResult>(response);
+}
+
 export function getPdfUrl(sourceId: string): string {
   return `/api/sources/${sourceId}/pdf#toolbar=0`;
 }

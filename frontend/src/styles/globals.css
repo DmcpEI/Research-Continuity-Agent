@@ -1566,6 +1566,33 @@ input {
   background: var(--raised);
 }
 
+.library-fetch-form {
+  display: flex;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+.library-fetch-input {
+  flex: 1;
+  width: auto;
+}
+
+.library-fetch-button {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  padding: var(--s-2) var(--s-3);
+  cursor: pointer;
+}
+
+.library-fetch-button:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  color: var(--text);
+}
+
 .library-upload-status {
   margin-top: var(--s-2);
   font-family: var(--font-mono);

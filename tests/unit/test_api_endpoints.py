@@ -444,6 +444,99 @@ def test_a_failed_move_leaves_no_empty_file(tmp_path: Path, monkeypatch) -> None
     assert sorted(p.name for p in uploads.iterdir() if p.is_file()) == ["paper.pdf"]
 
 
+def _fetch_client(tmp_path: Path, fetcher):
+    from rca.flows.ingest_flow import IngestFlow
+
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    flow = IngestFlow(settings, graph_store=store, vector_store=vectors, pdf_extractor=_TextPDF())
+    app = create_app(
+        settings=settings,
+        graph_store=store,
+        vector_store=vectors,
+        ingest_flow=flow,
+        paper_fetcher=fetcher,
+    )
+    return TestClient(app, raise_server_exceptions=False), tmp_path / ".rca" / "uploads"
+
+
+def _paper(pdf: bytes = b"%PDF fetched paper", **origin):
+    from rca.flows.fetch_flow import FetchedPaper
+
+    return FetchedPaper(
+        pdf=pdf,
+        file_name="Fetched_Paper.pdf",
+        title="Fetched Paper",
+        origin={
+            "kind": "arxiv",
+            "identifier": "2501.10868v3",
+            "url": "https://arxiv.org/pdf/2501.10868v3",
+            "license": "http://creativecommons.org/licenses/by/4.0/",
+            "fetched_at": "2026-11-19T12:00:00+00:00",
+            **origin,
+        },
+    )
+
+
+def test_fetch_ingests_the_paper_and_records_where_it_came_from(tmp_path: Path) -> None:
+    asked: list[str] = []
+
+    def fetcher(identifier: str):
+        asked.append(identifier)
+        return _paper()
+
+    client, uploads = _fetch_client(tmp_path, fetcher)
+
+    response = client.post("/sources/fetch", json={"identifier": " 2501.10868 "})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_id"] == "src:pdf/fetched_paper"
+    assert body["ingest_status"] == "created"
+    assert body["origin"]["identifier"] == "2501.10868v3"
+    assert body["title"] == "Fetched Paper"
+    assert asked == [" 2501.10868 "]
+    assert sorted(p.name for p in uploads.iterdir()) == ["Fetched_Paper.pdf"]
+    detail = client.get("/sources/src:pdf/fetched_paper").json()
+    assert detail["metadata"]["origin"]["license"].endswith("/by/4.0/")
+
+
+def test_fetching_a_paper_already_uploaded_reuses_it_and_adds_the_origin(tmp_path: Path) -> None:
+    client, uploads = _fetch_client(tmp_path, lambda _identifier: _paper(b"%PDF same bytes"))
+    uploaded = _upload(client, "my copy.pdf", b"%PDF same bytes").json()
+
+    fetched = client.post("/sources/fetch", json={"identifier": "2501.10868"})
+
+    assert fetched.status_code == 200
+    assert fetched.json()["source_id"] == uploaded["source_id"]
+    assert fetched.json()["ingest_status"] == "unchanged"
+    assert sorted(p.name for p in uploads.iterdir()) == ["my copy.pdf"]
+    detail = client.get(f"/sources/{uploaded['source_id']}").json()
+    assert detail["metadata"]["origin"]["kind"] == "arxiv"
+
+
+def test_fetch_errors_keep_their_status_and_message(tmp_path: Path) -> None:
+    from rca.flows.fetch_flow import FetchError
+
+    def fetcher(identifier: str):
+        raise FetchError(404, "No open-access PDF found for DOI 10.1109/x.")
+
+    client, uploads = _fetch_client(tmp_path, fetcher)
+
+    response = client.post("/sources/fetch", json={"identifier": "10.1109/x"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No open-access PDF found for DOI 10.1109/x."
+    assert not uploads.exists() or list(uploads.iterdir()) == []
+
+
+def test_fetch_rejects_a_missing_identifier(tmp_path: Path) -> None:
+    client, _uploads = _fetch_client(tmp_path, lambda _identifier: _paper())
+
+    assert client.post("/sources/fetch", json={}).status_code == 422
+
+
 def test_sources_never_flag_a_source_from_before_revision_tracking(tmp_path: Path) -> None:
     settings = _settings_for(tmp_path)
     store = GraphStore(settings.graph_db_path)

@@ -1,6 +1,14 @@
-import { type ChangeEvent, type MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteSource, ingestFile } from '../../api/client';
+import { ApiError, type ApiFetchResult, deleteSource, fetchPaper, ingestFile } from '../../api/client';
 import { useSources } from '../../hooks/useSources';
 import { SourceRow } from './SourceRow';
 
@@ -13,6 +21,9 @@ export function LibraryView({ onSourceOpen, selectedSourceId = null }: LibraryVi
   const [filter, setFilter] = useState('');
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState('');
+  const [fetchMessage, setFetchMessage] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<
     { sourceId: string; x: number; y: number } | null
   >(null);
@@ -30,7 +41,7 @@ export function LibraryView({ onSourceOpen, selectedSourceId = null }: LibraryVi
       void queryClient.invalidateQueries({ queryKey: ['status'] });
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Upload failed.';
+      const message = errorText(error, 'Upload failed.');
       setUploadError(message);
       setUploadMessage(null);
     },
@@ -38,6 +49,32 @@ export function LibraryView({ onSourceOpen, selectedSourceId = null }: LibraryVi
       setTimeout(() => setUploadMessage(null), 2500);
     },
   });
+
+  const fetchMutation = useMutation({
+    mutationFn: async (value: string) => fetchPaper(value),
+    onSuccess: (result) => {
+      setFetchMessage(fetchedText(result));
+      setFetchError(null);
+      setIdentifier('');
+      void queryClient.invalidateQueries({ queryKey: ['sources'] });
+      void queryClient.invalidateQueries({ queryKey: ['status'] });
+    },
+    onError: (error) => {
+      setFetchError(errorText(error, 'Could not fetch the paper.'));
+      setFetchMessage(null);
+    },
+  });
+
+  const handleFetch = (event: FormEvent) => {
+    event.preventDefault();
+    const value = identifier.trim();
+    if (!value || fetchMutation.isPending) {
+      return;
+    }
+    setFetchError(null);
+    setFetchMessage('Fetching…');
+    fetchMutation.mutate(value);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (sourceId: string) => deleteSource(sourceId),
@@ -217,6 +254,22 @@ export function LibraryView({ onSourceOpen, selectedSourceId = null }: LibraryVi
                 {uploadError ? (
                   <div className="library-upload-status is-error">{uploadError}</div>
                 ) : null}
+                <form className="library-fetch-form" onSubmit={handleFetch}>
+                  <input
+                    aria-label="arXiv ID or DOI"
+                    className="library-filter-input library-fetch-input"
+                    disabled={fetchMutation.isPending}
+                    onChange={(event) => setIdentifier(event.target.value)}
+                    placeholder="arXiv ID or DOI"
+                    type="text"
+                    value={identifier}
+                  />
+                  <button className="library-fetch-button" disabled={fetchMutation.isPending} type="submit">
+                    Fetch
+                  </button>
+                </form>
+                {fetchMessage ? <div className="library-upload-status">{fetchMessage}</div> : null}
+                {fetchError ? <div className="library-upload-status is-error">{fetchError}</div> : null}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -250,4 +303,21 @@ export function LibraryView({ onSourceOpen, selectedSourceId = null }: LibraryVi
       ) : null}
     </section>
   );
+}
+
+// The server's own message when there is one, not "API 404: {...}".
+function errorText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return error.detail || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
+function fetchedText(result: ApiFetchResult): string {
+  const title = result.title || result.source_id;
+  if (result.ingest_status === 'unchanged') {
+    return `“${title}” is already in your library.`;
+  }
+  const where = result.origin.kind === 'arxiv' ? 'arXiv' : 'DOI';
+  return `Added “${title}” (${where} ${result.origin.identifier}).`;
 }

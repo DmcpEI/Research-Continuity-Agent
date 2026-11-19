@@ -6,6 +6,7 @@ import json
 import re
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from rca.contracts.nodes import Edge, Node
 from rca.contracts.revisions import SourceRevision
@@ -136,6 +137,15 @@ class GraphStore:
                 "SELECT 1 FROM source_revisions WHERE revision_id = ?", (revision_id,)
             ).fetchone()
         return row is None
+
+    def set_metadata_field(self, node_id: str, key: str, value: Any) -> None:
+        """Set one metadata key in a single statement, so a concurrent write to the node's
+        other keys (an ingest) is not overwritten with stale values."""
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE nodes SET metadata = json_set(metadata, ?, json(?)) WHERE id = ?",
+                (f"$.{key}", json.dumps(value), node_id),
+            )
 
     def find_source_by_file_hash(self, file_sha256: str) -> Node | None:
         """The source whose current file has this SHA-256, committed or not."""
