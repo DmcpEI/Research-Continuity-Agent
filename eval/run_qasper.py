@@ -150,6 +150,13 @@ def library_settings(library: Path):
     )
 
 
+def check_library(flow, settings) -> None:
+    """Stop before asking anything if the flow would search another library (the user's)."""
+    searched = Path(flow.retrieve_flow.graph_store.db_path).resolve()
+    if searched != Path(settings.graph_db_path).resolve():
+        raise SystemExit(f"RCA would search {searched}, not the QASPER library; nothing asked.")
+
+
 def build_library(paper_ids: list[str], library: Path, fetch, ingest) -> dict[str, dict]:
     """Fetch and ingest each paper once; the manifest makes a rerun skip finished papers."""
     manifest_path = library / "manifest.json"
@@ -314,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     flow = GenerateFlow(settings=settings)
+    check_library(flow, settings)
     provenance = collect_provenance(
         settings, flow.retrieve_flow.graph_store, flow.retrieve_flow.vector_store
     )

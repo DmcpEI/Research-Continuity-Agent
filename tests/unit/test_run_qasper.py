@@ -280,3 +280,17 @@ def test_ask_resumes_from_its_checkpoint(tmp_path):
 
     assert asked == ["Q2", "Q3", "Q4"]
     assert [r["question_id"] for r in records] == ["a1", "a2", "m1", "a3"]
+
+
+def test_check_library_refuses_a_flow_that_reads_another_library(tmp_path):
+    library = tmp_path / "qasper-library"
+    settings = SimpleNamespace(graph_db_path=library / "graph.sqlite3")
+
+    def flow(path):
+        return SimpleNamespace(
+            retrieve_flow=SimpleNamespace(graph_store=SimpleNamespace(db_path=path))
+        )
+
+    rq.check_library(flow(library / "graph.sqlite3"), settings)  # no error
+    with pytest.raises(SystemExit, match="not the QASPER library"):
+        rq.check_library(flow(tmp_path / ".rca" / "graph.sqlite3"), settings)
