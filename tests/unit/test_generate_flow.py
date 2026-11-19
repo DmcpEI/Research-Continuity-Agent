@@ -867,3 +867,25 @@ def test_without_on_token_the_flow_never_streams() -> None:
     llm = _StreamCountingLLM()
     GenerateFlow(retrieve_flow=StubRetrieveFlow(), llm_client=llm).generate_answer(_CONCEPTUAL)
     assert llm.streamed == 0 and llm.calls == 2
+
+
+def test_generate_flow_retrieves_from_the_library_its_settings_name(tmp_path) -> None:
+    """GenerateFlow(settings=...) built its RetrieveFlow from the default settings, so a caller
+    pointing at another library (eval/run_qasper.py) still searched ./.rca."""
+    from rca.config.settings import Settings
+    from rca.llm.client import EchoLLMClient
+
+    library = tmp_path / "other-library"
+    settings = Settings(
+        data_dir=library,
+        graph_db_path=library / "graph.sqlite3",
+        vector_dir=library / "vectors",
+        telemetry_log_path=library / "telemetry.jsonl",
+        experiment_db_path=library / "experiments.sqlite3",
+        enable_reranker=False,
+    )
+
+    flow = GenerateFlow(settings=settings, llm_client=EchoLLMClient())
+
+    assert flow.retrieve_flow.settings is settings
+    assert flow.retrieve_flow.graph_store.db_path == library / "graph.sqlite3"

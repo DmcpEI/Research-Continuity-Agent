@@ -123,7 +123,7 @@ Rules:
         rewrite_llm: LLMClient | None = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.retrieve_flow = retrieve_flow or RetrieveFlow()
+        self.retrieve_flow = retrieve_flow or RetrieveFlow(settings=self.settings)
 
         if llm_client is not None:
             self.llm = llm_client
