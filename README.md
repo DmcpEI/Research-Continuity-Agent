@@ -29,6 +29,7 @@ Measured separately, not part of the scorecard:
 | What | Result | Details |
 |---|---|---|
 | Agent benchmark, 20 sandboxed tasks, default `qwen3.5:4b` (2026-11-12, two runs) | `18/20` tasks both runs, invalid tool calls `2` (was `11`) | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
+| QASPER: 147 questions written by others about 40 unseen arXiv papers (2026-11-19) | answered citing the right paper `66/117` with the paper named (`30/117` as written); the answering passage is in the context for `22/109` | [EVAL.md → QASPER](docs/EVAL.md#qasper-questions-written-by-others-step-17a) |
 | Retrieval regression gate in CI | fails the build when any fixture question ranks worse | [EVAL.md → CI Retrieval Gate](docs/EVAL.md#ci-retrieval-gate) |
 
 Golden set: 129 questions, 39 of them unanswerable, split 89 dev (tuning) / 40 test (reported above). Known gaps: [Known Limitations](docs/EVAL.md#known-limitations).

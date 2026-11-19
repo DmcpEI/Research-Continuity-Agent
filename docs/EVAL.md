@@ -736,6 +736,73 @@ uncited sentences. Run outputs: scratchpad only, not committed.
 
 ---
 
+## QASPER: questions written by others (step 17a)
+
+Why: every other number here comes from questions, papers and labels written for this project.
+QASPER (Dasigi et al., 2021; CC BY 4.0) has questions written by NLP readers about arXiv papers,
+with answers, evidence paragraphs and unanswerable questions. Nothing in RCA was tuned for it.
+
+Setup: `eval/run_qasper.py` takes a seeded sample (seed `20261119`) of 40 papers from the QASPER
+test split, fetches their PDFs from arXiv with the step 18 fetcher, builds a separate library
+(40 sources, 1,418 chunks; corpus `e87b8bd788b5dd54`) and asks all 147 questions on them with
+the shipped defaults (`qwen3.5:4b`, facts check on, Chroma). 117 are answerable (no annotator says
+unanswerable), 12 unanswerable (all annotators do), 18 mixed (asked, scored only in the
+all-question F1). No run had errors. Two question forms:
+- **As written** (run `20261119T123431Z`, commit `9783a6e`): QASPER's text, which is about one
+  paper and usually does not name it ("which baselines did they compare against?").
+- **Paper named** (run `20261119T125758Z`, commit `a14c5d2`): `In the paper "<title>": <question>`,
+  the way a person asking RCA about one of many papers would.
+
+| | as written | paper named |
+|---|---|---|
+| answerable: answered citing the paper asked about | 30/117 (26%, 19–34%) | 66/117 (56%, 47–65%) |
+| answerable: refused | 40/117 (34%, 26–43%) | 48/117 (41%, 33–50%) |
+| unanswerable: refused | 8/12 (67%, 39–86%) | 9/12 (75%, 47–91%) |
+| an evidence paragraph in the selected context | 17/109 (16%, 10–24%) | 22/109 (20%, 14–29%) |
+| … of those, in context the model read (a gate can refuse first) | 14/84 | 22/108 |
+| token F1, answerable questions | 0.046 | 0.061 |
+| token F1, every question (as QASPER's evaluator) | 0.15 | 0.19 |
+| median time per question | 11.4 s | 8.4 s |
+
+Intervals are Wilson 95%. Evidence counts answerable questions with a text evidence paragraph
+(tables and figures left out); a match is half of the paragraph's
+4-word runs in the context, because QASPER's text comes from LaTeX and RCA's from the PDF.
+
+Reading it:
+- **Questions that do not name their paper fail on a library.** As written, RCA answered 75 of
+  117 answerable questions, but only 30 from the paper asked about; 41 of the 117 refer to the
+  paper only as "they" or "their" and 5 more as "this paper". Naming the paper more than doubles
+  the right-paper answers (2.2x).
+- **Retrieval finds the paper, not the passage.** With the paper named, 88% of the context
+  (513 of 585 blocks) comes from the right paper, yet an evidence paragraph is in it for 22 of 109
+  questions. It is not the matcher: on the paper's whole PDF text the same match finds evidence
+  for 106 of 109. Over all 86 misses, a median 93% of the evidence's 4-word runs are in the paper
+  and 0.8% in the context (17 misses above 3%, 4 near misses at 44 to 49%).
+- **The opening of the paper fills the context.** Chunk 0 ranks first for 92 of 117 answerable
+  questions, and the paper's `src:` node, whose text is the same as chunk 0 in all 40 papers,
+  usually follows it, so two of five slots carry the same opening text. Why chunk 0 wins is a
+  hypothesis, not measured: every chunk's title is `<paper title> #N`, so title words lift all
+  of a paper's chunks equally, but chunk 0's text also holds the title, and the cross-encoder
+  scores only each hit's first 240 characters, which for chunk 0 is the title block. Worth
+  trying next, with an ablation: use a named paper to choose the source and rank its chunks by
+  the rest of the question, and drop a `src:` node whose text repeats a chunk already in context.
+- **Refusals follow.** With the right passage missing, the model often says the context does not
+  answer (41% of answerable questions refused). The 12 unanswerable questions are too few to read
+  much into the refusal rate.
+- **Token F1 is low by construction** and not comparable to QASPER papers that read the whole
+  paper: gold answers are short spans or yes/no (19 of 117), RCA writes sentences.
+- **Against the scorecard** (96% retrieval hit@5 and 86% answered with the right citation on our
+  own test split): hit@5 there counts the right paper in the top 5, a weaker test than the
+  passage match here, and our questions name their paper and use its terms. Which of the
+  differences explains the gap is not measured.
+
+Caveats: one run per form; 40 papers; the first full run answered from the wrong library and is
+not reported (its file, `qasper_20261119T120620Z.json`, stays local; fixed in `dabd0c7`, see
+CHANGELOG). Data, PDFs, library and run files are under
+`eval/external/` and `eval/results/` (not committed).
+
+---
+
 ## Current Status
 
 What is true today, independent of any single artifact:
@@ -743,6 +810,7 @@ What is true today, independent of any single artifact:
 - the split files cover that full corpus exactly
 - the eval schema tests pass against the updated corpus and split files
 - abstention has two measured parts: the pre-generation rerank gate (`rerank_max <= -3.618`, rechecked with `qwen3.5:4b` rewrites) and the facts check on hedged replies; an unanswerable question answered without any hedge passes both, so it is still the main open weakness
+- on questions written by others (QASPER, 40 unseen arXiv papers), RCA answers citing the right paper for 56% of answerable questions when the paper is named (26% when it is not), and the passage that answers is in the context for only 20%: the opening of the named paper fills the context (why is not yet measured)
 - citation support is measured but not checked at answer time: on test, 22 of 79 cited sentences are not fully backed by their block; the best per-sentence check caught 77% of not-supported cited sentences (natural and swapped) at 4.1 s per answer, below the bar for a "Supported" badge
 - a human-authored external subset would still be stronger for bias reduction than self-authored or model-authored additions
 
