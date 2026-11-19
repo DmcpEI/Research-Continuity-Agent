@@ -150,6 +150,13 @@ def library_settings(library: Path):
     )
 
 
+def asked_text(question: str, title: str, name_paper: bool) -> str:
+    """QASPER questions are written about one paper ("what data do they use?") and do not name
+    it; a person asking RCA, which searches a whole library, would."""
+    question = question.strip()
+    return f'In the paper "{title}": {question}' if name_paper else question
+
+
 def check_library(flow, settings) -> None:
     """Stop before asking anything if the flow would search another library (the user's)."""
     searched = Path(flow.retrieve_flow.graph_store.db_path).resolve()
@@ -187,7 +194,14 @@ def build_library(paper_ids: list[str], library: Path, fetch, ingest) -> dict[st
     return manifest
 
 
-def ask(flow, paper_ids: list[str], data: dict, manifest: dict, checkpoint: Path) -> list[dict]:
+def ask(
+    flow,
+    paper_ids: list[str],
+    data: dict,
+    manifest: dict,
+    checkpoint: Path,
+    name_paper: bool = False,
+) -> list[dict]:
     """One record per question on a paper that made it into the library, mixed ones included.
 
     Each record is appended to `checkpoint` as soon as it exists, and questions already there
@@ -212,8 +226,9 @@ def ask(flow, paper_ids: list[str], data: dict, manifest: dict, checkpoint: Path
                 if question["question_id"] in done:
                     records.append(done[question["question_id"]])
                     continue
+                text = asked_text(question["question"], data[paper_id].get("title", ""), name_paper)
                 record = _ask_one(
-                    flow, graph, question, manifest[paper_id]["source_id"], QueryTrace
+                    flow, graph, question, text, manifest[paper_id]["source_id"], QueryTrace
                 )
                 record = {"paper_id": paper_id, **record}
                 sink.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -227,8 +242,7 @@ def ask(flow, paper_ids: list[str], data: dict, manifest: dict, checkpoint: Path
     return records
 
 
-def _ask_one(flow, graph, question: dict, source_id: str, trace_type) -> dict:
-    text = question["question"].strip()
+def _ask_one(flow, graph, question: dict, text: str, source_id: str, trace_type) -> dict:
     record = {"question_id": question["question_id"], "kind": classify(question), "question": text}
     started = time.perf_counter()
     try:
@@ -244,6 +258,7 @@ def _ask_one(flow, graph, question: dict, source_id: str, trace_type) -> dict:
         "outcome": answer.outcome.value,
         "answer": answer.answer,
         "cited_sources": [citation.source_id for citation in answer.citations],
+        "context_node_ids": list(context_ids),
         "own_paper_cited": source_id in {citation.source_id for citation in answer.citations},
         # False when a gate refused before the model call: the context was selected, not read.
         "model_ran": any(stage.name == "llm_generate" for stage in (trace.stages if trace else [])),
@@ -303,6 +318,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=20261119)
     parser.add_argument("--library", type=Path, default=Path("eval/external/qasper/library"))
     parser.add_argument("--output-dir", type=Path, default=Path("eval/results"))
+    parser.add_argument(
+        "--name-paper",
+        action="store_true",
+        help='Ask "In the paper "<title>": <question>" instead of the question as written.',
+    )
     args = parser.parse_args(argv)
 
     from rca.flows.fetch_flow import fetch_paper, http_get
@@ -327,7 +347,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     commit = (provenance.get("code") or {}).get("commit") or "unknown"
     # One checkpoint per commit, so answers from different code are never mixed.
-    records = ask(flow, paper_ids, data, manifest, library / f"answers-{commit[:12]}.jsonl")
+    form = "-named" if args.name_paper else ""
+    records = ask(
+        flow,
+        paper_ids,
+        data,
+        manifest,
+        library / f"answers-{commit[:12]}{form}.jsonl",
+        name_paper=args.name_paper,
+    )
     summary = summarize(records)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -337,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "dataset": str(args.data),
                 "split": "test",
+                "question_form": "paper named" if args.name_paper else "as written",
                 "seed": args.seed,
                 "paper_ids": paper_ids,
                 "not_fetched": {k: v["error"] for k, v in manifest.items() if "error" in v},

@@ -258,6 +258,7 @@ def test_ask_records_a_failed_question_and_keeps_going(tmp_path):
     assert by_id["m1"]["kind"] == "mixed" and by_id["m1"]["outcome"] == "answered"
     # The rerank gate refused before the model ran: the evidence was selected, never read.
     assert by_id["a3"]["evidence_hit"] is True and by_id["a3"]["model_ran"] is False
+    assert by_id["a1"]["context_node_ids"] == ["c1"]
     assert len(checkpoint.read_text().splitlines()) == 4
 
 
@@ -294,3 +295,31 @@ def test_check_library_refuses_a_flow_that_reads_another_library(tmp_path):
     rq.check_library(flow(library / "graph.sqlite3"), settings)  # no error
     with pytest.raises(SystemExit, match="not the QASPER library"):
         rq.check_library(flow(tmp_path / ".rca" / "graph.sqlite3"), settings)
+
+
+def test_asked_text_names_the_paper_only_when_asked_to():
+    assert rq.asked_text(" What data? ", "A Paper", name_paper=False) == "What data?"
+    assert (
+        rq.asked_text(" What data? ", "A Paper", name_paper=True)
+        == 'In the paper "A Paper": What data?'
+    )
+
+
+def test_ask_sends_the_named_question_and_records_it(tmp_path):
+    graph = SimpleNamespace(get_node=lambda node_id: SimpleNamespace(text="x"))
+    sent: list[str] = []
+
+    class Recording(_Flow):
+        def generate_answer(self, question, trace=None):
+            sent.append(question)
+            return super().generate_answer("Q1", trace)
+
+    flow = Recording(graph, {"Q1": ("not_found", "No.", [], False)})
+    data = {"p1": {"title": "A Paper", "qas": [_paper_data()["p1"]["qas"][0]]}}
+
+    records = rq.ask(
+        flow, ["p1"], data, {"p1": {"source_id": "s"}}, tmp_path / "a.jsonl", name_paper=True
+    )
+
+    assert sent == ['In the paper "A Paper": Q1']
+    assert records[0]["question"] == 'In the paper "A Paper": Q1'
