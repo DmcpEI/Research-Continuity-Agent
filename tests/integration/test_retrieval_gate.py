@@ -42,6 +42,8 @@ def _settings(tmp_path: Path) -> Settings:
         enable_reranker=False,
         retrieval_reserve_new_source=True,
         retrieval_reserve_min_rerank_score=-6.0,
+        reranker_input="excerpt",
+        retrieval_skip_duplicate_source=True,
     )
 
 

@@ -94,8 +94,10 @@ class Settings(BaseSettings):
     # whole chunk ("text"). The rerank gate threshold is calibrated for one of them.
     reranker_input: Literal["excerpt", "text"] = "excerpt"
     # Leave out a paper's src: node when its text only repeats its first chunk (it always does
-    # for ingested files), so a paper's opening does not take two context slots.
-    retrieval_skip_duplicate_source: bool = False
+    # for ingested files), so a paper's opening does not take two context slots. On since
+    # 2026-11-19: QASPER evidence in context 22 -> 30 of 109, dev answers citing the expected
+    # paper 47 -> 52 of 62, retrieval hit@5 and the rerank gate unchanged (docs/EVAL.md).
+    retrieval_skip_duplicate_source: bool = True
     retrieval_fetch_limit: int = 20
     # Keep the top n-1 hits as ranked and give the last slot to the best-ranked paper
     # not already shown (lifts cross-paper hit@5; see eval/run_ablations.py).
