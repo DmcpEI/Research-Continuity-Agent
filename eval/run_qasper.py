@@ -99,15 +99,21 @@ def token_f1(prediction: str, golds: list[str]) -> float:
     for gold in golds:
         reference = _normalize(gold)
         common = sum((Counter(predicted) & Counter(reference)).values())
-        if not predicted or not reference:
-            score = float(predicted == reference)
-        elif common == 0:
+        if common == 0:  # also when either side is empty, as QASPER's scorer
             score = 0.0
         else:
             precision, recall = common / len(predicted), common / len(reference)
             score = 2 * precision * recall / (precision + recall)
         best = max(best, score)
     return best
+
+
+_MARKER = re.compile(r"\[\[(?:src|chk):[^\]]*\]\]")
+
+
+def answer_text(answer: str) -> str:
+    """The answer as a reader sees it: citation markers would each count as a wrong token."""
+    return _MARKER.sub("", answer)
 
 
 def paced(
@@ -174,50 +180,72 @@ def build_library(paper_ids: list[str], library: Path, fetch, ingest) -> dict[st
     return manifest
 
 
-def ask(flow, paper_ids: list[str], data: dict, manifest: dict) -> list[dict]:
-    """One record per non-mixed question on a paper that made it into the library."""
+def ask(flow, paper_ids: list[str], data: dict, manifest: dict, checkpoint: Path) -> list[dict]:
+    """One record per question on a paper that made it into the library, mixed ones included.
+
+    Each record is appended to `checkpoint` as soon as it exists, and questions already there
+    are not asked again, so a crash or a stop loses nothing. A question that raises is recorded
+    as an error and the run goes on.
+    """
     from rca.contracts.trace import QueryTrace
 
+    done = {}
+    if checkpoint.exists():
+        for line in checkpoint.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                record = json.loads(line)
+                done[record["question_id"]] = record
     graph = flow.retrieve_flow.graph_store
     records = []
-    for paper_id in paper_ids:
-        if "source_id" not in manifest.get(paper_id, {}):
-            continue
-        for question in data[paper_id]["qas"]:
-            kind = classify(question)
-            record = {"paper_id": paper_id, "question_id": question["question_id"], "kind": kind}
-            if kind == "mixed":
-                records.append(record)
+    with checkpoint.open("a", encoding="utf-8") as sink:
+        for paper_id in paper_ids:
+            if "source_id" not in manifest.get(paper_id, {}):
                 continue
-            started = time.perf_counter()
-            answer = flow.generate_answer(
-                question["question"].strip(), trace=QueryTrace(query=question["question"])
-            )
-            seconds = time.perf_counter() - started
-            context_ids = answer.trace.context_node_ids if answer.trace else []
-            texts = [
-                node.text or "" for node_id in context_ids if (node := graph.get_node(node_id))
-            ]
-            refused = answer.outcome.value == "not_found"
-            record |= {
-                "question": question["question"].strip(),
-                "outcome": answer.outcome.value,
-                "answer": answer.answer,
-                "cited_sources": [citation.source_id for citation in answer.citations],
-                "own_paper_cited": manifest[paper_id]["source_id"]
-                in {citation.source_id for citation in answer.citations},
-                "evidence_hit": evidence_hit(text_evidence(question), texts),
-                "answer_f1": token_f1(
-                    REFUSAL if refused else answer.answer, gold_answers(question)
-                ),
-                "seconds": round(seconds, 2),
-            }
-            print(
-                f"{record['question_id'][:10]} {kind:12} {record['outcome']:12} ev={record['evidence_hit']}",
-                flush=True,
-            )
-            records.append(record)
+            for question in data[paper_id]["qas"]:
+                if question["question_id"] in done:
+                    records.append(done[question["question_id"]])
+                    continue
+                record = _ask_one(
+                    flow, graph, question, manifest[paper_id]["source_id"], QueryTrace
+                )
+                record = {"paper_id": paper_id, **record}
+                sink.write(json.dumps(record, ensure_ascii=False) + "\n")
+                sink.flush()
+                print(
+                    f"{record['question_id'][:10]} {record['kind']:12} {record['outcome']:12}"
+                    f" ev={record.get('evidence_hit')}",
+                    flush=True,
+                )
+                records.append(record)
     return records
+
+
+def _ask_one(flow, graph, question: dict, source_id: str, trace_type) -> dict:
+    text = question["question"].strip()
+    record = {"question_id": question["question_id"], "kind": classify(question), "question": text}
+    started = time.perf_counter()
+    try:
+        answer = flow.generate_answer(text, trace=trace_type(query=text))
+    except Exception as exc:  # one failed question, e.g. a model timeout, is not a lost run
+        return record | {"outcome": "error", "error": f"{type(exc).__name__}: {exc}"}
+    seconds = time.perf_counter() - started
+    trace = answer.trace
+    context_ids = trace.context_node_ids if trace else []
+    texts = [node.text or "" for node_id in context_ids if (node := graph.get_node(node_id))]
+    refused = answer.outcome.value == "not_found"
+    return record | {
+        "outcome": answer.outcome.value,
+        "answer": answer.answer,
+        "cited_sources": [citation.source_id for citation in answer.citations],
+        "own_paper_cited": source_id in {citation.source_id for citation in answer.citations},
+        # False when a gate refused before the model call: the context was selected, not read.
+        "model_ran": any(stage.name == "llm_generate" for stage in (trace.stages if trace else [])),
+        "evidence_hit": evidence_hit(text_evidence(question), texts),
+        "answer_f1": token_f1(
+            REFUSAL if refused else answer_text(answer.answer), gold_answers(question)
+        ),
+        "seconds": round(seconds, 2),
+    }
 
 
 def summarize(records: list[dict]) -> dict[str, Any]:
@@ -225,16 +253,19 @@ def summarize(records: list[dict]) -> dict[str, Any]:
         low, high = wilson_interval(hits, n) if n else (None, None)
         return {"hits": hits, "n": n, "lower": low, "upper": high}
 
-    answerable = [r for r in records if r["kind"] == "answerable"]
-    unanswerable = [r for r in records if r["kind"] == "unanswerable"]
+    asked = [r for r in records if r.get("outcome") != "error"]
+    answerable = [r for r in asked if r["kind"] == "answerable"]
+    unanswerable = [r for r in asked if r["kind"] == "unanswerable"]
     with_evidence = [r for r in answerable if r["evidence_hit"] is not None]
-    asked = answerable + unanswerable
+    read = [r for r in with_evidence if r["model_ran"]]
     return {
         "questions": len(records),
-        "mixed_dropped": sum(r["kind"] == "mixed" for r in records),
-        "evidence_in_context": share(
+        "errors": len(records) - len(asked),
+        "mixed": sum(r["kind"] == "mixed" for r in records),
+        "evidence_in_selected_context": share(
             sum(r["evidence_hit"] for r in with_evidence), len(with_evidence)
         ),
+        "evidence_reached_model": share(sum(r["evidence_hit"] for r in read), len(read)),
         "answerable_answered_citing_its_paper": share(
             sum(r["outcome"] == "answered" and r["own_paper_cited"] for r in answerable),
             len(answerable),
@@ -247,6 +278,12 @@ def summarize(records: list[dict]) -> dict[str, Any]:
         ),
         "answer_f1_answerable_mean": round(statistics.mean(r["answer_f1"] for r in answerable), 3)
         if answerable
+        else None,
+        # As QASPER's own evaluator: every question, mixed included, an error scoring 0.
+        "answer_f1_all_questions_mean": round(
+            statistics.mean(r.get("answer_f1", 0.0) for r in records), 3
+        )
+        if records
         else None,
         "median_seconds": statistics.median(r["seconds"] for r in asked) if asked else None,
     }
@@ -280,7 +317,9 @@ def main(argv: list[str] | None = None) -> int:
     provenance = collect_provenance(
         settings, flow.retrieve_flow.graph_store, flow.retrieve_flow.vector_store
     )
-    records = ask(flow, paper_ids, data, manifest)
+    commit = (provenance.get("code") or {}).get("commit") or "unknown"
+    # One checkpoint per commit, so answers from different code are never mixed.
+    records = ask(flow, paper_ids, data, manifest, library / f"answers-{commit[:12]}.jsonl")
     summary = summarize(records)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     args.output_dir.mkdir(parents=True, exist_ok=True)
