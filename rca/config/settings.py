@@ -90,6 +90,12 @@ class Settings(BaseSettings):
     llm_keep_alive: int | str = "1m"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     reranker_top_k: int = 10
+    # What the cross-encoder reads of each hit: its first 240 characters ("excerpt") or the
+    # whole chunk ("text"). The rerank gate threshold is calibrated for one of them.
+    reranker_input: Literal["excerpt", "text"] = "excerpt"
+    # Leave out a paper's src: node when its text only repeats its first chunk (it always does
+    # for ingested files), so a paper's opening does not take two context slots.
+    retrieval_skip_duplicate_source: bool = False
     retrieval_fetch_limit: int = 20
     # Keep the top n-1 hits as ranked and give the last slot to the best-ranked paper
     # not already shown (lifts cross-paper hit@5; see eval/run_ablations.py).
@@ -174,6 +180,8 @@ class Settings(BaseSettings):
             "RCA_LLM_KEEP_ALIVE": "llm_keep_alive",
             "RCA_RERANKER_MODEL": "reranker_model",
             "RCA_RERANKER_TOP_K": "reranker_top_k",
+            "RCA_RERANKER_INPUT": "reranker_input",
+            "RCA_RETRIEVAL_SKIP_DUPLICATE_SOURCE": "retrieval_skip_duplicate_source",
             "RCA_RETRIEVAL_FETCH_LIMIT": "retrieval_fetch_limit",
             "RCA_RETRIEVAL_RESERVE_NEW_SOURCE": "retrieval_reserve_new_source",
             "RCA_RETRIEVAL_RESERVE_MIN_RERANK_SCORE": "retrieval_reserve_min_rerank_score",

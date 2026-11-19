@@ -28,6 +28,8 @@ RESULT_SETTINGS = (
     "facts_check_enabled",
     "reranker_model",
     "reranker_top_k",
+    "reranker_input",
+    "retrieval_skip_duplicate_source",
     "retrieval_fetch_limit",
     "retrieval_reserve_new_source",
     "retrieval_reserve_min_rerank_score",

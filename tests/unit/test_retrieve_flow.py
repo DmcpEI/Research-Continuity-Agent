@@ -582,3 +582,90 @@ def test_a_reranker_failure_is_reported_on_the_bundle() -> None:
     bundle = flow.retrieve("alpha", limit=3, trace=QueryTrace(query="alpha"))
     assert bundle.hits  # still answers, unranked
     assert bundle.rerank_error == "RuntimeError: model not loaded"
+
+
+def _store_with_opening_twice():
+    """A paper whose src: node repeats chunk 0's text, as ingest writes it."""
+    opening = "Paper Title. Authors. Abstract about the method."
+    nodes = {
+        "src:pdf/a": Node(id="src:pdf/a", kind=NodeKind.paper, title="A", text=opening),
+        "chk:pdf/a:0000": Node(
+            id="chk:pdf/a:0000", kind=NodeKind.chunk, title="A #1", text=opening
+        ),
+        "chk:pdf/a:0004": Node(
+            id="chk:pdf/a:0004", kind=NodeKind.chunk, title="A #5", text="The results section."
+        ),
+    }
+
+    class StubGraphStore:
+        def search_nodes(self, query: str, limit: int = 10) -> list[Node]:
+            return []
+
+        def get_node(self, node_id: str) -> Node | None:
+            return nodes.get(node_id)
+
+        def list_edges(self, node_id: str) -> list[Edge]:
+            if node_id.startswith("chk:"):
+                return [Edge(source="src:pdf/a", target=node_id, kind=EdgeKind.contains)]
+            return []
+
+    class StubVectorStore:
+        backend_warning = None
+
+        def query(self, query: str, limit: int = 10) -> list[VectorQueryResult]:
+            return [
+                VectorQueryResult(
+                    id="chk:pdf/a:0004", score=0.9, document="The results section.", metadata={}
+                )
+            ]
+
+    return StubGraphStore(), StubVectorStore()
+
+
+def _flow(skip: bool | None):
+    flow = object.__new__(RetrieveFlow)
+    flow.settings = SimpleNamespace(retrieval_fetch_limit=20, reranker_top_k=10)
+    if skip is not None:
+        flow.settings.retrieval_skip_duplicate_source = skip
+    flow.graph_store, flow.vector_store = _store_with_opening_twice()
+    flow._reranker = None
+    return flow
+
+
+def test_a_source_node_repeating_its_first_chunk_is_left_out_when_asked() -> None:
+    assert [h.node_id for h in _flow(skip=True).retrieve("results", limit=5).hits] == [
+        "chk:pdf/a:0004"
+    ]
+    # Default (and settings objects without the field): unchanged behaviour.
+    assert "src:pdf/a" in [h.node_id for h in _flow(skip=False).retrieve("results", limit=5).hits]
+    assert "src:pdf/a" in [h.node_id for h in _flow(skip=None).retrieve("results", limit=5).hits]
+
+
+def test_a_source_node_with_its_own_text_is_kept() -> None:
+    flow = _flow(skip=True)
+    original_get = flow.graph_store.get_node
+
+    def get_node(node_id):
+        node = original_get(node_id)
+        if node_id == "src:pdf/a":
+            return node.model_copy(update={"text": "A summary written separately."})
+        return node
+
+    flow.graph_store.get_node = get_node
+
+    assert "src:pdf/a" in [h.node_id for h in flow.retrieve("results", limit=5).hits]
+
+
+def test_retrieve_flow_builds_the_reranker_with_the_configured_input(tmp_path) -> None:
+    from rca.config.settings import Settings
+
+    def settings(**extra):
+        return Settings(
+            data_dir=tmp_path,
+            graph_db_path=tmp_path / "graph.sqlite3",
+            vector_dir=tmp_path / "vectors",
+            **extra,
+        )
+
+    assert RetrieveFlow(settings=settings())._reranker.input_field == "excerpt"
+    assert RetrieveFlow(settings=settings(reranker_input="text"))._reranker.input_field == "text"

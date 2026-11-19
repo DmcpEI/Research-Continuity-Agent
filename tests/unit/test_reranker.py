@@ -114,3 +114,25 @@ def test_errors_are_recorded_as_one_short_line(mock_ce_cls, exc, expected) -> No
     reranker = CrossEncoderReranker()
     reranker.load()
     assert reranker.error == expected
+
+
+def test_rerank_scores_the_full_text_when_configured() -> None:
+    from rca.flows.retrieve_flow import RetrievalHit
+    from rca.retrieval.reranker import CrossEncoderReranker
+
+    seen: list[tuple[str, str]] = []
+
+    class Model:
+        def predict(self, pairs):
+            seen.extend(pairs)
+            return [0.0 for _ in pairs]
+
+    hit = RetrievalHit(
+        node_id="c", score=0.5, title="T", excerpt="first 240", text="the whole chunk"
+    )
+    for field, expected in (("excerpt", "first 240"), ("text", "the whole chunk")):
+        seen.clear()
+        reranker = CrossEncoderReranker(input_field=field)
+        reranker._loaded = Model()
+        reranker.rerank("q", [hit])
+        assert seen == [("q", expected)]

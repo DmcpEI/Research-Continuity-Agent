@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from rca.config.settings import Settings, get_settings
+from rca.contracts.ids import make_chunk_id
 from rca.contracts.nodes import Edge, EdgeKind
 from rca.contracts.trace import HitProvenance, QueryTrace, StageTrace
 from rca.retrieval.query_classifier import QueryType
@@ -123,7 +124,9 @@ class RetrieveFlow:
             self.settings.vector_dir, self.settings.default_collection
         )
         self._reranker: CrossEncoderReranker | None = (
-            CrossEncoderReranker(self.settings.reranker_model)
+            CrossEncoderReranker(
+                self.settings.reranker_model, input_field=self.settings.reranker_input
+            )
             if self.settings.enable_reranker
             else None
         )
@@ -227,6 +230,8 @@ class RetrieveFlow:
             )
 
         final_hits = ordered_hits + source_hits_new
+        if getattr(settings, "retrieval_skip_duplicate_source", False):
+            final_hits = [hit for hit in final_hits if not self._repeats_first_chunk(hit)]
         for hit in source_hits_new:
             hit_stages[hit.node_id] = "expansion"
 
@@ -316,6 +321,16 @@ class RetrieveFlow:
                 text=result.document,
                 metadata=metadata,
             )
+
+    def _repeats_first_chunk(self, hit: RetrievalHit) -> bool:
+        """A src: node whose text is its first chunk's text adds nothing a chunk cannot."""
+        if not hit.node_id.startswith("src:") or not hit.text:
+            return False
+        try:
+            first = self.graph_store.get_node(make_chunk_id(hit.node_id, 0))
+        except ValueError:  # not a standard source ID: nothing to compare with
+            return False
+        return first is not None and first.text == hit.text
 
     def _expand_to_sources(self, hits: list[RetrievalHit]) -> list[RetrievalHit]:
         """Follow chunk → source edges to surface parent paper nodes."""

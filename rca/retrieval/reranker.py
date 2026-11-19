@@ -38,9 +38,13 @@ class CrossEncoderReranker:
     """Cross-encoder reranker. `error` holds the last load or scoring failure until a success."""
 
     def __init__(
-        self, model_name: str = DEFAULT_MODEL, clock: Callable[[], float] = time.monotonic
+        self,
+        model_name: str = DEFAULT_MODEL,
+        clock: Callable[[], float] = time.monotonic,
+        input_field: str = "excerpt",
     ) -> None:
         self.model_name = model_name
+        self.input_field = input_field  # "excerpt" (first 240 characters) or "text"
         self.error: str | None = None
         self._loaded = None
         self._lock = threading.Lock()  # one load at a time, also on Python 3.12+
@@ -84,7 +88,9 @@ class CrossEncoderReranker:
         if keep == 0:
             return []
 
-        pairs = [(query, hit.excerpt or hit.title) for hit in hits]
+        pairs = [
+            (query, getattr(hit, self.input_field) or hit.excerpt or hit.title) for hit in hits
+        ]
         try:
             scores = self._model().predict(pairs)
         except RerankerRetryLater:
