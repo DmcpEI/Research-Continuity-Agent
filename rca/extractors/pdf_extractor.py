@@ -30,5 +30,11 @@ class PDFExtractor:
             "title": pdf_path.stem,
             "content": "\n\n".join(pages).strip(),
             "sections": sections,
-            "metadata": {"kind": "pdf", "path": str(pdf_path), "page_count": len(reader.pages)},
+            "metadata": {
+                "kind": "pdf",
+                "path": str(pdf_path),
+                "page_count": len(reader.pages),
+                # Pages with no text layer (scanned): RCA has no OCR, so they are not searchable.
+                "pages_without_text": len(reader.pages) - len(pages),
+            },
         }

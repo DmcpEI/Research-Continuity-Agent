@@ -74,6 +74,9 @@ export type ApiSourceSummary = {
   latest_revision_created_at: string | null;
   // An ingest wrote the graph but did not finish; absent from older servers.
   incomplete?: boolean;
+  // PDFs only: pages with no text layer (scanned), which RCA cannot search.
+  page_count?: number | null;
+  pages_without_text?: number | null;
 };
 
 export type ApiRevision = {

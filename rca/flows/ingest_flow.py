@@ -22,6 +22,25 @@ from rca.store.graph_store import GraphStore
 from rca.store.vector_store import VectorStore
 
 
+class EmptyDocumentError(ValueError):
+    """The file has no text to index (no letter or digit), so nothing is written."""
+
+    def __init__(self, file_name: str, kind: str | None, page_count: int | None) -> None:
+        self.kind = kind
+        self.page_count = page_count
+        super().__init__(self.for_file(file_name))
+
+    def for_file(self, file_name: str) -> str:
+        """The message, naming the file as the user knows it (an upload is stored renamed)."""
+        if self.kind == "pdf":
+            pages = self.page_count or 0
+            return (
+                f"No text found in {file_name} ({pages} page{'s' if pages != 1 else ''}). "
+                "It may be a scanned PDF: RCA reads a PDF's text layer and has no OCR."
+            )
+        return f"No text found in {file_name}."
+
+
 class IngestResult(BaseModel):
     source_id: str
     chunk_ids: list[str] = Field(default_factory=list)
@@ -68,6 +87,11 @@ class IngestFlow:
     def ingest_path(self, path: str | Path) -> IngestResult:
         source_path = Path(path)
         payload = self._extract(source_path)
+        if not any(char.isalnum() for char in payload["content"]):
+            metadata = payload["metadata"]
+            raise EmptyDocumentError(
+                source_path.name, metadata.get("kind"), metadata.get("page_count")
+            )
         ingest_name = self._normalize_ingest_name(source_path)
         file_sha256 = self._file_sha256(source_path)
         content_sha256 = self._content_sha256(payload["content"])

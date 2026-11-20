@@ -537,6 +537,65 @@ def test_fetch_rejects_a_missing_identifier(tmp_path: Path) -> None:
     assert client.post("/sources/fetch", json={}).status_code == 422
 
 
+def test_uploading_a_pdf_with_no_text_says_why_and_keeps_nothing(tmp_path: Path) -> None:
+    from rca.flows.ingest_flow import IngestFlow
+    from tests.pdf_fixtures import make_pdf
+
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    flow = IngestFlow(settings, graph_store=store, vector_store=vectors)
+    client = TestClient(
+        create_app(settings=settings, graph_store=store, vector_store=vectors, ingest_flow=flow)
+    )
+
+    response = client.post(
+        "/sources/ingest", files={"file": ("scan.pdf", make_pdf([None]), "application/pdf")}
+    )
+
+    assert response.status_code == 422
+    assert "No text found in scan.pdf" in response.json()["detail"]
+    # A second blank upload under the same name is stored as scan-1.pdf until it is refused;
+    # the message still names the file the user sent.
+    client.post(
+        "/sources/ingest", files={"file": ("real.pdf", make_pdf(["Real text."]), "application/pdf")}
+    )
+    again = client.post(
+        "/sources/ingest", files={"file": ("real.pdf", make_pdf([None, None]), "application/pdf")}
+    )
+    assert again.status_code == 422
+    assert "No text found in real.pdf (2 pages)" in again.json()["detail"]
+    assert "scanned" in response.json()["detail"]
+    assert [p.name for p in (tmp_path / ".rca" / "uploads").iterdir() if p.is_file()] == [
+        "real.pdf"
+    ]
+    assert [s["id"] for s in client.get("/sources").json()] == ["src:pdf/real"]
+
+
+def test_sources_report_pages_without_text(tmp_path: Path) -> None:
+    from rca.flows.ingest_flow import IngestFlow
+    from tests.pdf_fixtures import make_pdf
+
+    settings = _settings_for(tmp_path)
+    store = GraphStore(settings.graph_db_path)
+    vectors = VectorStore(settings.vector_dir, settings.default_collection)
+    flow = IngestFlow(settings, graph_store=store, vector_store=vectors)
+    client = TestClient(
+        create_app(settings=settings, graph_store=store, vector_store=vectors, ingest_flow=flow)
+    )
+    pdf = make_pdf(["A cover page that has text on it.", None, None])
+
+    assert (
+        client.post(
+            "/sources/ingest", files={"file": ("mixed.pdf", pdf, "application/pdf")}
+        ).status_code
+        == 200
+    )
+
+    [source] = client.get("/sources").json()
+    assert (source["page_count"], source["pages_without_text"]) == (3, 2)
+
+
 def test_sources_never_flag_a_source_from_before_revision_tracking(tmp_path: Path) -> None:
     settings = _settings_for(tmp_path)
     store = GraphStore(settings.graph_db_path)

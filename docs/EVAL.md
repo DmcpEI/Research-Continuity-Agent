@@ -828,6 +828,26 @@ CHANGELOG). Data, PDFs, library and run files are under
 
 ---
 
+## Ingest by origin (step 17b)
+
+What backs each kind of input, checked 2026-11-20:
+
+| Origin | Evidence | Result |
+|---|---|---|
+| arXiv two-column PDFs (ACL style) | QASPER library, 40 papers | evidence paragraphs found in the PDF text for 106 of 109 questions (4-word-run match against QASPER's LaTeX text) |
+| Publisher PDFs (IEEE, MDPI) and reports | the user's library, 25 sources | scorecard retrieval 27/28 |
+| A long document | generated 300-page PDF, one 2,600-character line of text a page, temp library | 899 chunks in 17 s with `nomic-embed-text`; a sentence from page 250 retrieved in the top 5 |
+| A scanned PDF (no text layer) | generated blank pages | refused with a message (was: accepted as an empty source) |
+| A partly scanned PDF | text cover page and blank pages | ingested; the Library says "3 of 4 pages have no text (scanned?)" |
+| Notes, experiment files, git repositories | extractor and ingest tests | refused when there is not a single letter or digit: an empty note, a note of only `#` or invisible characters, an empty or `{}` JSON or YAML experiment file |
+
+Limits: no OCR; tables and figures are read only as whatever text the PDF holds (QASPER's
+table-only evidence was left out for that reason); the long-document check is synthetic, one line
+of text per page; a PDF whose only text is page numbers passes the check; PDFs already in the
+library get their page counts only when their content changes.
+
+---
+
 ## Current Status
 
 What is true today, independent of any single artifact:

@@ -38,3 +38,18 @@ describe('SourceRow incomplete flag', () => {
     expect(screen.queryByText(/Not fully indexed/)).toBeNull();
   });
 });
+
+describe('SourceRow pages without text', () => {
+  it('says how many pages could not be read', () => {
+    renderRow(source({ page_count: 10, pages_without_text: 3 }));
+
+    expect(screen.getByText('3 of 10 pages have no text (scanned?)')).toBeTruthy();
+  });
+
+  it('says nothing when every page has text, or for older servers', () => {
+    renderRow(source({ page_count: 10, pages_without_text: 0 }));
+    renderRow(source());
+
+    expect(screen.queryByText(/pages have no text/)).toBeNull();
+  });
+});

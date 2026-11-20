@@ -286,3 +286,69 @@ def test_ingest_writes_no_event_log(tmp_path, monkeypatch) -> None:
     IngestFlow(settings=_settings_for(tmp_path)).ingest_path(note_path)
 
     assert not list(tmp_path.rglob("events.jsonl"))
+
+
+def test_a_pdf_with_no_text_is_refused_and_nothing_is_written(tmp_path) -> None:
+    from rca.flows.ingest_flow import EmptyDocumentError
+    from tests.pdf_fixtures import make_pdf
+
+    path = tmp_path / "scanned.pdf"
+    path.write_bytes(make_pdf([None, None]))
+    flow = IngestFlow(settings=_settings_for(tmp_path))
+
+    with pytest.raises(
+        EmptyDocumentError, match=r"No text found in scanned\.pdf \(2 pages\).*scanned"
+    ):
+        flow.ingest_path(path)
+
+    assert flow.graph_store.get_node("src:pdf/scanned") is None
+
+
+def test_an_empty_note_is_refused(tmp_path) -> None:
+    from rca.flows.ingest_flow import EmptyDocumentError
+
+    path = tmp_path / "empty.md"
+    path.write_text("   \n\n", encoding="utf-8")
+    flow = IngestFlow(settings=_settings_for(tmp_path))
+
+    with pytest.raises(EmptyDocumentError, match=r"No text found in empty\.md"):
+        flow.ingest_path(path)
+    assert flow.graph_store.get_node(make_source_id("note", "empty")) is None
+
+
+def test_a_file_that_became_empty_keeps_its_previous_version(tmp_path) -> None:
+    from rca.flows.ingest_flow import EmptyDocumentError
+
+    path = tmp_path / "note.md"
+    path.write_text("# Note\n\nreal content here\n", encoding="utf-8")
+    flow = IngestFlow(settings=_settings_for(tmp_path))
+    first = flow.ingest_path(path)
+
+    path.write_text("", encoding="utf-8")
+    with pytest.raises(EmptyDocumentError):
+        flow.ingest_path(path)
+
+    assert flow.graph_store.list_source_chunk_ids(first.source_id) == first.chunk_ids
+    assert len(flow.graph_store.list_source_revisions(first.source_id)) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "body"),
+    [
+        ("e.yaml", ""),
+        ("t.yml", "~\n"),
+        ("o.json", "{}"),
+        ("zw.md", "​​\n"),
+        ("nul.md", "\x00\x00"),
+        ("hash.md", "#\n"),
+    ],
+)
+def test_files_with_no_letters_or_digits_are_refused(tmp_path, name, body) -> None:
+    from rca.flows.ingest_flow import EmptyDocumentError
+
+    path = tmp_path / name
+    path.write_text(body, encoding="utf-8")
+    flow = IngestFlow(settings=_settings_for(tmp_path))
+
+    with pytest.raises(EmptyDocumentError):
+        flow.ingest_path(path)

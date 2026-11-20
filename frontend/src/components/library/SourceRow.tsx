@@ -96,6 +96,11 @@ export function SourceRow({ source, onOpen, selected = false, onContextMenu }: S
       <td>
         <p className="library-source-title">{source.title || 'Untitled source'}</p>
         <p className="library-source-id">{source.id}</p>
+        {source.pages_without_text && source.page_count ? (
+          <p className="library-source-warning">
+            {source.pages_without_text} of {source.page_count} pages have no text (scanned?)
+          </p>
+        ) : null}
         {source.incomplete ? (
           <p className="library-source-warning">Not fully indexed: upload it again to repair</p>
         ) : null}

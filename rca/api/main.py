@@ -29,7 +29,7 @@ from rca.config.settings import Settings, get_settings
 from rca.contracts.nodes import NodeKind
 from rca.flows.fetch_flow import FetchedPaper, FetchError, fetch_paper
 from rca.flows.generate_flow import GeneratedAnswer, GenerateFlow
-from rca.flows.ingest_flow import IngestFlow, IngestResult
+from rca.flows.ingest_flow import EmptyDocumentError, IngestFlow, IngestResult
 from rca.flows.retrieve_flow import RetrieveFlow
 from rca.llm.models import (
     agent_model_choices,
@@ -159,6 +159,8 @@ def create_app(
                         latest_revision.created_at.isoformat() if latest_revision else None
                     ),
                     "incomplete": store.source_is_incomplete(source_id),
+                    "page_count": metadata.get("page_count"),
+                    "pages_without_text": metadata.get("pages_without_text"),
                 }
             )
         return response
@@ -608,7 +610,10 @@ def create_app(
         original_name = Path(file.filename).name
         if Path(original_name).suffix.lower() != ".pdf":
             raise HTTPException(status_code=400, detail="Only .pdf files are supported")
-        return store_and_ingest(file.file.read, original_name).model_dump(mode="json")
+        try:
+            return store_and_ingest(file.file.read, original_name).model_dump(mode="json")
+        except EmptyDocumentError as exc:
+            raise HTTPException(status_code=422, detail=exc.for_file(original_name)) from exc
 
     @router.post("/sources/fetch")
     def fetch_source(payload: FetchRequest) -> dict[str, Any]:
@@ -616,7 +621,10 @@ def create_app(
             paper = fetcher(payload.identifier)
         except FetchError as exc:
             raise HTTPException(status_code=exc.status, detail=str(exc)) from exc
-        result = store_and_ingest(io.BytesIO(paper.pdf).read, paper.file_name)
+        try:
+            result = store_and_ingest(io.BytesIO(paper.pdf).read, paper.file_name)
+        except EmptyDocumentError as exc:
+            raise HTTPException(status_code=422, detail=exc.for_file(paper.file_name)) from exc
         # After the ingest, so it is recorded even when the file was already in the library.
         store.set_metadata_field(result.source_id, "origin", paper.origin)
         return {**result.model_dump(mode="json"), "title": paper.title, "origin": paper.origin}
