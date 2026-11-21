@@ -848,6 +848,60 @@ library get their page counts only when their content changes.
 
 ---
 
+## Distilling the facts check (step 15)
+
+Question: can a small model make the facts check's decision (on a hedged reply: useful, or
+decline) instead of the second `qwen3.5:4b` call? Result: **no, not this one.** It catches every
+decline but drops many useful partial answers (4 of 6 on test, 26 of 58 on held-out papers), so
+the LLM call stays.
+
+Set-up (`eval/distil_facts_check.py`, design in the plan):
+- Teacher labels: 600 seeded library chunks (seed `20261121`), three generated questions each
+  (answered by the chunk, not answered, false premise), asked through `GenerateFlow` on a copy of
+  the library with the shipped facts check, commit `f91197b`. 1,800 questions, 1,749 reached the
+  model, 978 hedged and labelled by the check: 726 declines, 252 useful. 3 questions were dropped
+  as close to a golden question, 4 more at training time as close to a hand-labelled one; the
+  nearest trained question to any test question has word overlap 0.33 at most, and none is a
+  paraphrase (the closest pair, both about ViLaIn's symbolic planner, asks different things).
+- Hardware: built and trained on knuth (RTX PRO 6000 Blackwell) with the laptop's exact model
+  files (MLX nvfp4 build) on Ollama 0.40.15. On 30 chunks run on both, knuth agreed with the
+  laptop on the check's decision 39/44 times and with a second knuth run 38/40 times: the runner
+  is not deterministic at temperature 0, and at this size there is no clear extra difference from
+  the machine.
+- Student: `cross-encoder/ms-marco-MiniLM-L-6-v2` (22M), question and answer as a pair,
+  binary cross-entropy, 4 epochs, 5 of 25 papers held out. Dev hand labels picked epoch 2 (tied with
+  epoch 3 at 25/31; ties go to the earlier) and the threshold (0.311). The test hand labels were scored once, afterwards.
+
+Hedged hand-labelled answers (the only ones the check sees), useful = `answered` or `partial`:
+
+| | facts check (LLM, offline run of 2026-11-09, same 14 test answers) | student |
+|---|---|---|
+| test: declines caught | 8/8 | 8/8 |
+| test: useful kept | 5/6 | 2/6 |
+| test: agree | 13/14 | 10/14 |
+| dev: agree (student threshold tuned on it) | 24/31 | 25/31 |
+| held-out papers: agrees with the teacher | | 158/194 (81%) |
+| time per answer | 1.7 s median in the step 3 run | 9 ms CPU, 69 ms MPS (M3 Pro, one answer at a time) |
+
+The ship bar, set before training, was test at least 13/14 with no decline missed and held-out
+agreement at least 90%. It fails both. In the whole test pipeline the student would keep 23 of
+27 useful answers instead of 26.
+
+What the numbers say: the student learned "a hedge means decline" well (8/8 test, 126/136
+held-out declines) and partial answers badly (32 of 58 held-out useful replies kept). Those are
+the answers that say something is missing and then give part of it; the teacher tells them apart
+by listing the facts the answer gives, which a 22M classifier reading the whole reply does not
+reproduce from 252 useful examples. Small numbers: 14 test answers, 6 of them useful, so 2/6
+versus 5/6 is a big gap on very few cases.
+
+Not tried (each would need a new held-out split, since this one has been looked at): weighting
+the useful class (726 to 252), more useful examples (more false-premise questions, which gave the
+most), a larger encoder, or distilling the facts list instead of the decision. Artifacts (teacher
+JSONL, model, `student.json`): scratchpad and knuth only, not committed. The laptop's stopped
+partial build (about 290 chunks) is kept apart and not used.
+
+---
+
 ## Current Status
 
 What is true today, independent of any single artifact:

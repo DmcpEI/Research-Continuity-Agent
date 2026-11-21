@@ -30,6 +30,7 @@ Measured separately, not part of the scorecard:
 |---|---|---|
 | Agent benchmark, 20 sandboxed tasks, default `qwen3.5:4b` (2026-11-12, two runs) | `18/20` tasks both runs, invalid tool calls `2` (was `11`) | [EVAL.md → Agent Evaluation](docs/EVAL.md#agent-evaluation) |
 | QASPER: 147 questions written by others about 40 unseen arXiv papers (2026-11-19) | answered citing the right paper `75/117` with the paper named (`30/117` as written); the answering passage is in the context for `30/109` | [EVAL.md → QASPER](docs/EVAL.md#qasper-questions-written-by-others-step-17a) |
+| A 22M cross-encoder trained on 978 facts-check decisions, to replace that LLM call (2026-11-21) | not shipped: `10/14` hedged test answers right against the LLM's `13/14` (it drops useful partial answers), at 9 ms instead of about 1.7 s | [EVAL.md → Distilling the facts check](docs/EVAL.md#distilling-the-facts-check-step-15) |
 | Retrieval regression gate in CI | fails the build when any fixture question ranks worse | [EVAL.md → CI Retrieval Gate](docs/EVAL.md#ci-retrieval-gate) |
 
 Golden set: 129 questions, 39 of them unanswerable, split 89 dev (tuning) / 40 test (reported above). Known gaps: [Known Limitations](docs/EVAL.md#known-limitations).
