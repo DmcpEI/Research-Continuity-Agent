@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import random
 import re
 import statistics
@@ -277,6 +278,8 @@ def _answer(flow, base: dict, kind: str, question: str, golden: list[str], trace
 def _device() -> str:
     import torch
 
+    if torch.cuda.is_available():
+        return "cuda"
     return "mps" if torch.backends.mps.is_available() else "cpu"
 
 
@@ -399,6 +402,7 @@ def train(args) -> int:
         json.dumps(
             {
                 "base_model": BASE_MODEL,
+                "trained_on": f"{platform.node()} ({device})",
                 "data": str(args.data),
                 "seed": args.seed,
                 "held_out_papers": sorted({r["paper"] for r in held_records}),
